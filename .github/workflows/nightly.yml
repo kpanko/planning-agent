@@ -30,4 +30,4 @@ jobs:
 
       - name: Run nightly script
         run: |
-          poetry run python main.py
+          poetry run python src/todoistScheduler/main.py
