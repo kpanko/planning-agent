@@ -100,4 +100,4 @@ MIT
 
 ## Author
 
-Kevin Panko (pankok@gmail.com)
+Kevin Panko
