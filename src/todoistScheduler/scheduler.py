@@ -1,20 +1,22 @@
 import re
 from datetime import date, timedelta
 import logging
-from typing import List, Optional
+from typing import List, Optional, Tuple, TypeVar
 
 from todoist_api_python.api import TodoistAPI
 from todoist_api_python.models import Task
 
+T = TypeVar('T')
+
 
 class Scheduler:
-    def __init__(self, api: TodoistAPI, today: date, tasks_per_day: int, ignore_tag: str):
-        self.api = api
-        self.today = today
-        self.tasks_per_day = tasks_per_day
-        self.ignore_tag = ignore_tag
+    def __init__(self, api: TodoistAPI, today: date, tasks_per_day: int, ignore_tag: str) -> None:
+        self.api: TodoistAPI = api
+        self.today: date = today
+        self.tasks_per_day: int = tasks_per_day
+        self.ignore_tag: str = ignore_tag
 
-    def _sort_tasks(self, tasks: List[Task]):
+    def _sort_tasks(self, tasks: List[Task]) -> None:
         """Sorts tasks by priority (desc) and then due date (asc)."""
         tasks.sort(key=lambda t: (
             -t.priority,
@@ -27,7 +29,7 @@ class Scheduler:
             filter=f'! p1 & ! @{self.ignore_tag} & due on ' + day.strftime('%Y-%m-%d')
         )
 
-    def _reschedule_to(self, task: Task, day: date):
+    def _reschedule_to(self, task: Task, day: date) -> None:
         """Reschedules a task to a new date."""
         if task.due and task.due.date == day.strftime('%Y-%m-%d'):
             return
@@ -46,7 +48,7 @@ class Scheduler:
         if not is_success:
             raise Exception(f"Failed to reschedule task: {task.content}")
 
-    def _slice_list(self, lst, num_items):
+    def _slice_list(self, lst: List[T], num_items: int) -> Tuple[List[T], List[T]]:
         """Slices a list into two parts at a given index."""
         if num_items >= 0:
             return lst[:num_items], lst[num_items:]
@@ -58,7 +60,7 @@ class Scheduler:
         tasks_to_add: List[Task],
         day: Optional[date] = None,
         depth: int = 0
-    ):
+    ) -> None:
         """Schedules tasks, pushing them to later days if the current day is full."""
         if not tasks_to_add:
             return

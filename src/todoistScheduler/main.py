@@ -10,7 +10,7 @@ from scheduler import Scheduler
 logging.basicConfig(level=logging.DEBUG)
 
 
-def main():
+def main() -> None:
     """Main function to run the Todoist scheduler."""
     api = TodoistAPI(config.TODOIST_API_KEY)
     today = datetime.now(ZoneInfo(config.USER_TZ)).date()
