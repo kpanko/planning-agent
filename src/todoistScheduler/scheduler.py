@@ -1,5 +1,5 @@
 import re
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 import logging
 from typing import List, Optional, Tuple, TypeVar
 
@@ -36,7 +36,14 @@ class Scheduler:
 
         logging.info(f"Sending the task '{task.content}' to {day}")
 
-        due_date_string = day.strftime('%Y-%m-%d')
+        if task.due and task.due.datetime:
+            # This is a datetime object, so we can use strftime
+            time_str = datetime.fromisoformat(task.due.datetime).strftime('%H:%M')
+            due_date_string = f"{day.strftime('%Y-%m-%d')} {time_str}"
+        else:
+            # This is just a date
+            due_date_string = day.strftime('%Y-%m-%d')
+
         if task.due and task.due.is_recurring:
             # Preserve original due date string for recurring tasks
             original_due = re.sub(r'\s*starting on.*', '', task.due.string)

@@ -8,14 +8,15 @@ from todoistScheduler.scheduler import Scheduler
 # A sentinel object to detect if a keyword argument was provided
 _SENTINEL = object()
 
-def create_task(id, content, priority=1, due_date_str=None, is_recurring=False, due=_SENTINEL):
+def create_task(id, content, priority=1, due_date_str=None, is_recurring=False, due=_SENTINEL, due_string=None, due_datetime_str=None):
     if due is _SENTINEL:
         if due_date_str:
             due = Due(
-                string=f"every day starting {due_date_str}" if is_recurring else due_date_str,
+                string=due_string if due_string else (f"every day starting {due_date_str}" if is_recurring else due_date_str),
                 date=due_date_str,
                 is_recurring=is_recurring,
-                timezone=None
+                timezone=None,
+                datetime=due_datetime_str
             )
         else:
             due = None
@@ -166,6 +167,49 @@ class TestScheduling(unittest.TestCase):
         ]
         self.api.update_task.assert_has_calls(update_task_calls, any_order=True)
         self.assertEqual(self.api.update_task.call_count, 3)
+
+    def test_reschedule_preserves_time(self):
+        due_datetime_str = "2023-12-31T17:00:00Z"
+        tasks_to_add = [
+            create_task(
+                '1',
+                'Task with time',
+                priority=4,
+                due_date_str='2023-12-31',
+                is_recurring=True,
+                due_string='every week at 5pm',
+                due_datetime_str=due_datetime_str
+            )
+        ]
+        self.api.get_tasks.return_value = []
+        self.scheduler.schedule_and_push_down(tasks_to_add)
+
+        expected_due_string = f"every week at 5pm starting on {self.today.strftime('%Y-%m-%d')} 17:00"
+        self.api.update_task.assert_called_once_with(
+            task_id='1',
+            due_string=expected_due_string
+        )
+
+    def test_reschedule_non_recurring_preserves_time(self):
+        due_datetime_str = "2023-12-31T17:00:00Z"
+        tasks_to_add = [
+            create_task(
+                '1',
+                'Task with time',
+                priority=4,
+                due_date_str='2023-12-31',
+                is_recurring=False,
+                due_datetime_str=due_datetime_str
+            )
+        ]
+        self.api.get_tasks.return_value = []
+        self.scheduler.schedule_and_push_down(tasks_to_add)
+
+        expected_due_string = f"{self.today.strftime('%Y-%m-%d')} 17:00"
+        self.api.update_task.assert_called_once_with(
+            task_id='1',
+            due_string=expected_due_string
+        )
 
 if __name__ == '__main__':
     unittest.main()
