@@ -2,45 +2,8 @@ import unittest
 from unittest.mock import MagicMock, call
 from datetime import date, timedelta
 
-from todoist_api_python.models import Task, Due
 from todoistScheduler.scheduler import Scheduler
-
-# A sentinel object to detect if a keyword argument was provided
-_SENTINEL = object()
-
-def create_task(id, content, priority=1, due_date_str=None, is_recurring=False, due=_SENTINEL, due_string=None, due_datetime_str=None):
-    if due is _SENTINEL:
-        if due_date_str:
-            due = Due(
-                string=due_string if due_string else (f"every day starting {due_date_str}" if is_recurring else due_date_str),
-                date=due_date_str,
-                is_recurring=is_recurring,
-                timezone=None,
-                datetime=due_datetime_str
-            )
-        else:
-            due = None
-
-    return Task(
-        id=id,
-        content=content,
-        priority=priority,
-        due=due,
-        assignee_id=None,
-        assigner_id=None,
-        comment_count=0,
-        is_completed=False,
-        created_at='2024-01-01T12:00:00Z',
-        creator_id='1',
-        description='',
-        labels=[],
-        order=0,
-        parent_id=None,
-        project_id='1',
-        section_id=None,
-        url='',
-        sync_id=None,
-    )
+from conftest import create_task
 
 
 class TestSchedulerMethods(unittest.TestCase):
@@ -79,7 +42,7 @@ class TestSchedulerMethods(unittest.TestCase):
 
     def test_sort_due_is_none(self):
         task_with_due = create_task('with_due', 'with_due', due_date_str='2024-01-01')
-        task_without_due = create_task('without_due', 'without_due', due=None)
+        task_without_due = create_task('without_due', 'without_due')
         task_without_due.priority = 4
         lst = [task_with_due, task_without_due]
         self.scheduler._sort_tasks(lst)
