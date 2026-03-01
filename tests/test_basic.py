@@ -2,44 +2,8 @@ import unittest
 from unittest.mock import MagicMock, call
 from datetime import date, timedelta
 
-from todoist_api_python.models import Task, Due
 from todoistScheduler.scheduler import Scheduler
-
-# A sentinel object to detect if a keyword argument was provided
-_SENTINEL = object()
-
-def create_task(id, content, priority=1, due_date_str=None, is_recurring=False, due=_SENTINEL):
-    if due is _SENTINEL:
-        if due_date_str:
-            due = Due(
-                string=f"every day starting {due_date_str}" if is_recurring else due_date_str,
-                date=due_date_str,
-                is_recurring=is_recurring,
-                timezone=None
-            )
-        else:
-            due = None
-
-    return Task(
-        id=id,
-        content=content,
-        priority=priority,
-        due=due,
-        assignee_id=None,
-        assigner_id=None,
-        comment_count=0,
-        is_completed=False,
-        created_at='2024-01-01T12:00:00Z',
-        creator_id='1',
-        description='',
-        labels=[],
-        order=0,
-        parent_id=None,
-        project_id='1',
-        section_id=None,
-        url='',
-        sync_id=None,
-    )
+from conftest import create_task
 
 
 class TestSchedulerMethods(unittest.TestCase):
@@ -78,7 +42,7 @@ class TestSchedulerMethods(unittest.TestCase):
 
     def test_sort_due_is_none(self):
         task_with_due = create_task('with_due', 'with_due', due_date_str='2024-01-01')
-        task_without_due = create_task('without_due', 'without_due', due=None)
+        task_without_due = create_task('without_due', 'without_due')
         task_without_due.priority = 4
         lst = [task_with_due, task_without_due]
         self.scheduler._sort_tasks(lst)
@@ -166,6 +130,49 @@ class TestScheduling(unittest.TestCase):
         ]
         self.api.update_task.assert_has_calls(update_task_calls, any_order=True)
         self.assertEqual(self.api.update_task.call_count, 3)
+
+    def test_reschedule_preserves_time(self):
+        due_datetime_str = "2023-12-31T17:00:00Z"
+        tasks_to_add = [
+            create_task(
+                '1',
+                'Task with time',
+                priority=4,
+                due_date_str='2023-12-31',
+                is_recurring=True,
+                due_string='every week at 5pm',
+                due_datetime_str=due_datetime_str
+            )
+        ]
+        self.api.get_tasks.return_value = []
+        self.scheduler.schedule_and_push_down(tasks_to_add)
+
+        expected_due_string = f"every week at 5pm starting on {self.today.strftime('%Y-%m-%d')} 17:00"
+        self.api.update_task.assert_called_once_with(
+            task_id='1',
+            due_string=expected_due_string
+        )
+
+    def test_reschedule_non_recurring_preserves_time(self):
+        due_datetime_str = "2023-12-31T17:00:00Z"
+        tasks_to_add = [
+            create_task(
+                '1',
+                'Task with time',
+                priority=4,
+                due_date_str='2023-12-31',
+                is_recurring=False,
+                due_datetime_str=due_datetime_str
+            )
+        ]
+        self.api.get_tasks.return_value = []
+        self.scheduler.schedule_and_push_down(tasks_to_add)
+
+        expected_due_string = f"{self.today.strftime('%Y-%m-%d')} 17:00"
+        self.api.update_task.assert_called_once_with(
+            task_id='1',
+            due_string=expected_due_string
+        )
 
 if __name__ == '__main__':
     unittest.main()

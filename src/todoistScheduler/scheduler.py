@@ -1,10 +1,11 @@
-import re
 from datetime import date, timedelta
 import logging
 from typing import List, Optional, Tuple, TypeVar
 
 from todoist_api_python.api import TodoistAPI
 from todoist_api_python.models import Task
+
+from todoistScheduler.reschedule import reschedule_task
 
 T = TypeVar('T')
 
@@ -31,22 +32,7 @@ class Scheduler:
 
     def _reschedule_to(self, task: Task, day: date) -> None:
         """Reschedules a task to a new date."""
-        if task.due and task.due.date == day.strftime('%Y-%m-%d'):
-            return
-
-        logging.info(f"Sending the task '{task.content}' to {day}")
-
-        due_date_string = day.strftime('%Y-%m-%d')
-        if task.due and task.due.is_recurring:
-            # Preserve original due date string for recurring tasks
-            original_due = re.sub(r'\s*starting on.*', '', task.due.string)
-            due_date_string = f"{original_due} starting on {due_date_string}"
-
-        logging.debug("updating task_id %s with: %s", task.id, due_date_string)
-        is_success = self.api.update_task(task_id=task.id, due_string=due_date_string)
-
-        if not is_success:
-            raise Exception(f"Failed to reschedule task: {task.content}")
+        reschedule_task(self.api, task, day)
 
     def _slice_list(self, lst: List[T], num_items: int) -> Tuple[List[T], List[T]]:
         """Slices a list into two parts at a given index."""
