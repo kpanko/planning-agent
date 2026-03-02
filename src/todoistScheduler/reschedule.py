@@ -5,6 +5,21 @@ from datetime import date, datetime
 from todoist_api_python.api import TodoistAPI
 from todoist_api_python.models import Task
 
+from todoistScheduler.reminders import (
+    fetch_reminders,
+    restore_reminders,
+)
+
+
+def _parse_task_date(task: Task) -> date | None:
+    """Extract the date from a task's due info."""
+    if not task.due:
+        return None
+    date_str = str(task.due.date)
+    if 'T' in date_str:
+        return datetime.fromisoformat(date_str).date()
+    return date.fromisoformat(date_str)
+
 
 def compute_due_string(task: Task, day: date) -> str | None:
     """Compute the due string needed to reschedule a task to a new day.
@@ -34,15 +49,60 @@ def compute_due_string(task: Task, day: date) -> str | None:
     return due_date_string
 
 
-def reschedule_task(api: TodoistAPI, task: Task, day: date) -> None:
+def reschedule_task(
+    api: TodoistAPI,
+    task: Task,
+    day: date,
+    token: str = "",
+) -> None:
     """Reschedule a task to a new date via the Todoist API."""
     due_string = compute_due_string(task, day)
     if due_string is None:
         return
 
-    logging.info(f"Sending the task '{task.content}' to {day}")
-    logging.debug("updating task_id %s with: %s", task.id, due_string)
+    # Save reminders before the update drops them
+    reminders = []
+    old_date = _parse_task_date(task)
+    if token:
+        try:
+            reminders = fetch_reminders(token, task.id)
+        except Exception:
+            logging.warning(
+                "Failed to fetch reminders for '%s'",
+                task.content,
+                exc_info=True,
+            )
 
-    is_success = api.update_task(task_id=task.id, due_string=due_string)
+    logging.info(
+        f"Sending the task '{task.content}' to {day}"
+    )
+    logging.debug(
+        "updating task_id %s with: %s",
+        task.id,
+        due_string,
+    )
+
+    is_success = api.update_task(
+        task_id=task.id,
+        due_string=due_string,
+    )
     if not is_success:
-        raise Exception(f"Failed to reschedule task: {task.content}")
+        raise Exception(
+            f"Failed to reschedule task: {task.content}"
+        )
+
+    # Restore reminders after the update
+    if token and reminders:
+        day_delta = (
+            (day - old_date).days if old_date else 0
+        )
+        try:
+            restore_reminders(
+                token, reminders, day_delta
+            )
+        except Exception:
+            logging.warning(
+                "Failed to restore reminders for '%s'",
+                task.content,
+                exc_info=True,
+            )

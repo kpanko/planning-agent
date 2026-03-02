@@ -1,8 +1,11 @@
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from datetime import date
 
-from todoistScheduler.reschedule import compute_due_string, reschedule_task
+from todoistScheduler.reschedule import (
+    compute_due_string,
+    reschedule_task,
+)
 from conftest import create_task
 
 
@@ -88,6 +91,51 @@ class TestRescheduleTask(unittest.TestCase):
         task = create_task('1', 'Task', due_date_str='2024-01-10')
         with self.assertRaises(Exception):
             reschedule_task(self.api, task, date(2024, 1, 15))
+
+
+    @patch(
+        "todoistScheduler.reschedule.fetch_reminders"
+    )
+    @patch(
+        "todoistScheduler.reschedule.restore_reminders"
+    )
+    def test_saves_and_restores_reminders(
+        self, mock_restore, mock_fetch,
+    ):
+        mock_fetch.return_value = [
+            {"id": "r1", "item_id": "1"},
+        ]
+        task = create_task(
+            '1', 'Task', due_date_str='2024-01-10',
+        )
+        reschedule_task(
+            self.api, task, date(2024, 1, 15),
+            token="tok",
+        )
+        mock_fetch.assert_called_once_with("tok", "1")
+        mock_restore.assert_called_once_with(
+            "tok",
+            [{"id": "r1", "item_id": "1"}],
+            5,
+        )
+
+    @patch(
+        "todoistScheduler.reschedule.fetch_reminders"
+    )
+    @patch(
+        "todoistScheduler.reschedule.restore_reminders"
+    )
+    def test_skips_reminders_without_token(
+        self, mock_restore, mock_fetch,
+    ):
+        task = create_task(
+            '1', 'Task', due_date_str='2024-01-10',
+        )
+        reschedule_task(
+            self.api, task, date(2024, 1, 15),
+        )
+        mock_fetch.assert_not_called()
+        mock_restore.assert_not_called()
 
 
 if __name__ == '__main__':

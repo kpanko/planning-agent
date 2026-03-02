@@ -20,6 +20,7 @@ def main() -> None:
         today=today,
         tasks_per_day=config.TASKS_PER_DAY,
         ignore_tag=config.IGNORE_TASK_TAG,
+        token=config.TODOIST_API_KEY,
     )
 
     logging.info("Getting overdue tasks...")

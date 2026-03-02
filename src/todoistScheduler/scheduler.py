@@ -11,11 +11,19 @@ T = TypeVar('T')
 
 
 class Scheduler:
-    def __init__(self, api: TodoistAPI, today: date, tasks_per_day: int, ignore_tag: str) -> None:
+    def __init__(
+        self,
+        api: TodoistAPI,
+        today: date,
+        tasks_per_day: int,
+        ignore_tag: str,
+        token: str = "",
+    ) -> None:
         self.api: TodoistAPI = api
         self.today: date = today
         self.tasks_per_day: int = tasks_per_day
         self.ignore_tag: str = ignore_tag
+        self.token: str = token
 
     def _sort_tasks(self, tasks: List[Task]) -> None:
         """Sorts tasks by priority (desc) and then due date (asc)."""
@@ -37,7 +45,9 @@ class Scheduler:
 
     def _reschedule_to(self, task: Task, day: date) -> None:
         """Reschedules a task to a new date."""
-        reschedule_task(self.api, task, day)
+        reschedule_task(
+            self.api, task, day, token=self.token
+        )
 
     def _slice_list(self, lst: List[T], num_items: int) -> Tuple[List[T], List[T]]:
         """Slices a list into two parts at a given index."""
