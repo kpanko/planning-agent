@@ -7,7 +7,7 @@ from typing import Any, TypedDict
 
 import requests
 
-SYNC_API_URL = "https://api.todoist.com/sync/v9/sync"
+SYNC_API_URL = "https://api.todoist.com/api/v1/sync"
 
 
 class ReminderDue(TypedDict, total=False):
@@ -45,11 +45,21 @@ def fetch_reminders(
     )
     resp.raise_for_status()
     all_reminders = resp.json().get("reminders", [])
-    return [
+    logging.debug(
+        "Sync API returned %d total reminder(s)",
+        len(all_reminders),
+    )
+    matched = [
         r for r in all_reminders
-        if r.get("item_id") == task_id
+        if str(r.get("item_id")) == str(task_id)
         and not r.get("is_deleted", 0)
     ]
+    logging.debug(
+        "Found %d reminder(s) for task %s",
+        len(matched),
+        task_id,
+    )
+    return matched
 
 
 def _shift_absolute_due(
@@ -98,7 +108,9 @@ def restore_reminders(
         })
 
     logging.debug(
-        "Restoring %d reminder(s)", len(commands)
+        "Restoring %d reminder(s): %s",
+        len(commands),
+        json.dumps(commands, indent=2),
     )
     resp = requests.post(
         SYNC_API_URL,
@@ -110,3 +122,7 @@ def restore_reminders(
         },
     )
     resp.raise_for_status()
+    logging.debug(
+        "Sync API restore response: %s",
+        resp.json(),
+    )
