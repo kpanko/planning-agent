@@ -26,9 +26,14 @@ class Scheduler:
 
     def _get_tasks_for(self, day: date) -> List[Task]:
         """Gets all tasks for a given day, ignoring tasks with a specific tag."""
-        return self.api.get_tasks(
-            filter=f'! p1 & ! @{self.ignore_tag} & due on ' + day.strftime('%Y-%m-%d')
-        )
+        return [
+            task
+            for page in self.api.filter_tasks(
+                query='! p1 & ! @' + self.ignore_tag
+                + ' & due on ' + day.strftime('%Y-%m-%d')
+            )
+            for task in page
+        ]
 
     def _reschedule_to(self, task: Task, day: date) -> None:
         """Reschedules a task to a new date."""

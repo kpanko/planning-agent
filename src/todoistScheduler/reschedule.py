@@ -12,15 +12,18 @@ def compute_due_string(task: Task, day: date) -> str | None:
     Returns None if the task is already scheduled for that day.
     Preserves time for datetime tasks and recurrence patterns for recurring tasks.
     """
-    if task.due and task.due.date == day.strftime('%Y-%m-%d'):
+    due_date = str(task.due.date) if task.due else None
+    if due_date == day.strftime('%Y-%m-%d'):
         return None
 
-    if task.due and task.due.datetime:
-        # This is a datetime object, so we can use strftime
-        time_str = datetime.fromisoformat(task.due.datetime).strftime('%H:%M')
-        due_date_string = f"{day.strftime('%Y-%m-%d')} {time_str}"
+    if due_date and 'T' in due_date:
+        time_str = datetime.fromisoformat(
+            due_date
+        ).strftime('%H:%M')
+        due_date_string = (
+            f"{day.strftime('%Y-%m-%d')} {time_str}"
+        )
     else:
-        # This is just a date
         due_date_string = day.strftime('%Y-%m-%d')
 
     if task.due and task.due.is_recurring:

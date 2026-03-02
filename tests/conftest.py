@@ -20,10 +20,9 @@ def create_task(
             )
         due = Due(
             string=due_string,
-            date=due_date_str,
+            date=due_datetime_str or due_date_str,
             is_recurring=is_recurring,
             timezone=None,
-            datetime=due_datetime_str
         )
 
     return Task(
@@ -33,9 +32,9 @@ def create_task(
         due=due,
         assignee_id=None,
         assigner_id=None,
-        comment_count=0,
-        is_completed=False,
+        completed_at=None,
         created_at='2024-01-01T12:00:00Z',
+        updated_at='2024-01-01T12:00:00Z',
         creator_id='1',
         description='',
         labels=[],
@@ -43,6 +42,7 @@ def create_task(
         parent_id=None,
         project_id='1',
         section_id=None,
-        url='',
-        sync_id=None,
+        deadline=None,
+        duration=None,
+        is_collapsed=False,
     )
