@@ -75,7 +75,7 @@ class TestScheduling(unittest.TestCase):
 
     def test_schedule_no_tasks(self):
         self.scheduler.schedule_and_push_down([])
-        self.api.get_tasks.assert_not_called()
+        self.api.filter_tasks.assert_not_called()
         self.api.update_task.assert_not_called()
 
     def test_schedule_fit_in_one_day(self):
@@ -83,10 +83,12 @@ class TestScheduling(unittest.TestCase):
             create_task('1', 'Task 1', priority=4, due_date_str='2023-12-31'),
             create_task('2', 'Task 2', priority=1, due_date_str='2023-12-30')
         ]
-        self.api.get_tasks.return_value = []
+        self.api.filter_tasks.return_value = iter([])
         self.scheduler.schedule_and_push_down(tasks_to_add)
-        self.api.get_tasks.assert_called_once_with(
-            filter=f'! p1 & ! @{self.ignore_tag} & due on ' + self.today.strftime('%Y-%m-%d')
+        self.api.filter_tasks.assert_called_once_with(
+            query='! p1 & ! @' + self.ignore_tag
+            + ' & due on '
+            + self.today.strftime('%Y-%m-%d')
         )
         expected_calls = [
             call(task_id='1', due_string=self.today.strftime('%Y-%m-%d')),
@@ -100,7 +102,9 @@ class TestScheduling(unittest.TestCase):
             create_task('2', 'Task 2 P4', priority=4, due_date_str='2023-12-30'),
             create_task('3', 'Task 3 P1', priority=1, due_date_str='2023-12-29')
         ]
-        self.api.get_tasks.side_effect = [[], []]
+        self.api.filter_tasks.side_effect = [
+            iter([]), iter([]),
+        ]
         self.scheduler.schedule_and_push_down(tasks_to_add)
         update_task_calls = [
             call(task_id='2', due_string=self.today.strftime('%Y-%m-%d')),
@@ -118,7 +122,9 @@ class TestScheduling(unittest.TestCase):
             create_task('1', 'New Task 1 P4', priority=4, due_date_str='2023-12-31'),
             create_task('2', 'New Task 2 P4', priority=4, due_date_str='2023-12-30')
         ]
-        self.api.get_tasks.side_effect = [[existing_task], []]
+        self.api.filter_tasks.side_effect = [
+            iter([[existing_task]]), iter([]),
+        ]
         self.scheduler.schedule_and_push_down(tasks_to_add)
 
         # The two P4 tasks should be scheduled for today. The existing P1 task
@@ -144,7 +150,7 @@ class TestScheduling(unittest.TestCase):
                 due_datetime_str=due_datetime_str
             )
         ]
-        self.api.get_tasks.return_value = []
+        self.api.filter_tasks.return_value = iter([])
         self.scheduler.schedule_and_push_down(tasks_to_add)
 
         expected_due_string = f"every week at 5pm starting on {self.today.strftime('%Y-%m-%d')} 17:00"
@@ -165,7 +171,7 @@ class TestScheduling(unittest.TestCase):
                 due_datetime_str=due_datetime_str
             )
         ]
-        self.api.get_tasks.return_value = []
+        self.api.filter_tasks.return_value = iter([])
         self.scheduler.schedule_and_push_down(tasks_to_add)
 
         expected_due_string = f"{self.today.strftime('%Y-%m-%d')} 17:00"

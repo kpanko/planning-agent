@@ -23,13 +23,20 @@ def main() -> None:
     )
 
     logging.info("Getting overdue tasks...")
-    overdue_tasks = api.get_tasks(
-        filter=f"overdue & ! p1 & ! @{config.IGNORE_TASK_TAG}"
-    )
+    overdue_tasks = [
+        task
+        for page in api.filter_tasks(
+            query=(
+                "overdue & ! p1"
+                f" & ! @{config.IGNORE_TASK_TAG}"
+            )
+        )
+        for task in page
+    ]
 
     today_str = today.strftime("%Y-%m-%d")
-    # filter out tasks that are due today because Todoist has a weird idea
-    # about what overdue means
+    # filter out tasks that are due today because Todoist
+    # has a weird idea about what overdue means
     overdue_tasks = [
         t for t in overdue_tasks if
           t.due is not None and
