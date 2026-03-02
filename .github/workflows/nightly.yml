@@ -26,7 +26,7 @@ jobs:
 
       - name: Install dependencies with Poetry
         run: |
-          poetry install --no-root --no-interaction --no-ansi
+          poetry install --no-interaction --no-ansi
 
       - name: Run nightly script
         run: |
