@@ -53,7 +53,6 @@ def reschedule_task(
     api: TodoistAPI,
     task: Task,
     day: date,
-    token: str = "",
 ) -> None:
     """Reschedule a task to a new date via the Todoist API."""
     due_string = compute_due_string(task, day)
@@ -61,17 +60,17 @@ def reschedule_task(
         return
 
     # Save reminders before the update drops them
+    token = api._token
     reminders = []
     old_date = _parse_task_date(task)
-    if token:
-        try:
-            reminders = fetch_reminders(token, task.id)
-        except Exception:
-            logging.warning(
-                "Failed to fetch reminders for '%s'",
-                task.content,
-                exc_info=True,
-            )
+    try:
+        reminders = fetch_reminders(token, task.id)
+    except Exception:
+        logging.warning(
+            "Failed to fetch reminders for '%s'",
+            task.content,
+            exc_info=True,
+        )
 
     logging.info(
         f"Sending the task '{task.content}' to {day}"
@@ -92,7 +91,7 @@ def reschedule_task(
         )
 
     # Restore reminders after the update
-    if token and reminders:
+    if reminders:
         day_delta = (
             (day - old_date).days if old_date else 0
         )

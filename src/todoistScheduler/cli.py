@@ -96,10 +96,7 @@ def main(argv: list[str] | None = None) -> None:
         sys.exit(1)
 
     try:
-        reschedule_task(
-            api, task, args.date,
-            token=config.TODOIST_API_KEY,
-        )
+        reschedule_task(api, task, args.date)
     except Exception as exc:
         print(
             f"Error rescheduling task: {exc}",

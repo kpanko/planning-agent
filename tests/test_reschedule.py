@@ -72,6 +72,7 @@ class TestRescheduleTask(unittest.TestCase):
 
     def setUp(self):
         self.api = MagicMock()
+        self.api._token = "tok"
         self.api.update_task.return_value = True
 
     def test_calls_api(self):
@@ -110,7 +111,6 @@ class TestRescheduleTask(unittest.TestCase):
         )
         reschedule_task(
             self.api, task, date(2024, 1, 15),
-            token="tok",
         )
         mock_fetch.assert_called_once_with("tok", "1")
         mock_restore.assert_called_once_with(
@@ -118,24 +118,6 @@ class TestRescheduleTask(unittest.TestCase):
             [{"id": "r1", "item_id": "1"}],
             5,
         )
-
-    @patch(
-        "todoistScheduler.reschedule.fetch_reminders"
-    )
-    @patch(
-        "todoistScheduler.reschedule.restore_reminders"
-    )
-    def test_skips_reminders_without_token(
-        self, mock_restore, mock_fetch,
-    ):
-        task = create_task(
-            '1', 'Task', due_date_str='2024-01-10',
-        )
-        reschedule_task(
-            self.api, task, date(2024, 1, 15),
-        )
-        mock_fetch.assert_not_called()
-        mock_restore.assert_not_called()
 
 
 if __name__ == '__main__':
