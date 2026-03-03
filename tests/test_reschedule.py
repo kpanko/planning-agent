@@ -98,10 +98,16 @@ class TestRescheduleTask(unittest.TestCase):
         "todoistScheduler.reschedule.fetch_reminders"
     )
     @patch(
+        "todoistScheduler.reschedule.delete_reminders"
+    )
+    @patch(
         "todoistScheduler.reschedule.restore_reminders"
     )
     def test_saves_and_restores_reminders(
-        self, mock_restore, mock_fetch,
+        self,
+        mock_restore,
+        mock_delete,
+        mock_fetch,
     ):
         mock_fetch.return_value = [
             {"id": "r1", "item_id": "1"},
@@ -113,6 +119,9 @@ class TestRescheduleTask(unittest.TestCase):
             self.api, task, date(2024, 1, 15),
         )
         mock_fetch.assert_called_once_with("tok", "1")
+        mock_delete.assert_called_once_with(
+            "tok", ["r1"],
+        )
         mock_restore.assert_called_once_with(
             "tok",
             [{"id": "r1", "item_id": "1"}],

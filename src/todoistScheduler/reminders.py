@@ -75,6 +75,44 @@ def _shift_absolute_due(
     return new_due
 
 
+def delete_reminders(
+    token: str,
+    reminder_ids: list[str],
+) -> None:
+    """Delete reminders via Sync API commands."""
+    if not reminder_ids:
+        return
+
+    commands = [
+        {
+            "type": "reminder_delete",
+            "uuid": str(uuid.uuid4()),
+            "args": {"id": rid},
+        }
+        for rid in reminder_ids
+    ]
+
+    logging.debug(
+        "Deleting %d reminder(s): %s",
+        len(commands),
+        [c["args"]["id"] for c in commands],
+    )
+    resp = requests.post(
+        SYNC_API_URL,
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+        data={
+            "commands": json.dumps(commands),
+        },
+    )
+    resp.raise_for_status()
+    logging.debug(
+        "Sync API delete response: %s",
+        resp.json(),
+    )
+
+
 def restore_reminders(
     token: str,
     reminders: list[dict[str, Any]],

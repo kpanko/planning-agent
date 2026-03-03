@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import patch, MagicMock
 
 from todoistScheduler.reminders import (
+    delete_reminders,
     fetch_reminders,
     restore_reminders,
     _shift_absolute_due,
@@ -89,6 +90,35 @@ class TestShiftAbsoluteDue(unittest.TestCase):
         due = {"date": "2024-01-10T09:00:00"}
         _shift_absolute_due(due, 5)
         self.assertEqual(due["date"], "2024-01-10T09:00:00")
+
+
+class TestDeleteReminders(unittest.TestCase):
+
+    @patch("todoistScheduler.reminders.requests.post")
+    def test_noop_when_empty(self, mock_post):
+        delete_reminders("tok", [])
+        mock_post.assert_not_called()
+
+    @patch("todoistScheduler.reminders.requests.post")
+    def test_deletes_by_id(self, mock_post):
+        mock_post.return_value = MagicMock()
+        delete_reminders("tok", ["r1", "r2"])
+
+        call_data = mock_post.call_args
+        import json
+        commands = json.loads(
+            call_data.kwargs["data"]["commands"]
+        )
+        self.assertEqual(len(commands), 2)
+        self.assertEqual(
+            commands[0]["type"], "reminder_delete"
+        )
+        self.assertEqual(
+            commands[0]["args"]["id"], "r1"
+        )
+        self.assertEqual(
+            commands[1]["args"]["id"], "r2"
+        )
 
 
 class TestRestoreReminders(unittest.TestCase):

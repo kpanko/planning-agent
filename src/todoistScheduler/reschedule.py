@@ -6,6 +6,7 @@ from todoist_api_python.api import TodoistAPI
 from todoist_api_python.models import Task
 
 from todoistScheduler.reminders import (
+    delete_reminders,
     fetch_reminders,
     restore_reminders,
 )
@@ -95,6 +96,24 @@ def reschedule_task(
         day_delta = (
             (day - old_date).days if old_date else 0
         )
+        logging.debug(
+            "old_date=%s, target=%s, day_delta=%d",
+            old_date,
+            day,
+            day_delta,
+        )
+        reminder_ids = [
+            str(r["id"]) for r in reminders
+            if "id" in r
+        ]
+        try:
+            delete_reminders(token, reminder_ids)
+        except Exception:
+            logging.warning(
+                "Failed to delete reminders for '%s'",
+                task.content,
+                exc_info=True,
+            )
         try:
             restore_reminders(
                 token, reminders, day_delta
