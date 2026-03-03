@@ -11,7 +11,13 @@ T = TypeVar('T')
 
 
 class Scheduler:
-    def __init__(self, api: TodoistAPI, today: date, tasks_per_day: int, ignore_tag: str) -> None:
+    def __init__(
+        self,
+        api: TodoistAPI,
+        today: date,
+        tasks_per_day: int,
+        ignore_tag: str,
+    ) -> None:
         self.api: TodoistAPI = api
         self.today: date = today
         self.tasks_per_day: int = tasks_per_day

@@ -1,8 +1,11 @@
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from datetime import date
 
-from todoistScheduler.reschedule import compute_due_string, reschedule_task
+from todoistScheduler.reschedule import (
+    compute_due_string,
+    reschedule_task,
+)
 from conftest import create_task
 
 
@@ -10,6 +13,15 @@ class TestComputeDueString(unittest.TestCase):
 
     def test_already_on_target_day(self):
         task = create_task('1', 'Task', due_date_str='2024-01-15')
+        result = compute_due_string(task, date(2024, 1, 15))
+        self.assertIsNone(result)
+
+    def test_already_on_target_day_with_time(self):
+        task = create_task(
+            '1', 'Task',
+            due_date_str='2024-01-15',
+            due_datetime_str='2024-01-15 17:00:00',
+        )
         result = compute_due_string(task, date(2024, 1, 15))
         self.assertIsNone(result)
 
@@ -23,6 +35,15 @@ class TestComputeDueString(unittest.TestCase):
             '1', 'Task',
             due_date_str='2024-01-10',
             due_datetime_str='2024-01-10T17:00:00Z',
+        )
+        result = compute_due_string(task, date(2024, 1, 15))
+        self.assertEqual(result, '2024-01-15 17:00')
+
+    def test_preserves_time_space_separator(self):
+        task = create_task(
+            '1', 'Task',
+            due_date_str='2024-01-10',
+            due_datetime_str='2024-01-10 17:00:00',
         )
         result = compute_due_string(task, date(2024, 1, 15))
         self.assertEqual(result, '2024-01-15 17:00')
@@ -69,6 +90,7 @@ class TestRescheduleTask(unittest.TestCase):
 
     def setUp(self):
         self.api = MagicMock()
+        self.api._token = "tok"
         self.api.update_task.return_value = True
 
     def test_calls_api(self):
@@ -88,6 +110,77 @@ class TestRescheduleTask(unittest.TestCase):
         task = create_task('1', 'Task', due_date_str='2024-01-10')
         with self.assertRaises(Exception):
             reschedule_task(self.api, task, date(2024, 1, 15))
+
+
+    @patch(
+        "todoistScheduler.reschedule.fetch_reminders"
+    )
+    @patch(
+        "todoistScheduler.reschedule.delete_reminders"
+    )
+    @patch(
+        "todoistScheduler.reschedule.restore_reminders"
+    )
+    def test_saves_and_restores_reminders(
+        self,
+        mock_restore,
+        mock_delete,
+        mock_fetch,
+    ):
+        mock_fetch.return_value = [
+            {"id": "r1", "item_id": "1"},
+        ]
+        task = create_task(
+            '1', 'Task', due_date_str='2024-01-10',
+        )
+        reschedule_task(
+            self.api, task, date(2024, 1, 15),
+        )
+        mock_fetch.assert_called_once_with("tok", "1")
+        mock_delete.assert_called_once_with(
+            "tok", ["r1"],
+        )
+        mock_restore.assert_called_once_with(
+            "tok",
+            [{"id": "r1", "item_id": "1"}],
+            5,
+        )
+
+
+    @patch(
+        "todoistScheduler.reschedule.fetch_reminders"
+    )
+    @patch(
+        "todoistScheduler.reschedule.delete_reminders"
+    )
+    @patch(
+        "todoistScheduler.reschedule.restore_reminders"
+    )
+    def test_infers_delta_from_reminder_when_no_due(
+        self,
+        mock_restore,
+        mock_delete,
+        mock_fetch,
+    ):
+        mock_fetch.return_value = [
+            {
+                "id": "r1",
+                "item_id": "1",
+                "type": "absolute",
+                "due": {
+                    "date": "2024-01-10T22:30:00",
+                },
+            },
+        ]
+        task = create_task('1', 'Task')  # no due date
+        reschedule_task(
+            self.api, task, date(2024, 1, 15),
+        )
+        mock_restore.assert_called_once_with(
+            "tok",
+            mock_fetch.return_value,
+            5,
+        )
 
 
 if __name__ == '__main__':
