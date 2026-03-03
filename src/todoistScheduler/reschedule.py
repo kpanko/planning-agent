@@ -29,7 +29,7 @@ def compute_due_string(task: Task, day: date) -> str | None:
     Preserves time for datetime tasks and recurrence patterns for recurring tasks.
     """
     due_date = str(task.due.date) if task.due else None
-    if due_date == day.strftime('%Y-%m-%d'):
+    if due_date and due_date[:10] == day.strftime('%Y-%m-%d'):
         return None
 
     if due_date and len(due_date) > 10:
