@@ -93,6 +93,15 @@ def reschedule_task(
 
     # Restore reminders after the update
     if reminders:
+        if old_date is None:
+            # Task had no due date; infer from the
+            # first absolute reminder's date instead.
+            for r in reminders:
+                if r.get("type") == "absolute" and r.get("due"):
+                    old_date = datetime.fromisoformat(
+                        r["due"]["date"]
+                    ).date()
+                    break
         day_delta = (
             (day - old_date).days if old_date else 0
         )

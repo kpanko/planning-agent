@@ -129,5 +129,41 @@ class TestRescheduleTask(unittest.TestCase):
         )
 
 
+    @patch(
+        "todoistScheduler.reschedule.fetch_reminders"
+    )
+    @patch(
+        "todoistScheduler.reschedule.delete_reminders"
+    )
+    @patch(
+        "todoistScheduler.reschedule.restore_reminders"
+    )
+    def test_infers_delta_from_reminder_when_no_due(
+        self,
+        mock_restore,
+        mock_delete,
+        mock_fetch,
+    ):
+        mock_fetch.return_value = [
+            {
+                "id": "r1",
+                "item_id": "1",
+                "type": "absolute",
+                "due": {
+                    "date": "2024-01-10T22:30:00",
+                },
+            },
+        ]
+        task = create_task('1', 'Task')  # no due date
+        reschedule_task(
+            self.api, task, date(2024, 1, 15),
+        )
+        mock_restore.assert_called_once_with(
+            "tok",
+            mock_fetch.return_value,
+            5,
+        )
+
+
 if __name__ == '__main__':
     unittest.main()
