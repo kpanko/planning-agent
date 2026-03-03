@@ -17,7 +17,7 @@ def _parse_task_date(task: Task) -> date | None:
     if not task.due:
         return None
     date_str = str(task.due.date)
-    if 'T' in date_str:
+    if len(date_str) > 10:
         return datetime.fromisoformat(date_str).date()
     return date.fromisoformat(date_str)
 
@@ -32,7 +32,7 @@ def compute_due_string(task: Task, day: date) -> str | None:
     if due_date == day.strftime('%Y-%m-%d'):
         return None
 
-    if due_date and 'T' in due_date:
+    if due_date and len(due_date) > 10:
         time_str = datetime.fromisoformat(
             due_date
         ).strftime('%H:%M')

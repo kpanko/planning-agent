@@ -30,6 +30,15 @@ class TestComputeDueString(unittest.TestCase):
         result = compute_due_string(task, date(2024, 1, 15))
         self.assertEqual(result, '2024-01-15 17:00')
 
+    def test_preserves_time_space_separator(self):
+        task = create_task(
+            '1', 'Task',
+            due_date_str='2024-01-10',
+            due_datetime_str='2024-01-10 17:00:00',
+        )
+        result = compute_due_string(task, date(2024, 1, 15))
+        self.assertEqual(result, '2024-01-15 17:00')
+
     def test_recurring_date_only(self):
         task = create_task(
             '1', 'Task',
