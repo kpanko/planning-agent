@@ -1,0 +1,29 @@
+[project]
+name = "todoist-mcp"
+version = "0.1.0"
+description = "MCP server for Todoist with safe rescheduling"
+requires-python = ">=3.10"
+dependencies = [
+    "fastmcp>=2.0",
+    "todoist-api-python>=3.2.1",
+    "requests>=2.31",
+    "python-dotenv>=1.0",
+    "todoistScheduler",
+]
+
+[project.scripts]
+todoist-mcp = "todoist_mcp.server:main"
+
+[tool.uv.sources]
+todoistScheduler = { path = "../todoistScheduler", editable = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/todoist_mcp"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
