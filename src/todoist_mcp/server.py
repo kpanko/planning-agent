@@ -3,6 +3,8 @@ import os
 from datetime import date, timedelta
 from typing import Optional
 
+from pathlib import Path
+
 from dotenv import load_dotenv
 from fastmcp import FastMCP
 from todoist_api_python.api import TodoistAPI
@@ -11,9 +13,10 @@ from todoistScheduler.reschedule import (
     reschedule_task as _reschedule_task,
 )
 
-load_dotenv()
+# Load .env from the project root regardless of working directory
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
-_token = os.environ["TODOIST_API_TOKEN"]
+_token = os.environ["TODOIST_API_KEY"]
 _api = TodoistAPI(_token)
 
 mcp = FastMCP("Todoist")
