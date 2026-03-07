@@ -7,6 +7,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from fastmcp import FastMCP
+from pydantic import BaseModel
 from todoist_api_python.api import TodoistAPI
 
 from todoistScheduler.reschedule import (
@@ -333,8 +334,35 @@ def add_comment(task_id: str, content: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Custom tool
+# Custom tools
 # ---------------------------------------------------------------------------
+
+class TaskReschedule(BaseModel):
+    task_id: str
+    date: str
+
+
+@mcp.tool()
+def reschedule_tasks(tasks: list[TaskReschedule]) -> str:
+    """Reschedule multiple tasks in a single call.
+
+    Safely preserves recurring task patterns and reminders for each task.
+    Use this instead of calling reschedule_task repeatedly.
+
+    tasks: list of {task_id, date} where date is YYYY-MM-DD,
+           "today", or "tomorrow".
+    """
+    results = []
+    for item in tasks:
+        try:
+            task = _api.get_task(task_id=item.task_id)
+            target = _parse_date(item.date)
+            _reschedule_task(_api, task, target)
+            results.append(f"✓ '{task.content}' -> {target}")
+        except Exception as e:
+            results.append(f"✗ {item.task_id}: {e}")
+    return "\n".join(results)
+
 
 @mcp.tool()
 def reschedule_task(task_id: str, date: str) -> str:
