@@ -262,7 +262,7 @@ def update_task(
 ) -> str:
     """Update a task's content, description, priority, or labels.
 
-    NOTE: To change a task's due date use reschedule_task instead —
+    NOTE: To change a task's due date use reschedule_tasks instead —
     it safely preserves recurring patterns and reminders.
 
     priority: 1=lowest (p4), 2=p3, 3=p2, 4=highest (p1).
@@ -344,10 +344,9 @@ class TaskReschedule(BaseModel):
 
 @mcp.tool()
 def reschedule_tasks(tasks: list[TaskReschedule]) -> str:
-    """Reschedule multiple tasks in a single call.
+    """Reschedule one or more tasks.
 
     Safely preserves recurring task patterns and reminders for each task.
-    Use this instead of calling reschedule_task repeatedly.
 
     tasks: list of {task_id, date} where date is YYYY-MM-DD,
            "today", or "tomorrow".
@@ -363,23 +362,6 @@ def reschedule_tasks(tasks: list[TaskReschedule]) -> str:
             results.append(f"✗ {item.task_id}: {e}")
     return "\n".join(results)
 
-
-@mcp.tool()
-def reschedule_task(task_id: str, date: str) -> str:
-    """Reschedule a task to a new date.
-
-    Safely preserves recurring task patterns and reminders.
-    Use this for ALL due date changes instead of update_task.
-
-    date: YYYY-MM-DD, "today", or "tomorrow".
-    """
-    try:
-        task = _api.get_task(task_id=task_id)
-        target = _parse_date(date)
-        _reschedule_task(_api, task, target)
-        return f"Rescheduled '{task.content}' to {target}."
-    except Exception as e:
-        return f"Error: {e}"
 
 
 # ---------------------------------------------------------------------------
