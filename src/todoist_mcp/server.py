@@ -340,6 +340,7 @@ def add_comment(task_id: str, content: str) -> str:
 class TaskReschedule(BaseModel):
     task_id: str
     date: str
+    time: Optional[str] = None  # HH:MM, e.g. "09:30"
 
 
 @mcp.tool()
@@ -348,8 +349,8 @@ def reschedule_tasks(tasks: list[TaskReschedule]) -> str:
 
     Safely preserves recurring task patterns and reminders for each task.
 
-    tasks: list of {task_id, date} where date is YYYY-MM-DD,
-           "today", or "tomorrow".
+    tasks: list of {task_id, date, time?} where date is YYYY-MM-DD,
+           "today", or "tomorrow"; time is optional HH:MM (e.g. "09:30").
     """
     results = []
     for item in tasks:
@@ -357,7 +358,16 @@ def reschedule_tasks(tasks: list[TaskReschedule]) -> str:
             task = _api.get_task(task_id=item.task_id)
             target = _parse_date(item.date)
             _reschedule_task(_api, task, target)
-            results.append(f"✓ '{task.content}' -> {target}")
+            if item.time:
+                _api.update_task(
+                    task_id=item.task_id,
+                    due_datetime=f"{target}T{item.time}:00",
+                )
+                results.append(
+                    f"✓ '{task.content}' -> {target} {item.time}"
+                )
+            else:
+                results.append(f"✓ '{task.content}' -> {target}")
         except Exception as e:
             results.append(f"✗ {item.task_id}: {e}")
     return "\n".join(results)
