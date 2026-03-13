@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple, TypeVar
 from todoist_api_python.api import TodoistAPI
 from todoist_api_python.models import Task
 
-from todoistScheduler.reschedule import reschedule_task
+from todoist_scheduler.reschedule import reschedule_task
 
 T = TypeVar('T')
 

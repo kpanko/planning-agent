@@ -4,8 +4,8 @@ from zoneinfo import ZoneInfo
 
 from todoist_api_python.api import TodoistAPI
 
-import todoistScheduler.config as config
-from todoistScheduler.scheduler import Scheduler
+import todoist_scheduler.config as config
+from todoist_scheduler.scheduler import Scheduler
 
 logging.basicConfig(level=logging.DEBUG)
 

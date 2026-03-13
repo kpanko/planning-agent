@@ -10,15 +10,15 @@ from fastmcp import FastMCP
 from pydantic import BaseModel
 from todoist_api_python.api import TodoistAPI
 
-from todoistScheduler.reschedule import (
+from todoist_scheduler.reschedule import (
     reschedule_task as _reschedule_task,
 )
 
 # Load .env from the project root regardless of working directory
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
-_token = os.environ["TODOIST_API_KEY"]
-_api = TodoistAPI(_token)
+_token = os.environ.get("TODOIST_API_KEY", "")
+_api = TodoistAPI(_token) if _token else None
 
 mcp = FastMCP("Todoist")
 

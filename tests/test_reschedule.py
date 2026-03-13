@@ -2,11 +2,11 @@ import unittest
 from unittest.mock import MagicMock, patch
 from datetime import date
 
-from todoistScheduler.reschedule import (
+from todoist_scheduler.reschedule import (
     compute_due_string,
     reschedule_task,
 )
-from conftest import create_task
+from tests.conftest import create_task
 
 
 class TestComputeDueString(unittest.TestCase):
@@ -113,13 +113,13 @@ class TestRescheduleTask(unittest.TestCase):
 
 
     @patch(
-        "todoistScheduler.reschedule.fetch_reminders"
+        "todoist_scheduler.reschedule.fetch_reminders"
     )
     @patch(
-        "todoistScheduler.reschedule.delete_reminders"
+        "todoist_scheduler.reschedule.delete_reminders"
     )
     @patch(
-        "todoistScheduler.reschedule.restore_reminders"
+        "todoist_scheduler.reschedule.restore_reminders"
     )
     def test_saves_and_restores_reminders(
         self,
@@ -148,13 +148,13 @@ class TestRescheduleTask(unittest.TestCase):
 
 
     @patch(
-        "todoistScheduler.reschedule.fetch_reminders"
+        "todoist_scheduler.reschedule.fetch_reminders"
     )
     @patch(
-        "todoistScheduler.reschedule.delete_reminders"
+        "todoist_scheduler.reschedule.delete_reminders"
     )
     @patch(
-        "todoistScheduler.reschedule.restore_reminders"
+        "todoist_scheduler.reschedule.restore_reminders"
     )
     def test_infers_delta_from_reminder_when_no_due(
         self,

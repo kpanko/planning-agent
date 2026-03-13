@@ -10,8 +10,8 @@ from todoist_api_python.api import TodoistAPI
 
 load_dotenv()
 
-import todoistScheduler.config as config
-from todoistScheduler.reschedule import reschedule_task
+import todoist_scheduler.config as config
+from todoist_scheduler.reschedule import reschedule_task
 
 
 def _get_today() -> date:

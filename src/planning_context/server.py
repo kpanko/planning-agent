@@ -8,7 +8,7 @@ import json
 import logging
 import sys
 
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 
 from . import conversations, memories, values
 from .storage import get_data_dir

@@ -5,7 +5,7 @@ from datetime import date, datetime
 from todoist_api_python.api import TodoistAPI
 from todoist_api_python.models import Task
 
-from todoistScheduler.reminders import (
+from todoist_scheduler.reminders import (
     delete_reminders,
     fetch_reminders,
     restore_reminders,

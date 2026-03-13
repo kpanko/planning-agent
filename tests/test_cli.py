@@ -3,8 +3,8 @@ import unittest
 from datetime import date
 from unittest.mock import MagicMock, patch
 
-from conftest import create_task
-from todoistScheduler.cli import (
+from tests.conftest import create_task
+from todoist_scheduler.cli import (
     build_parser,
     main,
     parse_date,
@@ -23,19 +23,19 @@ class TestParseDate(unittest.TestCase):
         ):
             parse_date("not-a-date")
 
-    @patch("todoistScheduler.cli._get_today")
+    @patch("todoist_scheduler.cli._get_today")
     def test_today_alias(self, mock_today):
         mock_today.return_value = date(2026, 3, 1)
         result = parse_date("today")
         self.assertEqual(result, date(2026, 3, 1))
 
-    @patch("todoistScheduler.cli._get_today")
+    @patch("todoist_scheduler.cli._get_today")
     def test_tomorrow_alias(self, mock_today):
         mock_today.return_value = date(2026, 3, 1)
         result = parse_date("tomorrow")
         self.assertEqual(result, date(2026, 3, 2))
 
-    @patch("todoistScheduler.cli._get_today")
+    @patch("todoist_scheduler.cli._get_today")
     def test_today_case_insensitive(self, mock_today):
         mock_today.return_value = date(2026, 3, 1)
         result = parse_date("TODAY")
@@ -69,8 +69,8 @@ class TestBuildParser(unittest.TestCase):
 
 class TestMain(unittest.TestCase):
 
-    @patch("todoistScheduler.cli.TodoistAPI")
-    @patch("todoistScheduler.cli.config")
+    @patch("todoist_scheduler.cli.TodoistAPI")
+    @patch("todoist_scheduler.cli.config")
     def test_reschedules_task(
         self, mock_config, mock_api_cls
     ):
@@ -95,7 +95,7 @@ class TestMain(unittest.TestCase):
             due_string="2026-03-15",
         )
 
-    @patch("todoistScheduler.cli.config")
+    @patch("todoist_scheduler.cli.config")
     def test_exits_without_api_key(self, mock_config):
         mock_config.TODOIST_API_KEY = ""
         with self.assertRaises(SystemExit) as ctx:

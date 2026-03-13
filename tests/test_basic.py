@@ -2,8 +2,8 @@ import unittest
 from unittest.mock import MagicMock, call
 from datetime import date, timedelta
 
-from todoistScheduler.scheduler import Scheduler
-from conftest import create_task
+from todoist_scheduler.scheduler import Scheduler
+from tests.conftest import create_task
 
 
 class TestSchedulerMethods(unittest.TestCase):
