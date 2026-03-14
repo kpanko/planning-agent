@@ -19,6 +19,7 @@ env/
 
 # Environment / secrets
 .env
+project-plans/values.md
 
 # IDE
 .vscode/
