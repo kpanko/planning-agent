@@ -6,7 +6,9 @@ requires-python = ">=3.12"
 dependencies = [
     "fastmcp>=2.0",
     "pydantic>=2.0",
+    "pydantic-ai>=0.1",
     "python-dotenv>=1.0",
+    "rich>=13.0",
     "requests>=2.31",
     "todoist-api-python>=3.0",
 ]
@@ -16,6 +18,7 @@ todoist-reschedule = "todoist_scheduler.cli:main"
 todoist-scheduler = "todoist_scheduler.main:main"
 todoist-mcp = "todoist_mcp.server:main"
 planning-context = "planning_context.server:main"
+planning-agent = "planning_agent.main_cli:main_sync"
 
 [build-system]
 requires = ["hatchling"]
@@ -23,6 +26,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = [
+    "src/planning_agent",
     "src/planning_context",
     "src/todoist_mcp",
     "src/todoist_scheduler",
