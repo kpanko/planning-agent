@@ -28,6 +28,16 @@ def _tool_result(result: str) -> None:
     """Print a tool result to the terminal."""
     _console.print(f"    [dim]{result}[/dim]")
 
+
+def _confirm_tool(name: str, detail: str = "") -> bool:
+    """Show a pending tool call and ask the user to confirm."""
+    _tool_status(name, detail)
+    try:
+        answer = input("  Run? [y/N] ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        return False
+    return answer in ("y", "yes")
+
 from planning_context.conversations import save_summary
 from planning_context.memories import (
     add_memory as _add_memory,
@@ -280,10 +290,11 @@ def create_agent() -> Agent:
         tasks: list[RescheduleItem],
     ) -> str:
         """Reschedule one or more tasks to new dates."""
-        _tool_status(
+        if not _confirm_tool(
             "reschedule_tasks",
             repr([t.model_dump() for t in tasks]),
-        )
+        ):
+            return "Cancelled by user."
         return _tools.reschedule_tasks(
             _get_api(),
             [t.model_dump() for t in tasks],
@@ -295,7 +306,8 @@ def create_agent() -> Agent:
         task_id: str,
     ) -> str:
         """Mark a task as complete."""
-        _tool_status("complete_task", task_id)
+        if not _confirm_tool("complete_task", task_id):
+            return "Cancelled by user."
         return _tools.complete_task(_get_api(), task_id)
 
     @planning_agent.tool
@@ -318,7 +330,8 @@ def create_agent() -> Agent:
         detail = f'"{content}"'
         if due_string:
             detail += f" due={due_string}"
-        _tool_status("add_task", detail)
+        if not _confirm_tool("add_task", detail):
+            return "Cancelled by user."
         return _tools.add_task(
             _get_api(),
             content,
@@ -360,9 +373,10 @@ def create_agent() -> Agent:
             parts.append(f"project={project_id}")
         if label:
             parts.append(f"label={label}")
-        _tool_status(
+        if not _confirm_tool(
             "find_tasks", ", ".join(parts) or "",
-        )
+        ):
+            return "Cancelled by user."
         return _tools.find_tasks(
             _get_api(), query, search, project_id, label,
         )
@@ -381,7 +395,8 @@ def create_agent() -> Agent:
         detail = start_date
         if end_date:
             detail += f" to {end_date}"
-        _tool_status("find_tasks_by_date", detail)
+        if not _confirm_tool("find_tasks_by_date", detail):
+            return "Cancelled by user."
         return _tools.find_tasks_by_date(
             _get_api(), start_date, end_date,
         )
@@ -392,7 +407,8 @@ def create_agent() -> Agent:
         task_id: str,
     ) -> str:
         """Fetch a single task by ID."""
-        _tool_status("get_task", task_id)
+        if not _confirm_tool("get_task", task_id):
+            return "Cancelled by user."
         return _tools.get_task(_get_api(), task_id)
 
     # ---------------------------------------------------------------
@@ -413,9 +429,8 @@ def create_agent() -> Agent:
         expiry_date: Optional YYYY-MM-DD after which
                      this memory expires.
         """
-        _tool_status(
-            "add_memory", f"({category})",
-        )
+        if not _confirm_tool("add_memory", f"({category})"):
+            return "Cancelled by user."
         try:
             memory = _add_memory(
                 content, category, expiry_date
@@ -434,7 +449,8 @@ def create_agent() -> Agent:
         memory_id: str,
     ) -> str:
         """Mark a memory as resolved/no longer active."""
-        _tool_status("resolve_memory", memory_id)
+        if not _confirm_tool("resolve_memory", memory_id):
+            return "Cancelled by user."
         result = _resolve_memory(memory_id)
         if result:
             return f"Memory {memory_id} resolved."
@@ -449,7 +465,8 @@ def create_agent() -> Agent:
 
         Only use when priorities have clearly shifted.
         """
-        _tool_status("update_values_doc")
+        if not _confirm_tool("update_values_doc"):
+            return "Cancelled by user."
         return write_values(content)
 
     return planning_agent
