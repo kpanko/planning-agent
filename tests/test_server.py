@@ -5,9 +5,8 @@ from unittest.mock import MagicMock, call, patch
 import pytest
 
 import todoist_mcp.server as server
+from todoist_mcp.tools import fmt_task as _fmt_task, parse_date as _parse_date
 from todoist_mcp.server import (
-    _fmt_task,
-    _parse_date,
     add_comment,
     add_project,
     add_section,
