@@ -100,6 +100,14 @@ The `planning_context` package owns the flat file layer. The
 tools are used for agent tool calls; context pre-loading uses the REST
 APIs directly.
 
+## How to Run
+
+Install:  `pip install -e ".[dev]"`
+Run:      `planning-agent`
+Test:     `pytest`
+
+Web (not yet built): `uvicorn planning_agent.main_web:app --reload`
+
 ## Definition of Done (v1)
 
 A working daily-use system reachable from a phone browser:

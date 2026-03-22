@@ -138,7 +138,7 @@ class TestBuildContext:
         assert ctx.memories == []
         assert ctx.recent_conversations == []
         assert "(Todoist not connected)" in ctx.todoist_snapshot
-        assert "(not connected yet)" in ctx.calendar_snapshot
+        assert "(Google Calendar not connected)" in ctx.calendar_snapshot
         assert ctx.day_type in (
             "remote", "office", "weekend",
         )
