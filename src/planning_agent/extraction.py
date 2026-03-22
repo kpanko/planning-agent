@@ -56,8 +56,8 @@ class ExtractionResult(BaseModel):
 
 EXTRACTION_PROMPT = """\
 You are a memory extraction agent. Analyze the \
-conversation above between Kevin and his planning agent. \
-Extract:
+conversation above between the user and their planning \
+agent. Extract:
 
 1. **new_memories**: Facts, preferences, observations, \
 or open threads worth remembering for future \
@@ -76,7 +76,8 @@ common case).
 
 4. **conversation_summary**: A 2-4 sentence summary of \
 what was discussed, what was decided, what tasks were \
-rescheduled, and Kevin's general mood/energy if apparent.
+rescheduled, and the user's general mood/energy if \
+apparent.
 
 Be selective with memories — only save things that will \
 be useful in future planning conversations. Don't save \

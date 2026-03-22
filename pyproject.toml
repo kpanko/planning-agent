@@ -11,6 +11,9 @@ dependencies = [
     "rich>=13.0",
     "requests>=2.31",
     "todoist-api-python>=3.0",
+    "google-api-python-client>=2.0",
+    "google-auth>=2.0",
+    "google-auth-httplib2>=0.2",
 ]
 
 [project.scripts]

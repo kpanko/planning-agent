@@ -1,6 +1,6 @@
 # Milestones
 
-## Milestone 1: Stabilize and Polish — `planned`
+## Milestone 1: Stabilize and Polish — `in-progress`
 **Goal:** Fix the hardcoded personal name in the extraction prompt, connect
 Google Calendar, and add tests. The CLI works correctly with an OpenAI key
 after this pass.
@@ -13,14 +13,14 @@ after this pass.
 - `uv run pytest` passes with no missing fixture warnings.
 
 **Tasks:**
-- [ ] Fix `extraction.py`: replace hardcoded name with "the user" in
+- [x] Fix `extraction.py`: replace hardcoded name with "the user" in
   `EXTRACTION_PROMPT`. (#1)
-- [ ] Implement `_fetch_calendar_snapshot()` in `context.py` using the
+- [x] Implement `_fetch_calendar_snapshot()` in `context.py` using the
   Google Calendar API (read-only); replace the `"(not connected yet)"`
   stub. Auth via credentials file stored in `~/.planning-agent/`. (#2)
-- [ ] Add `google-api-python-client` and `google-auth` to
+- [x] Add `google-api-python-client` and `google-auth` to
   `pyproject.toml` dependencies. (#3)
-- [ ] Add `GOOGLE_CALENDAR_CREDENTIALS` config entry to `config.py`
+- [x] Add `GOOGLE_CALENDAR_CREDENTIALS` config entry to `config.py`
   (path to credentials JSON, with fallback so tests work without it). (#4)
 - [ ] Add unit tests for `_fetch_calendar_snapshot()` with a mocked
   Google API client. (#5)

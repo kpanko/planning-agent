@@ -10,7 +10,7 @@ from planning_context.memories import get_active
 from planning_context.values import read_values
 from todoist_api_python.api import TodoistAPI
 
-from .config import TODOIST_API_KEY
+from .config import GOOGLE_CALENDAR_CREDENTIALS, TODOIST_API_KEY
 
 
 @dataclass
@@ -97,6 +97,79 @@ def _fetch_todoist_snapshot(api: TodoistAPI) -> str:
     return "\n".join(lines) if lines else "No tasks found."
 
 
+def _fetch_calendar_snapshot() -> str:
+    """Fetch this week's Google Calendar events.
+
+    Returns a formatted string of events, or a short
+    fallback message if credentials are absent or the
+    API call fails.
+    """
+    if not GOOGLE_CALENDAR_CREDENTIALS.exists():
+        return "(Google Calendar not connected)"
+
+    try:
+        from google.oauth2.credentials import Credentials
+        from googleapiclient.discovery import build as gcal_build
+
+        creds = Credentials.from_authorized_user_file(
+            str(GOOGLE_CALENDAR_CREDENTIALS),
+            scopes=["https://www.googleapis.com/auth/calendar.readonly"],
+        )
+        service = gcal_build(
+            "calendar", "v3", credentials=creds
+        )
+
+        today = date.today()
+        monday = today - timedelta(days=today.weekday())
+        sunday = monday + timedelta(days=6)
+        time_min = (
+            datetime.combine(monday, datetime.min.time())
+            .isoformat() + "Z"
+        )
+        time_max = (
+            datetime.combine(
+                sunday,
+                datetime.max.time().replace(microsecond=0),
+            )
+            .isoformat() + "Z"
+        )
+
+        events_result = (
+            service.events()
+            .list(
+                calendarId="primary",
+                timeMin=time_min,
+                timeMax=time_max,
+                singleEvents=True,
+                orderBy="startTime",
+            )
+            .execute()
+        )
+        events = events_result.get("items", [])
+
+        if not events:
+            return "No calendar events this week."
+
+        lines: list[str] = []
+        for ev in events:
+            start = ev["start"].get(
+                "dateTime", ev["start"].get("date", "?")
+            )
+            summary = ev.get("summary", "(no title)")
+            # Trim to just date+time for readability
+            if "T" in start:
+                dt = datetime.fromisoformat(
+                    start.replace("Z", "+00:00")
+                )
+                start = dt.strftime("%a %b %d %I:%M %p")
+            lines.append(f"  {start}: {summary}")
+
+        return "This week:\n" + "\n".join(lines)
+
+    except Exception as exc:
+        return f"(Google Calendar error: {exc})"
+
+
 def build_context() -> PlanningContext:
     """Assemble full planning context for a conversation."""
     values_doc = read_values()
@@ -109,7 +182,7 @@ def build_context() -> PlanningContext:
     else:
         todoist_snapshot = "(Todoist not connected)"
 
-    calendar_snapshot = "(not connected yet)"
+    calendar_snapshot = _fetch_calendar_snapshot()
 
     now = datetime.now()
     current_datetime = now.strftime("%A, %B %d, %Y %I:%M %p")

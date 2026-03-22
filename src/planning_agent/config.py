@@ -10,6 +10,20 @@ load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 TODOIST_API_KEY = os.environ.get("TODOIST_API_KEY", "")
 
+_data_dir = Path(
+    os.environ.get(
+        "PLANNING_AGENT_DATA_DIR",
+        Path.home() / ".planning-agent",
+    )
+)
+
+GOOGLE_CALENDAR_CREDENTIALS = Path(
+    os.environ.get(
+        "GOOGLE_CALENDAR_CREDENTIALS",
+        _data_dir / "google_credentials.json",
+    )
+)
+
 
 def _default_models() -> tuple[str, str]:
     """Pick default models based on available API keys.
