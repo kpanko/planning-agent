@@ -116,3 +116,45 @@ Post-v1 but self-contained.
 - [ ] Add `get_due_soon` results to `build_context()` pre-loaded snapshot. (#24)
 - [ ] Add `tests/test_fuzzy_recurring.py` covering due-soon detection,
   seasonal suppression, and `update_last_done` persistence. (#25)
+
+
+## Milestone 5: Scheduling Pattern Learning — `planned`
+**Goal:** Extend the post-conversation extraction pipeline to capture
+scheduling patterns (completion rates, duration accuracy, deferral
+tendencies) in `scheduling_patterns.json`. Load these patterns into
+context so the planning agent calibrates its proposals based on
+observed behavior.
+
+**Acceptance Criteria:**
+- `scheduling_patterns.json` is created on first extraction run with
+  three sections: `completion_patterns`, `duration_patterns`,
+  `deferral_patterns`.
+- The extraction prompt identifies pattern evidence from conversation
+  transcripts and nightly replan results.
+- Patterns are natural-language observations with confidence levels
+  (`low`, `medium`, `high`) and evidence counts.
+- The extraction agent consolidates patterns (updates existing entries)
+  rather than appending duplicates.
+- `build_context()` loads patterns and injects them into the system
+  prompt under a "Learned Patterns" section.
+- After 3-4 sessions with duration mismatches, a duration pattern
+  appears in the file and the agent references it when proposing
+  schedules.
+
+**Tasks:**
+- [ ] Add `scheduling_patterns.json` to data directory defaults in
+  `storage.py`. (#26)
+- [ ] Add `load_scheduling_patterns()` and `update_scheduling_patterns()`
+  functions in a new `src/planning_context/patterns.py` module. (#27)
+- [ ] Add `SchedulingPatternUpdate` model and
+  `scheduling_pattern_updates` field to `ExtractionResult` in
+  `extraction.py`. (#28)
+- [ ] Expand `EXTRACTION_PROMPT` with a fifth extraction target for
+  scheduling pattern evidence. (#29)
+- [ ] Wire `apply_extraction()` to write pattern updates to
+  `scheduling_patterns.json`. (#30)
+- [ ] Add `scheduling_patterns` field to `PlanningContext` and load it
+  in `build_context()`. (#31)
+- [ ] Add "Learned Patterns" section to `STATIC_PROMPT` in
+  `agent.py`. (#32)
+- [ ] Add tests for pattern loading, updating, and consolidation. (#33)

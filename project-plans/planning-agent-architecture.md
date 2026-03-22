@@ -263,6 +263,7 @@ get_task_constraints    → which tasks have seasonal/weather constraints
   values.md                     # system-maintained priorities doc
   memories.json                 # facts, observations, open threads
   fuzzy-recurring.json          # "check spare tire every ~6 months"
+  scheduling_patterns.json      # learned completion, duration, deferral patterns
   conversations/
     2026-02-21.json             # daily conversation logs
   config.json                   # location, preferences, API keys
@@ -466,6 +467,14 @@ After onboarding, Claude does an initial scan of Todoist and Calendar and propos
 14. **Add replanning support.** "My afternoon just blew up, what do I move?"
 15. **Memory management.** Expiry, consolidation, staleness protection on values doc.
 
+15b. **Add scheduling pattern extraction** to the post-conversation
+pipeline. The extraction prompt is expanded to look for evidence of
+scheduling patterns — tasks that took longer than estimated, completion
+counts vs scheduled counts, categories that get deferred repeatedly.
+Patterns are natural-language observations stored in
+`scheduling_patterns.json`, maintained by the extraction agent,
+and loaded into context at the start of each conversation.
+
 **Goal:** The system gets better over time. Week 4 plans are noticeably smarter than week 1 plans.
 
 ### Phase 4: Polish and Automation (later)
@@ -548,6 +557,11 @@ The MCP approach is desktop-first. Mobile interaction can come later via a messa
 - **Claude's common sense** for a first guess ("calling to schedule an appointment" ≈ 10 min)
 - **User correction** during planning review ("that'll take longer, make it an hour")
 - **Derived signals** (inbox count → email processing duration)
-- **Historical patterns** (over time, the system learns that your "30-minute" tasks actually take 45 minutes)
+- **Historical patterns** — the post-conversation extraction
+  pipeline captures scheduling patterns (completion rates,
+  duration accuracy, deferral tendencies) in
+  `scheduling_patterns.json`. These are natural-language
+  observations maintained by the extraction agent, loaded into
+  context at conversation start, and used to calibrate estimates
 
 The system should default to slightly overestimating rather than packing the day too tight.

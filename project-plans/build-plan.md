@@ -99,6 +99,7 @@ Same flat files as before. They worked fine.
   values.md                     # system-maintained priorities
   memories.json                 # facts, observations, open threads
   fuzzy_recurring.json          # "check spare tire every ~6 months"
+  scheduling_patterns.json      # learned completion, duration, deferral patterns
   conversations/
     2026-02-23.json             # daily conversation logs
   config.json                   # API keys, preferences, location
@@ -169,6 +170,31 @@ Add the post-conversation hook:
 - Write everything to the flat files
 
 **Test:** Have a conversation where you mention something new ("I'm thinking about signing up for a 5K in April"). End the conversation. Start a new one. Verify the LLM knows about the 5K without you mentioning it.
+
+### Step 4b: Scheduling pattern learning
+
+Extend the extraction pipeline to capture scheduling patterns:
+
+- Add `scheduling_patterns.json` to the data directory. Three
+  sections: `completion_patterns`, `duration_patterns`,
+  `deferral_patterns`. Each entry is a natural-language
+  observation with a confidence level and evidence count.
+- Expand `ExtractionResult` with a
+  `scheduling_pattern_updates` field. Expand `EXTRACTION_PROMPT`
+  to look for pattern evidence (tasks taking longer than
+  estimated, completion counts vs scheduled, categories that get
+  deferred repeatedly).
+- Load `scheduling_patterns.json` in `build_context()` and
+  inject it into the system prompt as a "Learned Patterns"
+  section.
+- The extraction agent consolidates patterns rather than
+  appending endlessly — update existing patterns when new
+  evidence confirms or contradicts them.
+
+**Test:** Run several planning sessions. After 3-4 sessions
+where tasks take longer than estimated, verify that a duration
+pattern appears in `scheduling_patterns.json` and that the agent
+references it when proposing durations.
 
 ### Step 5: Simple web frontend
 

@@ -89,10 +89,11 @@ FastAPI backend
         main_nightly.py — scheduled replan (to build)
 
 Flat files (~/.planning-agent/)
-  values.md            — personal priorities, maintained by agent
-  memories.json        — facts, observations, open threads
-  fuzzy_recurring.json — "check spare tire ~every 6 months" (future)
-  conversations/       — daily summaries
+  values.md                — personal priorities, maintained by agent
+  memories.json            — facts, observations, open threads
+  fuzzy_recurring.json     — "check spare tire ~every 6 months" (future)
+  scheduling_patterns.json — learned completion/duration/deferral patterns
+  conversations/           — daily summaries
 ```
 
 The `planning_context` package owns the flat file layer. The

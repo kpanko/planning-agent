@@ -72,6 +72,23 @@ Quick review of today's plan. What's on the calendar, what tasks are scheduled, 
   - `office` — must be at the office (Tue–Thu)
   - `errands` — requires going out
 
+### Learned Patterns
+
+[loaded from scheduling_patterns.json via context assembly]
+
+Use these patterns to calibrate your scheduling:
+- If duration patterns say phone calls take 20 min, don't
+  estimate 5 min.
+- If completion patterns say weekday evenings handle 3-4 tasks
+  max, don't schedule 6.
+- If deferral patterns say car tasks get postponed, schedule
+  them at high-motivation times.
+
+Weight patterns by confidence and evidence count. High-confidence
+patterns (5+ observations) should strongly influence your
+proposals. Low-confidence patterns (1-2 observations) are
+tentative — consider them but don't rely on them.
+
 ### Daily Habits
 
 Tasks like "Floss teeth" and "Take vitamin D" that recur at specific times daily are habits, not planning decisions. Include them in the day's picture for awareness but don't spend time discussing or rescheduling them unless Kevin raises an issue.
@@ -157,6 +174,9 @@ When Kevin signals the conversation is ending (says "done," "thanks," "that's it
    - Stated preferences ("I'd rather do errands in the morning")
    - Open threads ("thinking about signing up for a gym")
    - Observations about patterns (low confidence until confirmed multiple times)
+   - Scheduling pattern evidence (tasks that took longer or
+     shorter than planned, completion counts vs scheduled
+     counts, categories that were deferred or adjusted)
 
 3. **Update the values doc** using `planning-context:update_values_doc` only if priorities clearly shifted during the conversation. Don't update for routine discussion of existing priorities.
 

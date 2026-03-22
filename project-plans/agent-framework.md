@@ -75,6 +75,7 @@ class PlanningContext:
     recent_conversations: list[dict]
     todoist_snapshot: str      # formatted task summary
     calendar_snapshot: str     # formatted event summary
+    scheduling_patterns: str   # learned completion/duration/deferral patterns
     current_datetime: str
     day_type: str              # "remote", "office", "weekend"
 
@@ -112,6 +113,9 @@ def build_system_prompt(ctx: RunContext[PlanningContext]) -> str:
 ## Calendar this week
 {deps.calendar_snapshot}
 
+## Scheduling patterns (learned from past sessions)
+{deps.scheduling_patterns}
+
 ## Right now
 {deps.current_datetime} — {deps.day_type}
 """
@@ -130,12 +134,13 @@ async def build_context() -> PlanningContext:
     Assembles full planning context. Called once at conversation start.
     All I/O is parallel where possible.
     """
-    todoist_tasks, calendar_events, memories, values, convos = await asyncio.gather(
+    todoist_tasks, calendar_events, memories, values, convos, patterns = await asyncio.gather(
         fetch_todoist_snapshot(),    # Todoist REST API: due/overdue/this week
         fetch_calendar_snapshot(),   # Google Calendar API: next 7 days
         load_memories(),             # memories.json: active, non-expired
         load_values_doc(),           # values.md: raw markdown
         load_recent_conversations(n=3),  # conversations/*.json: last 3 summaries
+        load_scheduling_patterns(),  # scheduling_patterns.json: learned patterns
     )
     return PlanningContext(
         values_doc=values,
@@ -143,6 +148,7 @@ async def build_context() -> PlanningContext:
         recent_conversations=convos,
         todoist_snapshot=format_todoist(todoist_tasks),
         calendar_snapshot=format_calendar(calendar_events),
+        scheduling_patterns=format_patterns(patterns),
         current_datetime=now_formatted(),
         day_type=compute_day_type(),  # uses schedule rules from values doc
     )
@@ -237,12 +243,22 @@ extraction_agent = Agent(
     output_type=ExtractionResult,  # Pydantic model — validated JSON
 )
 
+class SchedulingPatternUpdate(BaseModel):
+    """An update to a scheduling pattern."""
+    id: str | None = None     # existing ID to update, or None for new
+    section: str              # completion_patterns, duration_patterns, deferral_patterns
+    pattern: str              # natural language description
+    confidence: str           # low, medium, high
+
 @dataclass
 class ExtractionResult:
     new_memories: list[Memory]
     resolved_memory_ids: list[str]
     values_doc_update: str | None   # None = no change
     conversation_summary: str
+    scheduling_pattern_updates: list[SchedulingPatternUpdate] = field(
+        default_factory=list,
+    )
 
 async def run_extraction(message_history: list):
     result = await extraction_agent.run(
