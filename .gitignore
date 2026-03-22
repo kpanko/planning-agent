@@ -31,3 +31,4 @@ project-plans/values.md
 .DS_Store
 Thumbs.db
 .omc/
+.claude/

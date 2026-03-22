@@ -239,8 +239,8 @@ def reschedule_tasks(
             if time_str:
                 api.update_task(
                     task_id=task_id,
-                    due_datetime=(
-                        f"{target}T{time_str}:00"
+                    due_string=(
+                        f"{target} {time_str}"
                     ),
                 )
                 results.append(

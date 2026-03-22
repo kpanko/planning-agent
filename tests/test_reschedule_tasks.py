@@ -85,7 +85,7 @@ def test_with_time_calls_update_task(mock_api, mock_reschedule):
     )
     mock_api.update_task.assert_called_once_with(
         task_id="1",
-        due_datetime="2026-03-10T09:30:00",
+        due_string="2026-03-10 09:30",
     )
     assert result == "✓ 'Dentist' -> 2026-03-10 09:30"
 
@@ -116,7 +116,7 @@ def test_multiple_tasks_mixed(mock_api, mock_reschedule):
     assert mock_reschedule.call_count == 2
     mock_api.update_task.assert_called_once_with(
         task_id="1",
-        due_datetime="2026-03-10T14:00:00",
+        due_string="2026-03-10 14:00",
     )
     lines = result.splitlines()
     assert lines[0] == "✓ 'Call doctor' -> 2026-03-10 14:00"

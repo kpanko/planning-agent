@@ -1,5 +1,13 @@
 # Planning Agent
 
+## Rules
+- Enter plan mode for non-trivial tasks. Present your plan and wait for approval.
+- Do not delete files or data without explicit confirmation.
+- When the word "agent" appears, assume it refers to the planning-agent code,
+  not Claude Code itself, unless clearly stated otherwise.
+- State what you intend to modify before writing code.
+- If something goes wrong, stop and re-plan instead of pushing forward.
+
 ## Build & Test
 
 ```bash
