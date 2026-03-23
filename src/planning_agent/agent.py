@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
-from typing import Optional
+from typing import Awaitable, Callable, Optional
 
 from rich.console import Console
 
 logger = logging.getLogger("planning-agent")
+
+ConfirmFn = Callable[[str, str], Awaitable[bool]]
 
 from pydantic_ai import Agent, RunContext
 
@@ -29,11 +32,15 @@ def _tool_result(result: str) -> None:
     _console.print(f"    [dim]{result}[/dim]")
 
 
-def _confirm_tool(name: str, detail: str = "") -> bool:
-    """Show a pending tool call and ask the user to confirm."""
+async def _default_confirm(
+    name: str, detail: str = "",
+) -> bool:
+    """Default confirm: prompt via terminal (async)."""
     _tool_status(name, detail)
     try:
-        answer = input("  Run? [y/N] ").strip().lower()
+        answer = await asyncio.to_thread(
+            lambda: input("  Run? [y/N] ").strip().lower()
+        )
     except (EOFError, KeyboardInterrupt):
         return False
     return answer in ("y", "yes")
@@ -241,11 +248,18 @@ def _get_api():
     return TodoistAPI(TODOIST_API_KEY)
 
 
-def create_agent() -> Agent:
+def create_agent(
+    confirm: ConfirmFn | None = None,
+) -> Agent:
     """Build and return the planning agent.
 
     Deferred so import doesn't require API keys.
+    confirm: async callable(name, detail) -> bool used
+             for tool-call confirmation. Defaults to a
+             terminal prompt via stdin.
     """
+    if confirm is None:
+        confirm = _default_confirm
     planning_agent = Agent(
         LLM_MODEL,
         deps_type=PlanningContext,
@@ -285,12 +299,12 @@ def create_agent() -> Agent:
     # ---------------------------------------------------------------
 
     @planning_agent.tool
-    def reschedule_tasks(
+    async def reschedule_tasks(
         ctx: RunContext[PlanningContext],
         tasks: list[RescheduleItem],
     ) -> str:
         """Reschedule one or more tasks to new dates."""
-        if not _confirm_tool(
+        if not await confirm(
             "reschedule_tasks",
             repr([t.model_dump() for t in tasks]),
         ):
@@ -301,17 +315,17 @@ def create_agent() -> Agent:
         )
 
     @planning_agent.tool
-    def complete_task(
+    async def complete_task(
         ctx: RunContext[PlanningContext],
         task_id: str,
     ) -> str:
         """Mark a task as complete."""
-        if not _confirm_tool("complete_task", task_id):
+        if not await confirm("complete_task", task_id):
             return "Cancelled by user."
         return _tools.complete_task(_get_api(), task_id)
 
     @planning_agent.tool
-    def add_task(
+    async def add_task(
         ctx: RunContext[PlanningContext],
         content: str,
         due_string: Optional[str] = None,
@@ -330,7 +344,7 @@ def create_agent() -> Agent:
         detail = f'"{content}"'
         if due_string:
             detail += f" due={due_string}"
-        if not _confirm_tool("add_task", detail):
+        if not await confirm("add_task", detail):
             return "Cancelled by user."
         return _tools.add_task(
             _get_api(),
@@ -345,7 +359,7 @@ def create_agent() -> Agent:
         )
 
     @planning_agent.tool
-    def find_tasks(
+    async def find_tasks(
         ctx: RunContext[PlanningContext],
         query: Optional[str] = None,
         search: Optional[str] = None,
@@ -373,7 +387,7 @@ def create_agent() -> Agent:
             parts.append(f"project={project_id}")
         if label:
             parts.append(f"label={label}")
-        if not _confirm_tool(
+        if not await confirm(
             "find_tasks", ", ".join(parts) or "",
         ):
             return "Cancelled by user."
@@ -382,7 +396,7 @@ def create_agent() -> Agent:
         )
 
     @planning_agent.tool
-    def find_tasks_by_date(
+    async def find_tasks_by_date(
         ctx: RunContext[PlanningContext],
         start_date: str,
         end_date: Optional[str] = None,
@@ -395,19 +409,19 @@ def create_agent() -> Agent:
         detail = start_date
         if end_date:
             detail += f" to {end_date}"
-        if not _confirm_tool("find_tasks_by_date", detail):
+        if not await confirm("find_tasks_by_date", detail):
             return "Cancelled by user."
         return _tools.find_tasks_by_date(
             _get_api(), start_date, end_date,
         )
 
     @planning_agent.tool
-    def get_task(
+    async def get_task(
         ctx: RunContext[PlanningContext],
         task_id: str,
     ) -> str:
         """Fetch a single task by ID."""
-        if not _confirm_tool("get_task", task_id):
+        if not await confirm("get_task", task_id):
             return "Cancelled by user."
         return _tools.get_task(_get_api(), task_id)
 
@@ -416,7 +430,7 @@ def create_agent() -> Agent:
     # ---------------------------------------------------------------
 
     @planning_agent.tool
-    def add_memory(
+    async def add_memory(
         ctx: RunContext[PlanningContext],
         content: str,
         category: str,
@@ -429,7 +443,7 @@ def create_agent() -> Agent:
         expiry_date: Optional YYYY-MM-DD after which
                      this memory expires.
         """
-        if not _confirm_tool("add_memory", f"({category})"):
+        if not await confirm("add_memory", f"({category})"):
             return "Cancelled by user."
         try:
             memory = _add_memory(
@@ -444,12 +458,12 @@ def create_agent() -> Agent:
             return f"Error: {e}"
 
     @planning_agent.tool
-    def resolve_memory(
+    async def resolve_memory(
         ctx: RunContext[PlanningContext],
         memory_id: str,
     ) -> str:
         """Mark a memory as resolved/no longer active."""
-        if not _confirm_tool("resolve_memory", memory_id):
+        if not await confirm("resolve_memory", memory_id):
             return "Cancelled by user."
         result = _resolve_memory(memory_id)
         if result:
@@ -457,7 +471,7 @@ def create_agent() -> Agent:
         return f"Memory {memory_id} not found."
 
     @planning_agent.tool
-    def update_values_doc(
+    async def update_values_doc(
         ctx: RunContext[PlanningContext],
         content: str,
     ) -> str:
@@ -465,7 +479,7 @@ def create_agent() -> Agent:
 
         Only use when priorities have clearly shifted.
         """
-        if not _confirm_tool("update_values_doc"):
+        if not await confirm("update_values_doc", ""):
             return "Cancelled by user."
         return write_values(content)
 

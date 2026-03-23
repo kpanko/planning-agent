@@ -45,18 +45,18 @@ This milestone completes v1 DoD item 4.
   buttons) rather than blocking the server.
 
 **Tasks:**
-- [ ] Add `fastapi`, `uvicorn`, and `websockets` to `pyproject.toml`. (#7)
-- [ ] Create `src/planning_agent/main_web.py`: FastAPI app with a
+- [x] Add `fastapi`, `uvicorn`, and `websockets` to `pyproject.toml`. (#7)
+- [x] Create `src/planning_agent/main_web.py`: FastAPI app with a
   `GET /` HTML page and a `WebSocket /ws` chat endpoint. (#8)
-- [ ] Refactor tool-confirmation logic out of `agent.py`'s `_confirm_tool()`
+- [x] Refactor tool-confirmation logic out of `agent.py`'s `_confirm_tool()`
   into an injectable callback so the CLI uses `input()` and the web
   handler uses a WebSocket round-trip. (#9)
-- [ ] Build minimal `static/index.html` + inline JS: connect WebSocket,
+- [x] Build minimal `static/index.html` + inline JS: connect WebSocket,
   render Markdown responses, show confirm dialogs for tool calls. (#10)
-- [ ] Add `planning-agent-web` entry point in `pyproject.toml`. (#11)
-- [ ] Add integration tests for the FastAPI routes using
+- [x] Add `planning-agent-web` entry point in `pyproject.toml`. (#11)
+- [x] Add integration tests for the FastAPI routes using
   `httpx.AsyncClient`; mock the PydanticAI agent to avoid live LLM calls. (#12)
-- [ ] Document how to run the web server in `README.md`. (#13)
+- [x] Document how to run the web server in `README.md`. (#13)
 
 
 ## Milestone 3: Nightly Replan Job — `planned`
