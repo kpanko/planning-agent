@@ -1,6 +1,6 @@
 # Milestones
 
-## Milestone 1: Stabilize and Polish — `in-progress`
+## Milestone 1: Stabilize and Polish — `done`
 **Goal:** Fix the hardcoded personal name in the extraction prompt, connect
 Google Calendar, and add tests. The CLI works correctly with an OpenAI key
 after this pass.
@@ -28,7 +28,7 @@ after this pass.
   credentials are absent. (#6)
 
 
-## Milestone 2: Web Interface (Mobile-Accessible) — `planned`
+## Milestone 2: Web Interface (Mobile-Accessible) — `done`
 **Goal:** Build a FastAPI backend with a WebSocket chat endpoint and a
 minimal HTML/JS frontend so the agent is reachable from a phone browser.
 This milestone completes v1 DoD item 4.
@@ -59,7 +59,7 @@ This milestone completes v1 DoD item 4.
 - [x] Document how to run the web server in `README.md`. (#13)
 
 
-## Milestone 3: Nightly Replan Job — `planned`
+## Milestone 3: Nightly Replan Job — `in-progress`
 **Goal:** Build a headless job that runs once per night, finds undone tasks
 from today and earlier, and spreads them forward using the existing
 `todoist_scheduler` logic. This completes v1 DoD item 5.
