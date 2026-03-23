@@ -1,18 +1,17 @@
 # Status
 
-**Last updated:** 2026-03-21
-**Active milestone:** Milestone 1 — Stabilize and Polish
+**Last updated:** 2026-03-23
+**Active milestone:** Milestone 2 — Web Interface (Mobile-Accessible)
 
 ## Recently Completed
 
-- **#1** Fix hardcoded "Kevin" in `extraction.py` → "the user"
-- **#3** Add `google-api-python-client`, `google-auth`,
-  `google-auth-httplib2` to `pyproject.toml`
-- **#4** Add `GOOGLE_CALENDAR_CREDENTIALS` config entry to `config.py`
-  (defaults to `~/.planning-agent/google_credentials.json`)
-- **#2** Implement `_fetch_calendar_snapshot()` in `context.py`; falls
-  back gracefully to `"(Google Calendar not connected)"` when
-  credentials file is absent
+- **Milestone 1** — All 6 tasks done, landed on `main`
+  - #1 Fix hardcoded "Kevin" in `extraction.py`
+  - #2 Implement `_fetch_calendar_snapshot()` with GCal API
+  - #3 Add Google API dependencies to `pyproject.toml`
+  - #4 Add `GOOGLE_CALENDAR_CREDENTIALS` config entry
+  - #5 Unit tests for `_fetch_calendar_snapshot()` (mocked)
+  - #6 Confirmed GCal fallback covered in `TestBuildContext`
 
 ## In Progress
 
@@ -20,12 +19,10 @@ Nothing actively in progress.
 
 ## Next Up
 
-- **#5** Add unit tests for `_fetch_calendar_snapshot()` with a mocked
-  Google API client
-- **#6** Update existing `TestBuildContext` test — the assertion
-  `"(not connected yet)"` is now stale; update to
-  `"(Google Calendar not connected)"`, and add a test for the
-  no-credentials fallback path
+- **#7** Add `fastapi`, `uvicorn`, `websockets` to `pyproject.toml`
+  (start on branch `milestone-2`)
+- **#8** Create `src/planning_agent/main_web.py` — FastAPI app +
+  WebSocket chat endpoint
 
 ## Blockers / Open Questions
 
@@ -33,10 +30,9 @@ Nothing actively in progress.
 
 ## Key Context
 
-- `_fetch_calendar_snapshot()` uses
-  `google.oauth2.credentials.Credentials.from_authorized_user_file` —
-  expects an OAuth user token file, not a service account key. Real
-  credentials setup not yet tested against a live Google account.
-- `TestBuildContext.test_builds_without_todoist` in
-  `tests/test_planning_agent.py` (line 141) will fail until #6 is done:
-  it still asserts `"(not connected yet)"` in `calendar_snapshot`.
+- Branching strategy: one branch + PR per milestone. M1 landed
+  directly on `main` (decided after the fact). M2 starts on
+  `milestone-2`.
+- `_fetch_calendar_snapshot()` expects an OAuth user token file
+  at `~/.planning-agent/google_credentials.json`. Live credentials
+  not yet tested.

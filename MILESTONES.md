@@ -22,9 +22,9 @@ after this pass.
   `pyproject.toml` dependencies. (#3)
 - [x] Add `GOOGLE_CALENDAR_CREDENTIALS` config entry to `config.py`
   (path to credentials JSON, with fallback so tests work without it). (#4)
-- [ ] Add unit tests for `_fetch_calendar_snapshot()` with a mocked
+- [x] Add unit tests for `_fetch_calendar_snapshot()` with a mocked
   Google API client. (#5)
-- [ ] Update existing tests to assert graceful fallback when Google
+- [x] Update existing tests to assert graceful fallback when Google
   credentials are absent. (#6)
 
 
