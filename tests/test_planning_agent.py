@@ -13,6 +13,7 @@ from planning_agent.config import (
 from planning_agent.context import (
     PlanningContext,
     _compute_day_type,
+    _fetch_calendar_snapshot,
     _fmt_task,
     build_context,
 )
@@ -117,6 +118,87 @@ class TestFmtTask:
         )
         result = _fmt_task(task)
         assert "p1" in result
+
+
+class TestFetchCalendarSnapshot:
+    @patch("planning_agent.context.GOOGLE_CALENDAR_CREDENTIALS")
+    def test_no_credentials_returns_fallback(self, mock_path):
+        mock_path.exists.return_value = False
+        result = _fetch_calendar_snapshot()
+        assert result == "(Google Calendar not connected)"
+
+    @patch("googleapiclient.discovery.build")
+    @patch(
+        "google.oauth2.credentials.Credentials"
+        ".from_authorized_user_file"
+    )
+    @patch("planning_agent.context.GOOGLE_CALENDAR_CREDENTIALS")
+    def test_returns_formatted_events(
+        self, mock_path, _mock_creds, mock_build
+    ):
+        mock_path.exists.return_value = True
+        mock_service = MagicMock()
+        mock_build.return_value = mock_service
+        (
+            mock_service.events.return_value
+            .list.return_value
+            .execute.return_value
+        ) = {
+            "items": [
+                {
+                    "summary": "Team meeting",
+                    "start": {
+                        "dateTime": "2026-03-23T10:00:00+00:00"
+                    },
+                },
+                {
+                    "summary": "All-day event",
+                    "start": {"date": "2026-03-24"},
+                },
+            ]
+        }
+
+        result = _fetch_calendar_snapshot()
+
+        assert "This week:" in result
+        assert "Team meeting" in result
+        assert "All-day event" in result
+
+    @patch("googleapiclient.discovery.build")
+    @patch(
+        "google.oauth2.credentials.Credentials"
+        ".from_authorized_user_file"
+    )
+    @patch("planning_agent.context.GOOGLE_CALENDAR_CREDENTIALS")
+    def test_empty_calendar(
+        self, mock_path, _mock_creds, mock_build
+    ):
+        mock_path.exists.return_value = True
+        mock_service = MagicMock()
+        mock_build.return_value = mock_service
+        (
+            mock_service.events.return_value
+            .list.return_value
+            .execute.return_value
+        ) = {"items": []}
+
+        result = _fetch_calendar_snapshot()
+
+        assert result == "No calendar events this week."
+
+    @patch(
+        "google.oauth2.credentials.Credentials"
+        ".from_authorized_user_file",
+        side_effect=Exception("auth error"),
+    )
+    @patch("planning_agent.context.GOOGLE_CALENDAR_CREDENTIALS")
+    def test_api_error_returns_error_message(
+        self, mock_path, _mock_creds
+    ):
+        mock_path.exists.return_value = True
+        result = _fetch_calendar_snapshot()
+        assert "(Google Calendar error:" in result
+        assert "auth error" in result
 
 
 class TestBuildContext:
