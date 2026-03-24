@@ -1,0 +1,73 @@
+# Deploying to Fly.io
+
+## Prerequisites: Google Cloud OAuth client
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com) →
+   APIs & Services → Credentials.
+2. Create (or reuse) an **OAuth 2.0 Client ID** of type *Web application*.
+3. Under **Authorized redirect URIs** add:
+   ```
+   https://<your-app>.fly.dev/oauth/callback
+   http://localhost:8080/oauth/callback   ← for local dev
+   ```
+4. Note your **Client ID** and **Client Secret**.
+
+## One-time Fly setup
+
+```bash
+# Install flyctl: https://fly.io/docs/hands-on/install-flyctl/
+fly auth login
+fly launch --no-deploy   # creates the app, skips first deploy
+
+# Create persistent volume for app data
+fly volumes create planning_agent_data --size 1 --region ord
+
+# Set secrets
+fly secrets set \
+  GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com" \
+  GOOGLE_CLIENT_SECRET="your-client-secret" \
+  ALLOWED_GOOGLE_EMAIL="you@gmail.com" \
+  WEB_SECRET="$(openssl rand -hex 32)" \
+  BASE_URL="https://your-app.fly.dev" \
+  TODOIST_API_KEY="your-todoist-key" \
+  ANTHROPIC_API_KEY="your-anthropic-key"
+```
+
+## Deploy
+
+```bash
+fly deploy
+```
+
+## How auth works
+
+- Visiting the app redirects to `/login` if not signed in.
+- Clicking **Sign in with Google** starts an OAuth2 flow.
+- Only the `ALLOWED_GOOGLE_EMAIL` account is admitted; all others get 403.
+- On first login the Google OAuth token is saved to the data volume and
+  used automatically for Google Calendar — no separate Calendar setup needed.
+- Session cookies are signed with `WEB_SECRET` and expire after 30 days.
+
+## Local development
+
+```bash
+# Set env vars in .env (already git-ignored)
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+ALLOWED_GOOGLE_EMAIL=you@gmail.com
+WEB_SECRET=dev-secret
+BASE_URL=http://localhost:8080
+
+uv run planning-agent-web
+```
+
+## Regions
+
+The `fly.toml` defaults to `ord` (Chicago). Change `primary_region` to
+the closest option: `sea`, `lax`, `iad`, `ewr`, `lhr`, `fra`, etc.
+
+## Cost
+
+With `min_machines_running = 0` the machine stops when idle and restarts
+on the next request. This keeps usage within Fly's free tier for a
+personal tool.

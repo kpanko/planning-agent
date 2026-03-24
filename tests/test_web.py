@@ -5,9 +5,19 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from itsdangerous import URLSafeTimedSerializer
 from starlette.testclient import TestClient
 
 from planning_agent.main_web import app
+
+_TEST_SECRET = "test-secret-for-tests"
+_TEST_EMAIL = "test@example.com"
+
+
+def _session_cookies() -> dict[str, str]:
+    """Return a valid signed session cookie for tests."""
+    signer = URLSafeTimedSerializer(_TEST_SECRET)
+    return {"pa_session": signer.dumps(_TEST_EMAIL)}
 
 
 def _make_mock_agent(reply: str = "Hello from agent"):
@@ -25,24 +35,52 @@ def _make_mock_context():
     return MagicMock()
 
 
-# ── HTTP route ────────────────────────────────────────────
+# ── HTTP routes ────────────────────────────────────────────
+
+
+class TestLoginRoute:
+    def test_unauthenticated_get_index_redirects(self):
+        with TestClient(app, follow_redirects=False) as c:
+            response = c.get("/")
+        assert response.status_code == 303
+        assert response.headers["location"] == "/login"
+
+    def test_login_page_returns_200(self):
+        with TestClient(app) as c:
+            response = c.get("/login")
+        assert response.status_code == 200
+        assert "text/html" in response.headers[
+            "content-type"
+        ]
 
 
 class TestIndexRoute:
-    def test_returns_200(self):
-        with TestClient(app) as client:
+    def test_returns_200_with_session(self):
+        with patch(
+            "planning_agent.auth.WEB_SECRET", _TEST_SECRET
+        ):
+            client = TestClient(app)
+            client.cookies.update(_session_cookies())
             response = client.get("/")
         assert response.status_code == 200
 
-    def test_returns_html(self):
-        with TestClient(app) as client:
+    def test_returns_html_with_session(self):
+        with patch(
+            "planning_agent.auth.WEB_SECRET", _TEST_SECRET
+        ):
+            client = TestClient(app)
+            client.cookies.update(_session_cookies())
             response = client.get("/")
         assert "text/html" in response.headers[
             "content-type"
         ]
 
     def test_contains_websocket_script(self):
-        with TestClient(app) as client:
+        with patch(
+            "planning_agent.auth.WEB_SECRET", _TEST_SECRET
+        ):
+            client = TestClient(app)
+            client.cookies.update(_session_cookies())
             response = client.get("/")
         assert "WebSocket" in response.text
 
@@ -55,6 +93,10 @@ class TestWebSocketChat:
         mock_agent = _make_mock_agent("Here's your plan.")
 
         with (
+            patch(
+                "planning_agent.auth.WEB_SECRET",
+                _TEST_SECRET,
+            ),
             patch(
                 "planning_agent.main_web.create_agent",
                 return_value=mock_agent,
@@ -69,9 +111,8 @@ class TestWebSocketChat:
             ),
         ):
             with TestClient(app) as client:
-                with client.websocket_connect(
-                    "/ws"
-                ) as ws:
+                client.cookies.update(_session_cookies())
+                with client.websocket_connect("/ws") as ws:
                     ws.send_json(
                         {
                             "type": "chat",
@@ -88,6 +129,10 @@ class TestWebSocketChat:
 
         with (
             patch(
+                "planning_agent.auth.WEB_SECRET",
+                _TEST_SECRET,
+            ),
+            patch(
                 "planning_agent.main_web.create_agent",
                 return_value=mock_agent,
             ),
@@ -101,9 +146,8 @@ class TestWebSocketChat:
             ),
         ):
             with TestClient(app) as client:
-                with client.websocket_connect(
-                    "/ws"
-                ) as ws:
+                client.cookies.update(_session_cookies())
+                with client.websocket_connect("/ws") as ws:
                     ws.send_json(
                         {
                             "type": "chat",
@@ -123,6 +167,10 @@ class TestWebSocketChat:
 
         with (
             patch(
+                "planning_agent.auth.WEB_SECRET",
+                _TEST_SECRET,
+            ),
+            patch(
                 "planning_agent.main_web.create_agent",
                 return_value=mock_agent,
             ),
@@ -136,9 +184,8 @@ class TestWebSocketChat:
             ),
         ):
             with TestClient(app) as client:
-                with client.websocket_connect(
-                    "/ws"
-                ) as ws:
+                client.cookies.update(_session_cookies())
+                with client.websocket_connect("/ws") as ws:
                     ws.send_json(
                         {
                             "type": "chat",
@@ -149,6 +196,12 @@ class TestWebSocketChat:
 
         assert data["type"] == "error"
         assert "LLM failed" in data["content"]
+
+    def test_unauthenticated_ws_is_rejected(self):
+        with TestClient(app) as client:
+            with pytest.raises(Exception):
+                with client.websocket_connect("/ws"):
+                    pass
 
 
 # ── WebSocket: tool confirmation ──────────────────────────
@@ -185,6 +238,10 @@ class TestWebSocketConfirm:
 
         with (
             patch(
+                "planning_agent.auth.WEB_SECRET",
+                _TEST_SECRET,
+            ),
+            patch(
                 "planning_agent.main_web.create_agent",
                 side_effect=capture_create_agent,
             ),
@@ -198,9 +255,8 @@ class TestWebSocketConfirm:
             ),
         ):
             with TestClient(app) as client:
-                with client.websocket_connect(
-                    "/ws"
-                ) as ws:
+                client.cookies.update(_session_cookies())
+                with client.websocket_connect("/ws") as ws:
                     ws.send_json(
                         {
                             "type": "chat",
@@ -250,6 +306,10 @@ class TestWebSocketConfirm:
 
         with (
             patch(
+                "planning_agent.auth.WEB_SECRET",
+                _TEST_SECRET,
+            ),
+            patch(
                 "planning_agent.main_web.create_agent",
                 side_effect=capture_create_agent,
             ),
@@ -263,9 +323,8 @@ class TestWebSocketConfirm:
             ),
         ):
             with TestClient(app) as client:
-                with client.websocket_connect(
-                    "/ws"
-                ) as ws:
+                client.cookies.update(_session_cookies())
+                with client.websocket_connect("/ws") as ws:
                     ws.send_json(
                         {
                             "type": "chat",
