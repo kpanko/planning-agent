@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import traceback
 import uuid
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .agent import ConfirmFn, create_agent
+from .agent import ConfirmFn, DebugFn, create_agent
+from .config import DEBUG_MODE
 from .auth import (
     build_auth_url,
     check_allowed_email,
@@ -125,6 +127,9 @@ async def websocket_endpoint(ws: WebSocket) -> None:
     ctx = build_context()
     history: list = []
 
+    # Mutable so the receive loop can toggle it.
+    debug_state: dict = {"enabled": DEBUG_MODE}
+
     # Futures keyed by confirm-id, resolved when the
     # client sends a confirm_response.
     pending_confirms: dict[str, asyncio.Future[bool]] = {}
@@ -134,6 +139,18 @@ async def websocket_endpoint(ws: WebSocket) -> None:
     chat_queue: asyncio.Queue[str | None] = (
         asyncio.Queue()
     )
+
+    async def send_debug(
+        event: str, data: dict
+    ) -> None:
+        if not debug_state["enabled"]:
+            return
+        try:
+            await ws.send_json(
+                {"type": "debug", "event": event, **data}
+            )
+        except Exception:
+            pass
 
     async def web_confirm(
         name: str, detail: str = "",
@@ -154,7 +171,8 @@ async def websocket_endpoint(ws: WebSocket) -> None:
         return await fut
 
     confirm: ConfirmFn = web_confirm
-    agent = create_agent(confirm=confirm)
+    debug: DebugFn = send_debug
+    agent = create_agent(confirm=confirm, debug_fn=debug)
 
     async def receive_loop() -> None:
         """Route incoming WS messages to the right sink."""
@@ -173,6 +191,10 @@ async def websocket_endpoint(ws: WebSocket) -> None:
                         fut.set_result(
                             bool(data.get("approved"))
                         )
+                elif msg_type == "set_debug":
+                    debug_state["enabled"] = bool(
+                        data.get("enabled")
+                    )
         except WebSocketDisconnect:
             await chat_queue.put(None)  # signal done
 
@@ -200,12 +222,17 @@ async def websocket_endpoint(ws: WebSocket) -> None:
                 break
             except Exception as exc:
                 logger.exception("agent.run failed")
+                await send_debug(
+                    "exception",
+                    {"traceback": traceback.format_exc()},
+                )
                 try:
                     await ws.send_json(
                         {
                             "type": "error",
                             "content": (
-                                f"{type(exc).__name__}: {exc}"
+                                f"{type(exc).__name__}:"
+                                f" {exc}"
                             ),
                         }
                     )

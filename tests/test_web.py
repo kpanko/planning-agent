@@ -231,7 +231,7 @@ class TestWebSocketConfirm:
         # Capture the confirm fn injected into create_agent
         created_agents: list = []
 
-        def capture_create_agent(confirm=None):
+        def capture_create_agent(confirm=None, debug_fn=None):
             mock_run._confirm = confirm
             created_agents.append(mock_agent)
             return mock_agent
@@ -300,7 +300,7 @@ class TestWebSocketConfirm:
         mock_agent = MagicMock()
         mock_agent.run = mock_run
 
-        def capture_create_agent(confirm=None):
+        def capture_create_agent(confirm=None, debug_fn=None):
             mock_run._confirm = confirm
             return mock_agent
 

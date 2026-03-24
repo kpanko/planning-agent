@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import traceback as _traceback
 from typing import Awaitable, Callable, Optional
 
 from rich.console import Console
@@ -11,6 +12,7 @@ from rich.console import Console
 logger = logging.getLogger("planning-agent")
 
 ConfirmFn = Callable[[str, str], Awaitable[bool]]
+DebugFn = Callable[[str, dict], Awaitable[None]]
 
 from pydantic_ai import Agent, RunContext
 
@@ -250,6 +252,7 @@ def _get_api():
 
 def create_agent(
     confirm: ConfirmFn | None = None,
+    debug_fn: DebugFn | None = None,
 ) -> Agent:
     """Build and return the planning agent.
 
@@ -266,11 +269,11 @@ def create_agent(
     )
 
     @planning_agent.system_prompt
-    def build_system_prompt(
+    async def build_system_prompt(
         ctx: RunContext[PlanningContext],
     ) -> str:
         deps = ctx.deps
-        return f"""{STATIC_PROMPT}
+        prompt = f"""{STATIC_PROMPT}
 
 ---
 
@@ -293,6 +296,42 @@ def create_agent(
 
 ### Right now
 {deps.current_datetime} — {deps.day_type} day"""
+        if debug_fn:
+            await debug_fn(
+                "system_prompt", {"content": prompt}
+            )
+        return prompt
+
+    async def _run_tool(
+        name: str,
+        detail: str,
+        fn: Callable,
+        *args,
+        **kwargs,
+    ) -> str:
+        if debug_fn:
+            await debug_fn(
+                "tool_call",
+                {"tool": name, "args": detail},
+            )
+        try:
+            result = fn(*args, **kwargs)
+            if debug_fn:
+                await debug_fn(
+                    "tool_result",
+                    {"tool": name, "result": str(result)},
+                )
+            return result
+        except Exception:
+            if debug_fn:
+                await debug_fn(
+                    "exception",
+                    {
+                        "tool": name,
+                        "traceback": _traceback.format_exc(),
+                    },
+                )
+            raise
 
     # ---------------------------------------------------------------
     # Todoist tools
@@ -304,14 +343,16 @@ def create_agent(
         tasks: list[RescheduleItem],
     ) -> str:
         """Reschedule one or more tasks to new dates."""
-        if not await confirm(
-            "reschedule_tasks",
-            repr([t.model_dump() for t in tasks]),
-        ):
+        dumped = [t.model_dump() for t in tasks]
+        detail = repr(dumped)
+        if not await confirm("reschedule_tasks", detail):
             return "Cancelled by user."
-        return _tools.reschedule_tasks(
+        return await _run_tool(
+            "reschedule_tasks",
+            detail,
+            _tools.reschedule_tasks,
             _get_api(),
-            [t.model_dump() for t in tasks],
+            dumped,
         )
 
     @planning_agent.tool
@@ -322,7 +363,13 @@ def create_agent(
         """Mark a task as complete."""
         if not await confirm("complete_task", task_id):
             return "Cancelled by user."
-        return _tools.complete_task(_get_api(), task_id)
+        return await _run_tool(
+            "complete_task",
+            task_id,
+            _tools.complete_task,
+            _get_api(),
+            task_id,
+        )
 
     @planning_agent.tool
     async def add_task(
@@ -346,7 +393,10 @@ def create_agent(
             detail += f" due={due_string}"
         if not await confirm("add_task", detail):
             return "Cancelled by user."
-        return _tools.add_task(
+        return await _run_tool(
+            "add_task",
+            detail,
+            _tools.add_task,
             _get_api(),
             content,
             description,
@@ -387,12 +437,18 @@ def create_agent(
             parts.append(f"project={project_id}")
         if label:
             parts.append(f"label={label}")
-        if not await confirm(
-            "find_tasks", ", ".join(parts) or "",
-        ):
+        detail = ", ".join(parts) or ""
+        if not await confirm("find_tasks", detail):
             return "Cancelled by user."
-        return _tools.find_tasks(
-            _get_api(), query, search, project_id, label,
+        return await _run_tool(
+            "find_tasks",
+            detail,
+            _tools.find_tasks,
+            _get_api(),
+            query,
+            search,
+            project_id,
+            label,
         )
 
     @planning_agent.tool
@@ -411,8 +467,13 @@ def create_agent(
             detail += f" to {end_date}"
         if not await confirm("find_tasks_by_date", detail):
             return "Cancelled by user."
-        return _tools.find_tasks_by_date(
-            _get_api(), start_date, end_date,
+        return await _run_tool(
+            "find_tasks_by_date",
+            detail,
+            _tools.find_tasks_by_date,
+            _get_api(),
+            start_date,
+            end_date,
         )
 
     @planning_agent.tool
@@ -423,7 +484,13 @@ def create_agent(
         """Fetch a single task by ID."""
         if not await confirm("get_task", task_id):
             return "Cancelled by user."
-        return _tools.get_task(_get_api(), task_id)
+        return await _run_tool(
+            "get_task",
+            task_id,
+            _tools.get_task,
+            _get_api(),
+            task_id,
+        )
 
     # ---------------------------------------------------------------
     # Planning context tools
@@ -443,18 +510,38 @@ def create_agent(
         expiry_date: Optional YYYY-MM-DD after which
                      this memory expires.
         """
-        if not await confirm("add_memory", f"({category})"):
+        detail = f"({category})"
+        if not await confirm("add_memory", detail):
             return "Cancelled by user."
+        if debug_fn:
+            await debug_fn(
+                "tool_call",
+                {"tool": "add_memory", "args": detail},
+            )
         try:
             memory = _add_memory(
                 content, category, expiry_date
             )
-            return (
+            result = (
                 f"Memory saved: {memory['id']}"
                 f" ({category})"
             )
+            if debug_fn:
+                await debug_fn(
+                    "tool_result",
+                    {"tool": "add_memory", "result": result},
+                )
+            return result
         except Exception as e:
             logger.exception("add_memory failed")
+            if debug_fn:
+                await debug_fn(
+                    "exception",
+                    {
+                        "tool": "add_memory",
+                        "traceback": _traceback.format_exc(),
+                    },
+                )
             return f"Error: {e}"
 
     @planning_agent.tool
@@ -465,10 +552,15 @@ def create_agent(
         """Mark a memory as resolved/no longer active."""
         if not await confirm("resolve_memory", memory_id):
             return "Cancelled by user."
-        result = _resolve_memory(memory_id)
-        if result:
-            return f"Memory {memory_id} resolved."
-        return f"Memory {memory_id} not found."
+        return await _run_tool(
+            "resolve_memory",
+            memory_id,
+            lambda: (
+                f"Memory {memory_id} resolved."
+                if _resolve_memory(memory_id)
+                else f"Memory {memory_id} not found."
+            ),
+        )
 
     @planning_agent.tool
     async def update_values_doc(
@@ -481,6 +573,11 @@ def create_agent(
         """
         if not await confirm("update_values_doc", ""):
             return "Cancelled by user."
-        return write_values(content)
+        return await _run_tool(
+            "update_values_doc",
+            f"({len(content)} chars)",
+            write_values,
+            content,
+        )
 
     return planning_agent
