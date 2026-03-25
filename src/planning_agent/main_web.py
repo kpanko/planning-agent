@@ -134,6 +134,14 @@ async def websocket_endpoint(ws: WebSocket) -> None:
     # Mutable so the receive loop can toggle it.
     debug_state: dict = {"enabled": DEBUG_MODE}
 
+    if DEBUG_MODE:
+        logger.info("Debug mode enabled for session")
+        await ws.send_json({
+            "type": "debug",
+            "event": "connected",
+            "content": "Debug mode ON",
+        })
+
     # Futures keyed by confirm-id, resolved when the
     # client sends a confirm_response.
     pending_confirms: dict[str, asyncio.Future[bool]] = {}
