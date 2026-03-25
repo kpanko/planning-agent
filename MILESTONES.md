@@ -143,18 +143,18 @@ observed behavior.
 
 **Tasks:**
 - [ ] Add `scheduling_patterns.json` to data directory defaults in
-  `storage.py`. (#26)
+  `storage.py`. (#27)
 - [ ] Add `load_scheduling_patterns()` and `update_scheduling_patterns()`
-  functions in a new `src/planning_context/patterns.py` module. (#27)
+  functions in a new `src/planning_context/patterns.py` module. (#28)
 - [ ] Add `SchedulingPatternUpdate` model and
   `scheduling_pattern_updates` field to `ExtractionResult` in
-  `extraction.py`. (#28)
+  `extraction.py`. (#29)
 - [ ] Expand `EXTRACTION_PROMPT` with a fifth extraction target for
-  scheduling pattern evidence. (#29)
+  scheduling pattern evidence. (#30)
 - [ ] Wire `apply_extraction()` to write pattern updates to
-  `scheduling_patterns.json`. (#30)
+  `scheduling_patterns.json`. (#31)
 - [ ] Add `scheduling_patterns` field to `PlanningContext` and load it
-  in `build_context()`. (#31)
+  in `build_context()`. (#32)
 - [ ] Add "Learned Patterns" section to `STATIC_PROMPT` in
-  `agent.py`. (#32)
-- [ ] Add tests for pattern loading, updating, and consolidation. (#33)
+  `agent.py`. (#33)
+- [ ] Add tests for pattern loading, updating, and consolidation. (#34)
