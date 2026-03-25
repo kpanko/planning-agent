@@ -69,5 +69,7 @@ the closest option: `sea`, `lax`, `iad`, `ewr`, `lhr`, `fra`, etc.
 ## Cost
 
 With `min_machines_running = 0` the machine stops when idle and restarts
-on the next request. This keeps usage within Fly's free tier for a
-personal tool.
+on the next request. You pay only for active compute time, which is very
+low for a personal tool with infrequent use. Fly.io no longer has a free
+tier, but a shared-cpu-1x machine costs roughly $0.0000022/second when
+running.

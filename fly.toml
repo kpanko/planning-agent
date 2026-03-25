@@ -12,14 +12,21 @@ primary_region = "ord"          # Chicago — pick closest: sea, lax, iad, ewr, 
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = "stop"   # free tier: stop when idle
+  auto_stop_machines = "stop"   # stop when idle (pay only when in use)
   auto_start_machines = true
-  min_machines_running = 0      # 0 = fully free when idle
+  min_machines_running = 0      # 0 = stopped when idle
 
   [http_service.concurrency]
     type = "connections"
     hard_limit = 25
     soft_limit = 20
+
+  [[http_service.checks]]
+    interval = "15s"
+    timeout = "5s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/health"
 
 [[vm]]
   size = "shared-cpu-1x"
