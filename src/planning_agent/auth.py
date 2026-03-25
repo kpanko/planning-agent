@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
+import os
 from typing import TYPE_CHECKING
 
 from fastapi import HTTPException, Request, Response
@@ -28,6 +31,7 @@ _SCOPES = [
 
 _SESSION_COOKIE = "pa_session"
 _STATE_COOKIE = "pa_oauth_state"
+_VERIFIER_COOKIE = "pa_oauth_verifier"
 _COOKIE_MAX_AGE = 60 * 60 * 24 * 30  # 30 days
 _STATE_MAX_AGE = 60 * 10  # 10 minutes
 
@@ -66,23 +70,46 @@ def _flow(state: str | None = None):
     )
 
 
-def build_auth_url() -> tuple[str, str]:
-    """Return (auth_url, state) to redirect the browser to Google."""
+def _pkce_pair() -> tuple[str, str]:
+    """Return (code_verifier, code_challenge) for PKCE."""
+    verifier = (
+        base64.urlsafe_b64encode(os.urandom(32))
+        .rstrip(b"=")
+        .decode("ascii")
+    )
+    challenge = (
+        base64.urlsafe_b64encode(
+            hashlib.sha256(verifier.encode()).digest()
+        )
+        .rstrip(b"=")
+        .decode("ascii")
+    )
+    return verifier, challenge
+
+
+def build_auth_url() -> tuple[str, str, str]:
+    """Return (auth_url, state, code_verifier)."""
+    verifier, challenge = _pkce_pair()
     flow = _flow()
     url, state = flow.authorization_url(
         access_type="offline",
         include_granted_scopes="true",
         prompt="select_account",
+        code_challenge=challenge,
+        code_challenge_method="S256",
     )
-    return url, state
+    return url, state, verifier
 
 
 def exchange_code(
-    code: str, state: str
+    code: str, state: str, code_verifier: str = "",
 ) -> "Credentials":
     """Exchange an auth code for credentials."""
     flow = _flow(state=state)
-    flow.fetch_token(code=code)
+    flow.fetch_token(
+        code=code,
+        code_verifier=code_verifier or None,
+    )
     return flow.credentials
 
 
@@ -200,6 +227,33 @@ def verify_state_cookie(
         raise HTTPException(
             status_code=400, detail="OAuth state mismatch"
         )
+
+
+def set_verifier_cookie(
+    response: Response, verifier: str
+) -> None:
+    token = _signer().dumps(verifier)
+    response.set_cookie(
+        _VERIFIER_COOKIE,
+        token,
+        httponly=True,
+        secure=BASE_URL.startswith("https"),
+        samesite="lax",
+        max_age=_STATE_MAX_AGE,
+    )
+
+
+def get_verifier_cookie(request: Request) -> str:
+    """Return the PKCE code verifier, or empty string."""
+    token = request.cookies.get(_VERIFIER_COOKIE, "")
+    if not token:
+        return ""
+    try:
+        return _signer().loads(
+            token, max_age=_STATE_MAX_AGE
+        )
+    except BadSignature:
+        return ""
 
 
 def check_allowed_email(email: str) -> None:

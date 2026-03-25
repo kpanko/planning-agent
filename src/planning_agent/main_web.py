@@ -22,8 +22,10 @@ from .auth import (
     save_credentials,
     set_session,
     set_state_cookie,
+    set_verifier_cookie,
     verify_email,
     verify_state_cookie,
+    get_verifier_cookie,
 )
 from .context import build_context
 from .extraction import run_extraction
@@ -48,11 +50,12 @@ async def login_page() -> str:
 
 @app.get("/login/google")
 async def login_google() -> Response:
-    auth_url, state = build_auth_url()
+    auth_url, state, verifier = build_auth_url()
     response = RedirectResponse(
         url=auth_url, status_code=303
     )
     set_state_cookie(response, state)
+    set_verifier_cookie(response, verifier)
     return response
 
 
@@ -70,7 +73,8 @@ async def oauth_callback(
 
     try:
         verify_state_cookie(request, state)
-        creds = exchange_code(code, state)
+        verifier = get_verifier_cookie(request)
+        creds = exchange_code(code, state, verifier)
         email = verify_email(creds)
         check_allowed_email(email)
         save_credentials(creds)
