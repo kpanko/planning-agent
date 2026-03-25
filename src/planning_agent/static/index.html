@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1">
+  <title>Planning Agent</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: system-ui, sans-serif;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;
+    }
+
+    header {
+      padding: 0.6rem 1rem;
+      background: #111;
+      border-bottom: 1px solid #333;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    #status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #666;
+      flex-shrink: 0;
+    }
+    #status-dot.connected  { background: #4caf50; }
+    #status-dot.connecting { background: #ff9800; }
+    #status-dot.error      { background: #f44336; }
+
+    #messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .bubble {
+      max-width: 85%;
+      padding: 0.6rem 0.9rem;
+      border-radius: 12px;
+      line-height: 1.5;
+      word-break: break-word;
+    }
+
+    .bubble.user {
+      align-self: flex-end;
+      background: #2563eb;
+      color: #fff;
+      border-bottom-right-radius: 3px;
+    }
+
+    .bubble.agent {
+      align-self: flex-start;
+      background: #2a2a2a;
+      border: 1px solid #3a3a3a;
+      border-bottom-left-radius: 3px;
+    }
+
+    .bubble.error {
+      align-self: flex-start;
+      background: #3b1a1a;
+      border: 1px solid #7f1d1d;
+      color: #fca5a5;
+      font-size: 0.85rem;
+    }
+
+    /* Markdown resets inside agent bubbles */
+    .bubble.agent p  { margin: 0 0 0.5em; }
+    .bubble.agent p:last-child { margin-bottom: 0; }
+    .bubble.agent ul,
+    .bubble.agent ol { margin: 0.25em 0; padding-left: 1.4em; }
+    .bubble.agent code {
+      background: #111;
+      padding: 0.1em 0.3em;
+      border-radius: 3px;
+      font-size: 0.88em;
+    }
+    .bubble.agent pre {
+      background: #111;
+      padding: 0.6em;
+      border-radius: 6px;
+      overflow-x: auto;
+    }
+    .bubble.agent pre code {
+      background: none;
+      padding: 0;
+    }
+
+    /* Confirm dialog */
+    #confirm-banner {
+      display: none;
+      background: #1e293b;
+      border-top: 1px solid #334155;
+      padding: 0.75rem 1rem;
+      gap: 0.5rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    #confirm-banner.visible { display: flex; }
+
+    #confirm-text {
+      flex: 1;
+      font-size: 0.85rem;
+      color: #cbd5e1;
+    }
+    #confirm-text strong { color: #e2e8f0; }
+
+    .confirm-btn {
+      padding: 0.35rem 0.9rem;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    #confirm-yes { background: #16a34a; color: #fff; }
+    #confirm-no  { background: #64748b; color: #fff; }
+
+    /* Input row */
+    #input-row {
+      display: flex;
+      gap: 0.5rem;
+      padding: 0.75rem;
+      background: #111;
+      border-top: 1px solid #333;
+    }
+
+    #msg-input {
+      flex: 1;
+      padding: 0.55rem 0.75rem;
+      background: #222;
+      border: 1px solid #444;
+      border-radius: 8px;
+      color: #e0e0e0;
+      font-size: 1rem;
+      outline: none;
+    }
+    #msg-input:focus { border-color: #2563eb; }
+
+    #send-btn {
+      padding: 0.55rem 1rem;
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    #send-btn:disabled {
+      background: #334155;
+      cursor: not-allowed;
+    }
+
+    /* Debug toggle */
+    #debug-toggle {
+      margin-left: auto;
+      padding: 0.25rem 0.6rem;
+      background: transparent;
+      border: 1px solid #444;
+      border-radius: 5px;
+      color: #888;
+      font-size: 0.75rem;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    #debug-toggle.active {
+      border-color: #f59e0b;
+      color: #f59e0b;
+    }
+
+    /* Debug events */
+    .debug-item {
+      font-family: monospace;
+      font-size: 0.78rem;
+      color: #6b7280;
+      border-left: 2px solid #374151;
+      padding-left: 0.6rem;
+      margin: 0.15rem 0;
+    }
+    .debug-item summary {
+      cursor: pointer;
+      user-select: none;
+      list-style: none;
+      padding: 0.15rem 0;
+    }
+    .debug-item summary::-webkit-details-marker {
+      display: none;
+    }
+    .debug-item summary::before {
+      content: "▶ ";
+      font-size: 0.65rem;
+    }
+    details.debug-item[open] > summary::before {
+      content: "▼ ";
+    }
+    .debug-item pre {
+      margin: 0.3rem 0 0;
+      white-space: pre-wrap;
+      word-break: break-all;
+      background: #111;
+      padding: 0.4rem 0.5rem;
+      border-radius: 4px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .debug-item.exc {
+      border-left-color: #dc2626;
+      color: #f87171;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div id="status-dot" class="connecting"></div>
+  <span id="status-label">Connecting…</span>
+  <button id="debug-toggle">Debug</button>
+</header>
+
+<div id="messages"></div>
+
+<div id="confirm-banner">
+  <span id="confirm-text"></span>
+  <button class="confirm-btn" id="confirm-yes">Yes</button>
+  <button class="confirm-btn" id="confirm-no">No</button>
+</div>
+
+<div id="input-row">
+  <input
+    id="msg-input"
+    type="text"
+    placeholder="Message…"
+    autocomplete="off"
+    disabled
+  >
+  <button id="send-btn" disabled>Send</button>
+</div>
+
+<script>
+  "use strict";
+
+  const statusDot   = document.getElementById("status-dot");
+  const statusLabel = document.getElementById("status-label");
+  const messages    = document.getElementById("messages");
+  const input       = document.getElementById("msg-input");
+  const sendBtn     = document.getElementById("send-btn");
+  const confirmBanner = document.getElementById("confirm-banner");
+  const confirmText   = document.getElementById("confirm-text");
+  const confirmYes    = document.getElementById("confirm-yes");
+  const confirmNo     = document.getElementById("confirm-no");
+  const debugToggle   = document.getElementById("debug-toggle");
+
+  let ws = null;
+  let pendingConfirmId = null;
+  let debugMode = false;
+
+  // ── helpers ──────────────────────────────────────────
+
+  function setStatus(state, label) {
+    statusDot.className = state;
+    statusLabel.textContent = label;
+  }
+
+  function setInputEnabled(enabled) {
+    input.disabled   = !enabled;
+    sendBtn.disabled = !enabled;
+  }
+
+  function addBubble(role, html) {
+    const div = document.createElement("div");
+    div.className = `bubble ${role}`;
+    if (role === "agent") {
+      div.innerHTML = marked.parse(html);
+    } else {
+      div.textContent = html;
+    }
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
+  }
+
+  function addDebug(event, data) {
+    const det = document.createElement("details");
+    det.className =
+      "debug-item" + (event === "exception" ? " exc" : "");
+    if (event === "exception") det.open = true;
+
+    const summary = document.createElement("summary");
+    let label = `[${event}]`;
+    if (data.tool) label += ` ${data.tool}`;
+    if (event === "tool_call" && data.args) {
+      label += `  ${data.args}`;
+    }
+    summary.textContent = label;
+    det.appendChild(summary);
+
+    const body =
+      data.content ||
+      data.result ||
+      data.traceback ||
+      JSON.stringify(data, null, 2);
+    const pre = document.createElement("pre");
+    pre.textContent = body;
+    det.appendChild(pre);
+
+    messages.appendChild(det);
+    messages.scrollTop = messages.scrollHeight;
+  }
+
+  function showConfirm(id, tool, detail) {
+    pendingConfirmId = id;
+    confirmText.innerHTML =
+      `Run <strong>${tool}</strong>` +
+      (detail ? ` <code>${detail}</code>` : "") + `?`;
+    confirmBanner.classList.add("visible");
+    setInputEnabled(false);
+  }
+
+  function hideConfirm() {
+    confirmBanner.classList.remove("visible");
+    pendingConfirmId = null;
+    setInputEnabled(true);
+  }
+
+  function sendConfirm(approved) {
+    if (!pendingConfirmId) return;
+    ws.send(JSON.stringify({
+      type: "confirm_response",
+      id: pendingConfirmId,
+      approved,
+    }));
+    hideConfirm();
+  }
+
+  // ── WebSocket ─────────────────────────────────────────
+
+  function connect() {
+    const proto = location.protocol === "https:" ? "wss" : "ws";
+    ws = new WebSocket(`${proto}://${location.host}/ws`);
+
+    ws.onopen = () => {
+      setStatus("connected", "Connected");
+      setInputEnabled(true);
+      input.focus();
+    };
+
+    ws.onclose = () => {
+      setStatus("error", "Disconnected — reload to reconnect");
+      setInputEnabled(false);
+    };
+
+    ws.onerror = () => {
+      setStatus("error", "Connection error");
+    };
+
+    ws.onmessage = (evt) => {
+      const data = JSON.parse(evt.data);
+      if (data.type === "message") {
+        addBubble("agent", data.content);
+        setInputEnabled(true);
+      } else if (data.type === "confirm") {
+        showConfirm(data.id, data.tool, data.detail || "");
+      } else if (data.type === "error") {
+        addBubble("error", `Error: ${data.content}`);
+        setInputEnabled(true);
+      } else if (data.type === "debug") {
+        addDebug(data.event, data);
+      }
+    };
+  }
+
+  // ── send ─────────────────────────────────────────────
+
+  function sendMessage() {
+    const text = input.value.trim();
+    if (!text || !ws || ws.readyState !== WebSocket.OPEN) {
+      return;
+    }
+    addBubble("user", text);
+    ws.send(JSON.stringify({ type: "chat", content: text }));
+    input.value = "";
+    setInputEnabled(false);
+  }
+
+  sendBtn.addEventListener("click", sendMessage);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  confirmYes.addEventListener("click", () => sendConfirm(true));
+  confirmNo.addEventListener("click",  () => sendConfirm(false));
+
+  debugToggle.addEventListener("click", () => {
+    debugMode = !debugMode;
+    debugToggle.classList.toggle("active", debugMode);
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({
+        type: "set_debug",
+        enabled: debugMode,
+      }));
+    }
+  });
+
+  connect();
+</script>
+</body>
+</html>

@@ -6,12 +6,14 @@
 ## Recently Completed
 
 - **Milestone 1** — All 6 tasks done, landed on `main`
-  - #1 Fix hardcoded "Kevin" in `extraction.py`
-  - #2 Implement `_fetch_calendar_snapshot()` with GCal API
-  - #3 Add Google API dependencies to `pyproject.toml`
-  - #4 Add `GOOGLE_CALENDAR_CREDENTIALS` config entry
-  - #5 Unit tests for `_fetch_calendar_snapshot()` (mocked)
-  - #6 Confirmed GCal fallback covered in `TestBuildContext`
+- **Milestone 2** — All 7 tasks done, on `milestone-2` (PR pending)
+  - #7 Add `fastapi`, `uvicorn`, `websockets` to `pyproject.toml`
+  - #8 `src/planning_agent/main_web.py` — FastAPI + WebSocket endpoint
+  - #9 Injectable async confirm callback in `agent.py`
+  - #10 `src/planning_agent/static/index.html` — mobile chat UI
+  - #11 `planning-agent-web` entry point
+  - #12 8 integration tests (HTTP + WebSocket + confirm flow)
+  - #13 Web server docs in `README.md`
 
 ## In Progress
 
@@ -19,10 +21,8 @@ Nothing actively in progress.
 
 ## Next Up
 
-- **#7** Add `fastapi`, `uvicorn`, `websockets` to `pyproject.toml`
-  (start on branch `milestone-2`)
-- **#8** Create `src/planning_agent/main_web.py` — FastAPI app +
-  WebSocket chat endpoint
+- **Milestone 3** — Nightly Replan Job (#14–#19)
+  Start on branch `milestone-3`.
 
 ## Blockers / Open Questions
 
@@ -30,9 +30,10 @@ Nothing actively in progress.
 
 ## Key Context
 
-- Branching strategy: one branch + PR per milestone. M1 landed
-  directly on `main` (decided after the fact). M2 starts on
-  `milestone-2`.
+- Branching strategy: one branch + PR per milestone.
 - `_fetch_calendar_snapshot()` expects an OAuth user token file
   at `~/.planning-agent/google_credentials.json`. Live credentials
   not yet tested.
+- All agent tools are now `async def`; confirm callback is an
+  injectable `async (name, detail) -> bool`. CLI uses
+  `asyncio.to_thread(input, ...)` as the default.

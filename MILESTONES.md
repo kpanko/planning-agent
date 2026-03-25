@@ -1,6 +1,6 @@
 # Milestones
 
-## Milestone 1: Stabilize and Polish — `in-progress`
+## Milestone 1: Stabilize and Polish — `done`
 **Goal:** Fix the hardcoded personal name in the extraction prompt, connect
 Google Calendar, and add tests. The CLI works correctly with an OpenAI key
 after this pass.
@@ -28,7 +28,7 @@ after this pass.
   credentials are absent. (#6)
 
 
-## Milestone 2: Web Interface (Mobile-Accessible) — `planned`
+## Milestone 2: Web Interface (Mobile-Accessible) — `done`
 **Goal:** Build a FastAPI backend with a WebSocket chat endpoint and a
 minimal HTML/JS frontend so the agent is reachable from a phone browser.
 This milestone completes v1 DoD item 4.
@@ -45,21 +45,21 @@ This milestone completes v1 DoD item 4.
   buttons) rather than blocking the server.
 
 **Tasks:**
-- [ ] Add `fastapi`, `uvicorn`, and `websockets` to `pyproject.toml`. (#7)
-- [ ] Create `src/planning_agent/main_web.py`: FastAPI app with a
+- [x] Add `fastapi`, `uvicorn`, and `websockets` to `pyproject.toml`. (#7)
+- [x] Create `src/planning_agent/main_web.py`: FastAPI app with a
   `GET /` HTML page and a `WebSocket /ws` chat endpoint. (#8)
-- [ ] Refactor tool-confirmation logic out of `agent.py`'s `_confirm_tool()`
+- [x] Refactor tool-confirmation logic out of `agent.py`'s `_confirm_tool()`
   into an injectable callback so the CLI uses `input()` and the web
   handler uses a WebSocket round-trip. (#9)
-- [ ] Build minimal `static/index.html` + inline JS: connect WebSocket,
+- [x] Build minimal `static/index.html` + inline JS: connect WebSocket,
   render Markdown responses, show confirm dialogs for tool calls. (#10)
-- [ ] Add `planning-agent-web` entry point in `pyproject.toml`. (#11)
-- [ ] Add integration tests for the FastAPI routes using
+- [x] Add `planning-agent-web` entry point in `pyproject.toml`. (#11)
+- [x] Add integration tests for the FastAPI routes using
   `httpx.AsyncClient`; mock the PydanticAI agent to avoid live LLM calls. (#12)
-- [ ] Document how to run the web server in `README.md`. (#13)
+- [x] Document how to run the web server in `README.md`. (#13)
 
 
-## Milestone 3: Nightly Replan Job — `planned`
+## Milestone 3: Nightly Replan Job — `in-progress`
 **Goal:** Build a headless job that runs once per night, finds undone tasks
 from today and earlier, and spreads them forward using the existing
 `todoist_scheduler` logic. This completes v1 DoD item 5.
@@ -143,18 +143,18 @@ observed behavior.
 
 **Tasks:**
 - [ ] Add `scheduling_patterns.json` to data directory defaults in
-  `storage.py`. (#26)
+  `storage.py`. (#27)
 - [ ] Add `load_scheduling_patterns()` and `update_scheduling_patterns()`
-  functions in a new `src/planning_context/patterns.py` module. (#27)
+  functions in a new `src/planning_context/patterns.py` module. (#28)
 - [ ] Add `SchedulingPatternUpdate` model and
   `scheduling_pattern_updates` field to `ExtractionResult` in
-  `extraction.py`. (#28)
+  `extraction.py`. (#29)
 - [ ] Expand `EXTRACTION_PROMPT` with a fifth extraction target for
-  scheduling pattern evidence. (#29)
+  scheduling pattern evidence. (#30)
 - [ ] Wire `apply_extraction()` to write pattern updates to
-  `scheduling_patterns.json`. (#30)
+  `scheduling_patterns.json`. (#31)
 - [ ] Add `scheduling_patterns` field to `PlanningContext` and load it
-  in `build_context()`. (#31)
+  in `build_context()`. (#32)
 - [ ] Add "Learned Patterns" section to `STATIC_PROMPT` in
-  `agent.py`. (#32)
-- [ ] Add tests for pattern loading, updating, and consolidation. (#33)
+  `agent.py`. (#33)
+- [ ] Add tests for pattern loading, updating, and consolidation. (#34)
