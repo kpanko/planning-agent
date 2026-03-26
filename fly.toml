@@ -30,7 +30,7 @@ primary_region = "ord"          # Chicago — pick closest: sea, lax, iad, ewr, 
 
 [[vm]]
   size = "shared-cpu-1x"
-  memory = "256mb"
+  memory = "512mb"
 
 [[mounts]]
   source = "planning_agent_data"
