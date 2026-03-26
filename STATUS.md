@@ -1,6 +1,6 @@
 # Status
 
-**Last updated:** 2026-03-25
+**Last updated:** 2026-03-26
 **Active milestone:** Milestone 3 — Observability, Evaluation, and System Verification
 
 ## Recently Completed
@@ -8,10 +8,8 @@
 - **Milestone 1** — All 6 tasks done, landed on `main`
 - **Milestone 2** — All 7 tasks done, merged to `main`
 - **Fly.io deployment** — app live at https://planning-agent.fly.dev
-  - `.dockerignore`, `GET /health` endpoint, health check in `fly.toml`
-  - Fixed stale "free tier" comments in `fly.toml` and `DEPLOY.md`
-  - Fixed 4 pre-existing WebSocket test failures (DEBUG_MODE not patched)
-  - VM memory bumped to 512mb after OOM kill on first boot
+- **Milestone planning** — Added Milestone 3 (observability/eval, #36–#45);
+  renumbered old M3→M4, M4→M5, M5→M6 on GitHub and in MILESTONES.md
 
 ## In Progress
 
@@ -23,11 +21,9 @@ Nothing actively in progress.
   Branch: `milestone-3-eval`
 - **Milestone 4** — Nightly Replan Job (#14–#19)
   Branch: `milestone-3` (branch predates renumber)
-- **Debug mode UI bugs** — debug toggle doesn't light up reliably; debug
-  mode itself not reliably active (investigate separately)
-- **Session end UX** — clarify whether ending a web session requires
-  typing "done" or if disconnect is sufficient to trigger memory
-  extraction
+- Start **Milestone 3** — pick up any of #36–#45; suggested start: #38
+  (debug mode, small and self-contained) or #39 (verify extraction on
+  disconnect)
 
 ## Blockers / Open Questions
 
