@@ -1,19 +1,17 @@
 # Status
 
-**Last updated:** 2026-03-23
-**Active milestone:** Milestone 2 — Web Interface (Mobile-Accessible)
+**Last updated:** 2026-03-25
+**Active milestone:** Milestone 3 — Nightly Replan Job
 
 ## Recently Completed
 
 - **Milestone 1** — All 6 tasks done, landed on `main`
-- **Milestone 2** — All 7 tasks done, on `milestone-2` (PR pending)
-  - #7 Add `fastapi`, `uvicorn`, `websockets` to `pyproject.toml`
-  - #8 `src/planning_agent/main_web.py` — FastAPI + WebSocket endpoint
-  - #9 Injectable async confirm callback in `agent.py`
-  - #10 `src/planning_agent/static/index.html` — mobile chat UI
-  - #11 `planning-agent-web` entry point
-  - #12 8 integration tests (HTTP + WebSocket + confirm flow)
-  - #13 Web server docs in `README.md`
+- **Milestone 2** — All 7 tasks done, merged to `main`
+- **Fly.io deployment** — app live at https://planning-agent.fly.dev
+  - `.dockerignore`, `GET /health` endpoint, health check in `fly.toml`
+  - Fixed stale "free tier" comments in `fly.toml` and `DEPLOY.md`
+  - Fixed 4 pre-existing WebSocket test failures (DEBUG_MODE not patched)
+  - VM memory bumped to 512mb after OOM kill on first boot
 
 ## In Progress
 
@@ -22,18 +20,30 @@ Nothing actively in progress.
 ## Next Up
 
 - **Milestone 3** — Nightly Replan Job (#14–#19)
-  Start on branch `milestone-3`.
+  Branch: `milestone-3`
+- **Debug mode UI bugs** — debug toggle doesn't light up reliably; debug
+  mode itself not reliably active (investigate separately)
+- **Session end UX** — clarify whether ending a web session requires
+  typing "done" or if disconnect is sufficient to trigger memory
+  extraction
 
 ## Blockers / Open Questions
 
-- None
+- Debug mode on fly.io: `DEBUG_MODE` env var not set as a secret, so
+  debug is off in production. Need to decide if that's intentional or
+  if it should be settable per-session via the UI toggle.
+- Session end: `run_extraction()` is called in the `finally` block of
+  the WebSocket handler, so disconnect should trigger it — but needs
+  verification on the live app.
 
 ## Key Context
 
+- Deployed on fly.io: `planning-agent` app, `ord` region, 512mb
+  shared-cpu-1x, 1GB volume at `/data`.
+- After Google OAuth login, credentials are saved to the data volume
+  and reused for Google Calendar — no separate Calendar setup needed.
 - Branching strategy: one branch + PR per milestone.
-- `_fetch_calendar_snapshot()` expects an OAuth user token file
-  at `~/.planning-agent/google_credentials.json`. Live credentials
-  not yet tested.
-- All agent tools are now `async def`; confirm callback is an
-  injectable `async (name, detail) -> bool`. CLI uses
-  `asyncio.to_thread(input, ...)` as the default.
+- All agent tools are `async def`; confirm callback is injectable
+  `async (name, detail) -> bool`.
+- `uv run` at container start rebuilds the editable install on each
+  boot (adds ~5s startup time) — acceptable for now.
