@@ -9,7 +9,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Request, Response, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from .agent import ConfirmFn, DebugFn, create_agent
 from .config import DEBUG_MODE
@@ -35,6 +35,15 @@ logger = logging.getLogger("planning-agent")
 _STATIC = Path(__file__).parent / "static"
 
 app = FastAPI(title="Planning Agent")
+
+
+# ---------------------------------------------------------------------------
+# Health check (no auth required)
+# ---------------------------------------------------------------------------
+
+@app.get("/health")
+async def health() -> JSONResponse:
+    return JSONResponse({"status": "ok"})
 
 
 # ---------------------------------------------------------------------------

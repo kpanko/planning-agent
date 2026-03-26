@@ -97,6 +97,7 @@ class TestWebSocketChat:
                 "planning_agent.auth.WEB_SECRET",
                 _TEST_SECRET,
             ),
+            patch("planning_agent.main_web.DEBUG_MODE", False),
             patch(
                 "planning_agent.main_web.create_agent",
                 return_value=mock_agent,
@@ -170,6 +171,7 @@ class TestWebSocketChat:
                 "planning_agent.auth.WEB_SECRET",
                 _TEST_SECRET,
             ),
+            patch("planning_agent.main_web.DEBUG_MODE", False),
             patch(
                 "planning_agent.main_web.create_agent",
                 return_value=mock_agent,
@@ -241,6 +243,7 @@ class TestWebSocketConfirm:
                 "planning_agent.auth.WEB_SECRET",
                 _TEST_SECRET,
             ),
+            patch("planning_agent.main_web.DEBUG_MODE", False),
             patch(
                 "planning_agent.main_web.create_agent",
                 side_effect=capture_create_agent,
@@ -309,6 +312,7 @@ class TestWebSocketConfirm:
                 "planning_agent.auth.WEB_SECRET",
                 _TEST_SECRET,
             ),
+            patch("planning_agent.main_web.DEBUG_MODE", False),
             patch(
                 "planning_agent.main_web.create_agent",
                 side_effect=capture_create_agent,
