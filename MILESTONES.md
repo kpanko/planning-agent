@@ -59,7 +59,46 @@ This milestone completes v1 DoD item 4.
 - [x] Document how to run the web server in `README.md`. (#13)
 
 
-## Milestone 3: Nightly Replan Job — `in-progress`
+## Milestone 3: Observability, Evaluation, and System Verification — `planned`
+**Goal:** Instrument the live system with tracing, resolve open bugs from STATUS.md,
+and run a structured end-to-end verification pass on the deployed app before adding
+new features.
+
+**Acceptance Criteria:**
+- Every LLM call emits a trace with inputs, outputs, latency, and token cost to a
+  persistent platform.
+- Traces are grouped by session ID; a past interaction can be replayed in the
+  tracing UI.
+- Debug mode toggle works reliably in the UI; `DEBUG_MODE` behavior on fly.io is
+  documented and intentional.
+- WebSocket disconnect reliably triggers `run_extraction()` on the live app;
+  verified with a real session.
+- Memory extraction writes files to the `/data` volume and they survive a container
+  restart.
+- A real "plan my week" session runs end-to-end on the live app with no errors.
+- Todoist task reads, Google Calendar reads, and a Todoist reschedule write all
+  verified working in production.
+- A seed evaluation dataset of ≥10 representative queries exists with
+  expected/actual outputs recorded.
+- At least one LLM-as-judge scorer and one deterministic check run against the
+  dataset and produce scores.
+
+**Tasks:**
+- [ ] Integrate tracing platform (Langfuse) and instrument all LLM calls (#36)
+- [ ] Add session/conversation trace IDs spanning the full multi-turn
+  interaction (#37)
+- [ ] Investigate and fix debug mode toggle reliability; decide on `DEBUG_MODE`
+  fly.io secret (#38)
+- [ ] Verify `run_extraction()` fires on WebSocket disconnect in production (#39)
+- [ ] Verify memory and conversation files persist across container restarts (#40)
+- [ ] Verify Todoist reads, GCal reads, and reschedule write in production (#41)
+- [ ] Run full "plan my week" session on live app and document results (#42)
+- [ ] Curate seed evaluation dataset from real sessions (#43)
+- [ ] Write LLM-as-judge scorer for planning response quality (#44)
+- [ ] Add deterministic checks for rescheduled task validity (#45)
+
+
+## Milestone 4: Nightly Replan Job — `in-progress`
 **Goal:** Build a headless job that runs once per night, finds undone tasks
 from today and earlier, and spreads them forward using the existing
 `todoist_scheduler` logic. This completes v1 DoD item 5.
@@ -87,7 +126,7 @@ from today and earlier, and spreads them forward using the existing
 - [ ] Document cron / Task Scheduler setup in `README.md`. (#19)
 
 
-## Milestone 4: Fuzzy Recurring Tasks — `planned`
+## Milestone 5: Fuzzy Recurring Tasks — `planned`
 **Goal:** Add the fuzzy-recurring-task subsystem: a `fuzzy_recurring.json`
 store, MCP tools to manage it, and agent integration so maintenance tasks
 (e.g. "check spare tire ~every 6 months") surface during weekly planning.
@@ -118,7 +157,7 @@ Post-v1 but self-contained.
   seasonal suppression, and `update_last_done` persistence. (#25)
 
 
-## Milestone 5: Scheduling Pattern Learning — `planned`
+## Milestone 6: Scheduling Pattern Learning — `planned`
 **Goal:** Extend the post-conversation extraction pipeline to capture
 scheduling patterns (completion rates, duration accuracy, deferral
 tendencies) in `scheduling_patterns.json`. Load these patterns into

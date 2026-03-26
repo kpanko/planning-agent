@@ -1,7 +1,7 @@
 # Status
 
 **Last updated:** 2026-03-25
-**Active milestone:** Milestone 3 — Nightly Replan Job
+**Active milestone:** Milestone 3 — Observability, Evaluation, and System Verification
 
 ## Recently Completed
 
@@ -19,8 +19,10 @@ Nothing actively in progress.
 
 ## Next Up
 
-- **Milestone 3** — Nightly Replan Job (#14–#19)
-  Branch: `milestone-3`
+- **Milestone 3** — Observability, Evaluation, and System Verification (#36–#45)
+  Branch: `milestone-3-eval`
+- **Milestone 4** — Nightly Replan Job (#14–#19)
+  Branch: `milestone-3` (branch predates renumber)
 - **Debug mode UI bugs** — debug toggle doesn't light up reliably; debug
   mode itself not reliably active (investigate separately)
 - **Session end UX** — clarify whether ending a web session requires
