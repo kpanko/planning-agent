@@ -91,6 +91,7 @@ new features.
   fly.io secret (#38)
 - [x] Verify `run_extraction()` fires on WebSocket disconnect in production (#39)
 - [ ] Verify memory and conversation files persist across container restarts (#40)
+- [ ] Fix Google Calendar OAuth refresh token (#46)
 - [ ] Verify Todoist reads, GCal reads, and reschedule write in production (#41)
 - [ ] Run full "plan my week" session on live app and document results (#42)
 - [ ] Curate seed evaluation dataset from real sessions (#43)
