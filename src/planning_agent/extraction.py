@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 
@@ -13,6 +15,8 @@ from planning_context.memories import (
 from planning_context.values import write_values
 
 from .config import EXTRACTION_MODEL
+
+logger = logging.getLogger("planning-agent")
 
 
 class Memory(BaseModel):
@@ -100,6 +104,11 @@ async def run_extraction(
     Returns the ExtractionResult, or None if extraction
     fails.
     """
+    n_msgs = len(message_history)
+    logger.info(
+        "Starting memory extraction (%d messages)",
+        n_msgs,
+    )
     try:
         extraction_agent = _make_extraction_agent()
         result = await extraction_agent.run(
@@ -107,10 +116,15 @@ async def run_extraction(
             message_history=message_history,
         )
         _apply(result.output)
+        logger.info(
+            "Extraction complete: %d new memories,"
+            " %d resolved, summary saved",
+            len(result.output.new_memories),
+            len(result.output.resolved_memory_ids),
+        )
         return result.output
     except Exception:
-        import logging
-        logging.getLogger("planning-agent").warning(
+        logger.warning(
             "Extraction failed", exc_info=True
         )
         return None

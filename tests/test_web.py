@@ -243,6 +243,42 @@ class TestWebSocketChat:
                     pass
 
 
+# ── WebSocket: extraction on disconnect ────────────────────
+
+
+class TestEndSession:
+    @pytest.mark.anyio
+    async def test_calls_extraction_with_history(self):
+        """end_session calls run_extraction when history
+        is non-empty."""
+        from planning_agent.main_web import end_session
+
+        mock_extract = AsyncMock()
+        history = [{"role": "user", "content": "hi"}]
+        with patch(
+            "planning_agent.main_web.run_extraction",
+            mock_extract,
+        ):
+            await end_session(history)
+        mock_extract.assert_called_once_with(history)
+
+    @pytest.mark.anyio
+    async def test_skips_extraction_with_empty_history(
+        self,
+    ):
+        """end_session skips extraction when history is
+        empty."""
+        from planning_agent.main_web import end_session
+
+        mock_extract = AsyncMock()
+        with patch(
+            "planning_agent.main_web.run_extraction",
+            mock_extract,
+        ):
+            await end_session([])
+        mock_extract.assert_not_called()
+
+
 # ── WebSocket: tool confirmation ──────────────────────────
 
 

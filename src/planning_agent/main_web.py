@@ -263,8 +263,22 @@ async def websocket_endpoint(ws: WebSocket) -> None:
                     break
     finally:
         recv_task.cancel()
-        if history:
-            await run_extraction(history)
+        await end_session(history)
+
+
+async def end_session(history: list) -> None:
+    """Run post-session cleanup: extract memories if the
+    session had any messages."""
+    if history:
+        logger.info(
+            "Session ended, triggering extraction"
+        )
+        await run_extraction(history)
+    else:
+        logger.info(
+            "Session ended with no messages,"
+            " skipping extraction"
+        )
 
 
 def main() -> None:
