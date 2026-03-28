@@ -114,6 +114,7 @@ class TestWebSocketChat:
             with TestClient(app) as client:
                 client.cookies.update(_session_cookies())
                 with client.websocket_connect("/ws") as ws:
+                    ws.receive_json()  # debug_state
                     ws.send_json(
                         {
                             "type": "chat",
@@ -149,6 +150,7 @@ class TestWebSocketChat:
             with TestClient(app) as client:
                 client.cookies.update(_session_cookies())
                 with client.websocket_connect("/ws") as ws:
+                    ws.receive_json()  # debug_state
                     ws.send_json(
                         {
                             "type": "chat",
@@ -188,6 +190,7 @@ class TestWebSocketChat:
             with TestClient(app) as client:
                 client.cookies.update(_session_cookies())
                 with client.websocket_connect("/ws") as ws:
+                    ws.receive_json()  # debug_state
                     ws.send_json(
                         {
                             "type": "chat",
@@ -198,6 +201,40 @@ class TestWebSocketChat:
 
         assert data["type"] == "error"
         assert "LLM failed" in data["content"]
+
+    def test_debug_state_sent_on_connect(self):
+        """First WS message is debug_state with enabled flag."""
+        mock_agent = _make_mock_agent()
+        with (
+            patch(
+                "planning_agent.auth.WEB_SECRET",
+                _TEST_SECRET,
+            ),
+            patch(
+                "planning_agent.main_web.DEBUG_MODE",
+                False,
+            ),
+            patch(
+                "planning_agent.main_web.create_agent",
+                return_value=mock_agent,
+            ),
+            patch(
+                "planning_agent.main_web.build_context",
+                return_value=_make_mock_context(),
+            ),
+            patch(
+                "planning_agent.main_web.run_extraction",
+                new_callable=AsyncMock,
+            ),
+        ):
+            with TestClient(app) as client:
+                client.cookies.update(_session_cookies())
+                with client.websocket_connect("/ws") as ws:
+                    data = ws.receive_json()
+        assert data == {
+            "type": "debug_state",
+            "enabled": False,
+        }
 
     def test_unauthenticated_ws_is_rejected(self):
         with TestClient(app) as client:
@@ -260,6 +297,7 @@ class TestWebSocketConfirm:
             with TestClient(app) as client:
                 client.cookies.update(_session_cookies())
                 with client.websocket_connect("/ws") as ws:
+                    ws.receive_json()  # debug_state
                     ws.send_json(
                         {
                             "type": "chat",
@@ -329,6 +367,7 @@ class TestWebSocketConfirm:
             with TestClient(app) as client:
                 client.cookies.update(_session_cookies())
                 with client.websocket_connect("/ws") as ws:
+                    ws.receive_json()  # debug_state
                     ws.send_json(
                         {
                             "type": "chat",

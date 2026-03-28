@@ -61,6 +61,28 @@ BASE_URL=http://localhost:8080
 uv run planning-agent-web
 ```
 
+## Debug mode
+
+Debug mode shows tool calls, tool results, and exceptions in the
+chat UI. It is controlled per-session via the **Debug** toggle
+button in the web interface.
+
+The `DEBUG_MODE` environment variable sets the default state for
+new sessions. When unset (the default on fly.io), debug starts
+off and the user can toggle it on. There is no need to add
+`DEBUG_MODE` as a fly.io secret — the UI toggle is sufficient
+for on-demand debugging.
+
+To default debug on for all sessions (e.g. during development):
+
+```bash
+# Local
+DEBUG_MODE=1 uv run planning-agent-web
+
+# Fly.io (optional, not recommended for normal use)
+fly secrets set DEBUG_MODE=1
+```
+
 ## Regions
 
 The `fly.toml` defaults to `ord` (Chicago). Change `primary_region` to

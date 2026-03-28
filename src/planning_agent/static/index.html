@@ -379,6 +379,11 @@
       } else if (data.type === "error") {
         addBubble("error", `Error: ${data.content}`);
         setInputEnabled(true);
+      } else if (data.type === "debug_state") {
+        debugMode = !!data.enabled;
+        debugToggle.classList.toggle(
+          "active", debugMode
+        );
       } else if (data.type === "debug") {
         addDebug(data.event, data);
       }
