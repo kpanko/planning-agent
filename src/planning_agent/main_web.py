@@ -281,10 +281,25 @@ async def end_session(history: list) -> None:
         )
 
 
+def _setup_logging() -> None:
+    """Configure the planning-agent logger for the web
+    server. Writes to stderr so fly.io captures it."""
+    import sys
+
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter(
+        "%(asctime)s %(levelname)s %(name)s: %(message)s"
+    ))
+    pa_logger = logging.getLogger("planning-agent")
+    pa_logger.addHandler(handler)
+    pa_logger.setLevel(logging.INFO)
+
+
 def main() -> None:
     """Entry point for the planning-agent-web command."""
     import uvicorn
 
+    _setup_logging()
     uvicorn.run(
         "planning_agent.main_web:app",
         host="0.0.0.0",
