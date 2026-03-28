@@ -87,7 +87,7 @@ new features.
 - [ ] Integrate tracing platform (Langfuse) and instrument all LLM calls (#36)
 - [ ] Add session/conversation trace IDs spanning the full multi-turn
   interaction (#37)
-- [ ] Investigate and fix debug mode toggle reliability; decide on `DEBUG_MODE`
+- [x] Investigate and fix debug mode toggle reliability; decide on `DEBUG_MODE`
   fly.io secret (#38)
 - [ ] Verify `run_extraction()` fires on WebSocket disconnect in production (#39)
 - [ ] Verify memory and conversation files persist across container restarts (#40)

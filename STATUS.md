@@ -1,6 +1,6 @@
 # Status
 
-**Last updated:** 2026-03-26
+**Last updated:** 2026-03-27
 **Active milestone:** Milestone 3 — Observability, Evaluation, and System Verification
 
 ## Recently Completed
@@ -13,23 +13,18 @@
 
 ## In Progress
 
-Nothing actively in progress.
+- **Milestone 3** — Observability, Evaluation, and System Verification
+  Branch: `milestone-3-eval`
+- Completed: #38 (debug toggle sync)
 
 ## Next Up
 
-- **Milestone 3** — Observability, Evaluation, and System Verification (#36–#45)
-  Branch: `milestone-3-eval`
-- **Milestone 4** — Nightly Replan Job (#14–#19)
-  Branch: `milestone-3` (branch predates renumber)
-- Start **Milestone 3** — pick up any of #36–#45; suggested start: #38
-  (debug mode, small and self-contained) or #39 (verify extraction on
-  disconnect)
+- #39 — Verify `run_extraction()` fires on WebSocket disconnect
+- #40 — Verify memory files persist across container restarts
+- #36 — Integrate tracing platform (Langfuse)
 
 ## Blockers / Open Questions
 
-- Debug mode on fly.io: `DEBUG_MODE` env var not set as a secret, so
-  debug is off in production. Need to decide if that's intentional or
-  if it should be settable per-session via the UI toggle.
 - Session end: `run_extraction()` is called in the `finally` block of
   the WebSocket handler, so disconnect should trigger it — but needs
   verification on the live app.
