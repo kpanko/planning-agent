@@ -1,6 +1,6 @@
 # Status
 
-**Last updated:** 2026-03-27
+**Last updated:** 2026-03-28
 **Active milestone:** Milestone 3 — Observability, Evaluation, and System Verification
 
 ## Recently Completed
@@ -39,3 +39,11 @@
   `async (name, detail) -> bool`.
 - `uv run` at container start rebuilds the editable install on each
   boot (adds ~5s startup time) — acceptable for now.
+- Branch `milestone-3-eval` is the active working branch for M3.
+- Web entrypoint now has logging configured (stderr); extraction
+  lifecycle is visible in `flyctl logs`.
+- Debug mode is per-session via the UI toggle; `DEBUG_MODE` env var
+  sets the default. Documented in DEPLOY.md.
+- Starlette TestClient does not reliably propagate WebSocket
+  disconnect through the handler's `finally` block after a chat
+  exchange — `end_session()` was extracted for direct testability.
