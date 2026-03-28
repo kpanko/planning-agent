@@ -89,7 +89,7 @@ new features.
   interaction (#37)
 - [x] Investigate and fix debug mode toggle reliability; decide on `DEBUG_MODE`
   fly.io secret (#38)
-- [ ] Verify `run_extraction()` fires on WebSocket disconnect in production (#39)
+- [x] Verify `run_extraction()` fires on WebSocket disconnect in production (#39)
 - [ ] Verify memory and conversation files persist across container restarts (#40)
 - [ ] Verify Todoist reads, GCal reads, and reschedule write in production (#41)
 - [ ] Run full "plan my week" session on live app and document results (#42)

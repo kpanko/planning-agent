@@ -15,19 +15,18 @@
 
 - **Milestone 3** — Observability, Evaluation, and System Verification
   Branch: `milestone-3-eval`
-- Completed: #38 (debug toggle sync)
+- Completed: #38 (debug toggle sync), #39 (extraction on disconnect)
 
 ## Next Up
 
-- #39 — Verify `run_extraction()` fires on WebSocket disconnect
 - #40 — Verify memory files persist across container restarts
+- #41 — Verify Todoist reads, GCal reads, and reschedule write in prod
 - #36 — Integrate tracing platform (Langfuse)
 
 ## Blockers / Open Questions
 
-- Session end: `run_extraction()` is called in the `finally` block of
-  the WebSocket handler, so disconnect should trigger it — but needs
-  verification on the live app.
+- Google Calendar OAuth token missing refresh token — agent can't read
+  calendar. Tracked in #46.
 
 ## Key Context
 
