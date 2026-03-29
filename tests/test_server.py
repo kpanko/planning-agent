@@ -430,7 +430,7 @@ class TestGetProjects:
         p.id = "p1"
         p.name = "Inbox"
         p.is_favorite = False
-        mock_api.get_projects.return_value = [p]
+        mock_api.get_projects.return_value = [[p]]
         result = get_projects()
         assert "Inbox" in result
 
@@ -439,7 +439,7 @@ class TestGetProjects:
         p.id = "p1"
         p.name = "Inbox"
         p.is_favorite = True
-        mock_api.get_projects.return_value = [p]
+        mock_api.get_projects.return_value = [[p]]
         assert "(favorite)" in get_projects()
 
     def test_empty(self, mock_api):

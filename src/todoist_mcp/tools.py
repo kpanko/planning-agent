@@ -112,7 +112,11 @@ def find_tasks(
 
 def get_projects(api: TodoistAPI) -> str:
     try:
-        projects = api.get_projects()
+        projects = [
+            p
+            for page in api.get_projects()
+            for p in page
+        ]
         if not projects:
             return "No projects found."
         return "\n".join(

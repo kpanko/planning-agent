@@ -227,6 +227,8 @@
       border-radius: 4px;
       max-height: 300px;
       overflow-y: auto;
+      user-select: text;
+      -webkit-user-select: text;
     }
     .debug-item.exc {
       border-left-color: #dc2626;
@@ -290,6 +292,7 @@
   function setInputEnabled(enabled) {
     input.disabled   = !enabled;
     sendBtn.disabled = !enabled;
+    if (enabled) input.focus();
   }
 
   function addBubble(role, html) {
