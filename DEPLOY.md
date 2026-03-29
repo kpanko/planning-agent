@@ -15,15 +15,15 @@
 ## One-time Fly setup
 
 ```bash
-# Install flyctl: https://fly.io/docs/hands-on/install-flyctl/
-fly auth login
-fly launch --no-deploy   # creates the app, skips first deploy
+# Install flyctl: https://fly.io/docs/flyctl/install/
+flyctl auth login
+flyctl launch --no-deploy   # creates the app, skips first deploy
 
 # Create persistent volume for app data
-fly volumes create planning_agent_data --size 1 --region ord
+flyctl volumes create planning_agent_data --size 1 --region ord
 
 # Set secrets
-fly secrets set \
+flyctl secrets set \
   GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com" \
   GOOGLE_CLIENT_SECRET="your-client-secret" \
   ALLOWED_GOOGLE_EMAIL="you@gmail.com" \
@@ -36,7 +36,7 @@ fly secrets set \
 ## Deploy
 
 ```bash
-fly deploy
+flyctl deploy
 ```
 
 ## How auth works
@@ -80,7 +80,7 @@ To default debug on for all sessions (e.g. during development):
 DEBUG_MODE=1 uv run planning-agent-web
 
 # Fly.io (optional, not recommended for normal use)
-fly secrets set DEBUG_MODE=1
+flyctl secrets set DEBUG_MODE=1
 ```
 
 ## Regions
