@@ -94,7 +94,7 @@ def build_auth_url() -> tuple[str, str, str]:
     url, state = flow.authorization_url(
         access_type="offline",
         include_granted_scopes="true",
-        prompt="select_account",
+        prompt="consent",
         code_challenge=challenge,
         code_challenge_method="S256",
     )
