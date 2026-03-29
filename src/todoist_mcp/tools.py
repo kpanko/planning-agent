@@ -110,6 +110,24 @@ def find_tasks(
         return f"Error: {e}"
 
 
+def get_projects(api: TodoistAPI) -> str:
+    try:
+        projects = api.get_projects()
+        if not projects:
+            return "No projects found."
+        return "\n".join(
+            f"[{p.id}] {p.name}"
+            + (
+                " (favorite)"
+                if p.is_favorite
+                else ""
+            )
+            for p in projects
+        )
+    except Exception as e:
+        return f"Error: {e}"
+
+
 def find_tasks_by_date(
     api: TodoistAPI,
     start_date: str,
@@ -216,6 +234,19 @@ def complete_task(
         task = api.get_task(task_id=task_id)
         api.close_task(task_id=task_id)
         return f"Completed: {task.content}"
+    except Exception as e:
+        return f"Error: {e}"
+
+
+def delete_task(
+    api: TodoistAPI,
+    task_id: str,
+) -> str:
+    try:
+        task = api.get_task(task_id=task_id)
+        name = task.content
+        api.delete_task(task_id=task_id)
+        return f"Deleted: {name}"
     except Exception as e:
         return f"Error: {e}"
 

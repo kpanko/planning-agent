@@ -68,17 +68,7 @@ def find_tasks_by_date(
 @mcp.tool()
 def get_projects() -> str:
     """List all projects."""
-    try:
-        projects = _api.get_projects()
-        if not projects:
-            return "No projects found."
-        return "\n".join(
-            f"[{p.id}] {p.name}"
-            + (" (favorite)" if p.is_favorite else "")
-            for p in projects
-        )
-    except Exception as e:
-        return f"Error: {e}"
+    return _tools.get_projects(_api)
 
 
 @mcp.tool()
@@ -205,6 +195,12 @@ def update_task(
 def complete_task(task_id: str) -> str:
     """Mark a task as complete."""
     return _tools.complete_task(_api, task_id)
+
+
+@mcp.tool()
+def delete_task(task_id: str) -> str:
+    """Permanently delete a task."""
+    return _tools.delete_task(_api, task_id)
 
 
 @mcp.tool()

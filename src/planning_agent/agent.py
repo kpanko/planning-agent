@@ -171,6 +171,7 @@ relevant.
 **Always use this for date changes** — preserves \
 recurring patterns and reminders.
 - `complete_task(task_id)` — mark done.
+- `delete_task(task_id)` — permanently delete a task.
 - `add_task(content, due_string, ...)` — create a task.
 
 ### Critical: Recurring Task Rescheduling
@@ -376,6 +377,22 @@ def create_agent(
         )
 
     @planning_agent.tool
+    async def delete_task(
+        ctx: RunContext[PlanningContext],
+        task_id: str,
+    ) -> str:
+        """Permanently delete a task."""
+        if not await confirm("delete_task", task_id):
+            return "Cancelled by user."
+        return await _run_tool(
+            "delete_task",
+            task_id,
+            _tools.delete_task,
+            _get_api(),
+            task_id,
+        )
+
+    @planning_agent.tool
     async def add_task(
         ctx: RunContext[PlanningContext],
         content: str,
@@ -494,6 +511,18 @@ def create_agent(
             _tools.get_task,
             _get_api(),
             task_id,
+        )
+
+    @planning_agent.tool
+    async def get_projects(
+        ctx: RunContext[PlanningContext],
+    ) -> str:
+        """List all Todoist projects with their IDs."""
+        return await _run_tool(
+            "get_projects",
+            "",
+            _tools.get_projects,
+            _get_api(),
         )
 
     # ---------------------------------------------------------------
