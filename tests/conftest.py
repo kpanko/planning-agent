@@ -1,4 +1,4 @@
-from todoist_api_python.models import Task, Due
+from todoist_api_python.models import Duration, Task, Due
 
 
 def create_task(
@@ -9,6 +9,7 @@ def create_task(
     is_recurring=False,
     due_string=None,
     due_datetime_str=None,
+    duration=None,
 ):
     due = None
     if due_date_str:
@@ -43,6 +44,6 @@ def create_task(
         project_id='1',
         section_id=None,
         deadline=None,
-        duration=None,
+        duration=duration,
         is_collapsed=False,
     )

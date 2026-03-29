@@ -82,10 +82,15 @@ def reschedule_task(
         due_string,
     )
 
-    is_success = api.update_task(
-        task_id=task.id,
-        due_string=due_string,
-    )
+    update_kwargs: dict = {
+        "task_id": task.id,
+        "due_string": due_string,
+    }
+    if task.duration:
+        update_kwargs["duration"] = task.duration.amount
+        update_kwargs["duration_unit"] = task.duration.unit
+
+    is_success = api.update_task(**update_kwargs)
     if not is_success:
         raise Exception(
             f"Failed to reschedule task: {task.content}"
