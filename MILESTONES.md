@@ -59,7 +59,7 @@ This milestone completes v1 DoD item 4.
 - [x] Document how to run the web server in `README.md`. (#13)
 
 
-## Milestone 3: Observability, Evaluation, and System Verification — `planned`
+## Milestone 3: Observability, Evaluation, and System Verification — `in-progress`
 **Goal:** Instrument the live system with tracing, resolve open bugs from STATUS.md,
 and run a structured end-to-end verification pass on the deployed app before adding
 new features.
@@ -98,6 +98,7 @@ new features.
 - [ ] Write LLM-as-judge scorer for planning response quality (#44)
 - [ ] Add deterministic checks for rescheduled task validity (#45)
 - [x] Test reschedule logic with task durations (#47)
+- [ ] Fix agent not using get_projects to discover Inbox ID (#48)
 
 
 ## Milestone 4: Nightly Replan Job — `in-progress`
