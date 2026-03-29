@@ -153,14 +153,18 @@ relevant.
 
 ### Reading Tasks
 - `find_tasks(query)` — Todoist filter syntax \
-  (e.g. "today", "overdue", "p1 & @home"). \
+  (e.g. "today", "overdue", "p1 & @home", \
+  "#Inbox", "#ProjectName"). \
   **Not** for searching by task name.
 - `find_tasks(search)` — case-insensitive substring \
   search against task titles. Use this when looking \
   up a task by name.
+- `find_tasks(project_id)` — all tasks in a project. \
+  Use `get_projects()` first to look up the ID.
 - `find_tasks_by_date(start_date, end_date)` — date \
   range.
 - `get_task(task_id)` — details on one task.
+- `get_projects()` — list all projects with IDs.
 
 ### Modifying Tasks
 - `reschedule_tasks(tasks)` — move tasks to new dates. \
