@@ -98,6 +98,15 @@ async def oauth_callback(
     return response
 
 
+@app.get("/logout")
+async def logout() -> Response:
+    response = RedirectResponse(
+        url="/login", status_code=303
+    )
+    response.delete_cookie("pa_session")
+    return response
+
+
 # ---------------------------------------------------------------------------
 # Chat UI
 # ---------------------------------------------------------------------------

@@ -185,6 +185,14 @@
       color: #f59e0b;
     }
 
+    #logout-link {
+      padding: 0.25rem 0.6rem;
+      color: #888;
+      font-size: 0.75rem;
+      text-decoration: none;
+    }
+    #logout-link:hover { color: #ccc; }
+
     /* Debug events */
     .debug-item {
       font-family: monospace;
@@ -232,6 +240,7 @@
   <div id="status-dot" class="connecting"></div>
   <span id="status-label">Connecting…</span>
   <button id="debug-toggle">Debug</button>
+  <a href="/logout" id="logout-link">Log out</a>
 </header>
 
 <div id="messages"></div>
