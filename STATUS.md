@@ -26,12 +26,13 @@
   Branch: `milestone-3-eval`
 - Completed: #38, #39, #46, #47
 - GCal reads verified working in prod after OAuth re-auth
-- Pyright strict mode: 60 errors remaining (down from 358),
-  mostly third-party library stubs (Google APIs, Todoist SDK)
+- Pyright strict mode added: 60 errors remaining (down from 358),
+  all from third-party library stubs (Google APIs, Todoist SDK).
+  No errors in our own code.
 
 ## Next Up
 
-- Finish resolving remaining pyright errors (library stub issues)
+- Resolve remaining 60 pyright errors (third-party library stubs)
 - #48 — Fix agent not using get_projects to discover Inbox ID
 - #40 — Verify memory files persist across container restarts
 - #41 — Verify Todoist reads, GCal reads, and reschedule write in prod
