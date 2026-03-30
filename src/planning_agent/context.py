@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from typing import Any
 
 from planning_context.conversations import get_recent
 from planning_context.memories import get_active
 from planning_context.values import read_values
 from todoist_api_python.api import TodoistAPI
+from todoist_api_python.models import Task
 
 from .config import GOOGLE_CALENDAR_CREDENTIALS, TODOIST_API_KEY
 
@@ -18,8 +20,8 @@ class PlanningContext:
     """Pre-loaded context injected into every conversation."""
 
     values_doc: str
-    memories: list[dict]
-    recent_conversations: list[dict]
+    memories: list[dict[str, Any]]
+    recent_conversations: list[dict[str, Any]]
     todoist_snapshot: str
     calendar_snapshot: str
     current_datetime: str
@@ -36,9 +38,11 @@ def _compute_day_type() -> str:
     return "office"  # Tue, Wed, Thu
 
 
-def _fmt_task(task) -> str:
+def _fmt_task(task: Task) -> str:
     """Format a Todoist task for display."""
-    due = task.due.date if task.due else "no due date"
+    due: str = (
+        str(task.due.date) if task.due else "no due date"
+    )
     recurring = (
         " (recurring)"
         if task.due and task.due.is_recurring
@@ -111,11 +115,11 @@ def _fetch_calendar_snapshot() -> str:
         from google.oauth2.credentials import Credentials
         from googleapiclient.discovery import build as gcal_build
 
-        creds = Credentials.from_authorized_user_file(
+        creds: Any = Credentials.from_authorized_user_file(
             str(GOOGLE_CALENDAR_CREDENTIALS),
             scopes=["https://www.googleapis.com/auth/calendar.readonly"],
         )
-        service = gcal_build(
+        service: Any = gcal_build(
             "calendar", "v3", credentials=creds
         )
 
@@ -134,7 +138,7 @@ def _fetch_calendar_snapshot() -> str:
             .isoformat() + "Z"
         )
 
-        events_result = (
+        events_result: dict[str, Any] = (
             service.events()
             .list(
                 calendarId="primary",
@@ -145,17 +149,19 @@ def _fetch_calendar_snapshot() -> str:
             )
             .execute()
         )
-        events = events_result.get("items", [])
+        events: list[dict[str, Any]] = (
+            events_result.get("items", [])
+        )
 
         if not events:
             return "No calendar events this week."
 
         lines: list[str] = []
         for ev in events:
-            start = ev["start"].get(
+            start: str = ev["start"].get(
                 "dateTime", ev["start"].get("date", "?")
             )
-            summary = ev.get("summary", "(no title)")
+            summary: str = ev.get("summary", "(no title)")
             # Trim to just date+time for readability
             if "T" in start:
                 dt = datetime.fromisoformat(

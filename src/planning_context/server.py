@@ -92,7 +92,7 @@ async def get_active_memories() -> str:
     if not active:
         return "(No active memories yet.)"
     logger.debug("get_active_memories returning %d memories", len(active))
-    lines = []
+    lines: list[str] = []
     for m in active:
         lines.append(
             f"[{m['id']}] ({m['category']}) {m['content']}"
@@ -164,7 +164,7 @@ async def get_recent_conversations(count: int = 3) -> str:
     return json.dumps(recent, indent=2, ensure_ascii=False)
 
 
-def main():
+def main() -> None:
     _setup_logging()
     logger.info("Starting planning-context MCP server")
     try:

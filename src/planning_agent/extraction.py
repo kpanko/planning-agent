@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
@@ -88,7 +89,7 @@ be useful in future planning conversations. Don't save \
 things that are already in Todoist as tasks.\
 """
 
-def _make_extraction_agent() -> Agent:
+def _make_extraction_agent() -> Agent[None, ExtractionResult]:
     return Agent(
         EXTRACTION_MODEL,
         output_type=ExtractionResult,
@@ -96,7 +97,7 @@ def _make_extraction_agent() -> Agent:
 
 
 async def run_extraction(
-    message_history: list,
+    message_history: list[Any],
 ) -> ExtractionResult | None:
     """Run extraction on a conversation and apply
     results.

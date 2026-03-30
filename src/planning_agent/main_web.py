@@ -7,6 +7,7 @@ import logging
 import traceback
 import uuid
 from pathlib import Path
+from typing import Any
 
 from fastapi import Depends, FastAPI, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -147,10 +148,10 @@ async def websocket_endpoint(ws: WebSocket) -> None:
     await ws.accept()
 
     ctx = build_context()
-    history: list = []
+    history: list[Any] = []
 
     # Mutable so the receive loop can toggle it.
-    debug_state: dict = {"enabled": DEBUG_MODE}
+    debug_state: dict[str, bool] = {"enabled": DEBUG_MODE}
 
     # Tell the client the initial debug state so
     # the toggle reflects reality on connect.
@@ -173,7 +174,7 @@ async def websocket_endpoint(ws: WebSocket) -> None:
     )
 
     async def send_debug(
-        event: str, data: dict
+        event: str, data: dict[str, Any],
     ) -> None:
         if not debug_state["enabled"]:
             return
@@ -275,7 +276,7 @@ async def websocket_endpoint(ws: WebSocket) -> None:
         await end_session(history)
 
 
-async def end_session(history: list) -> None:
+async def end_session(history: list[Any]) -> None:
     """Run post-session cleanup: extract memories if the
     session had any messages."""
     if history:

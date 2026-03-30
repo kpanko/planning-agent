@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import sys
+from typing import Any
 
 from rich.console import Console
 from rich.markdown import Markdown
@@ -45,7 +45,7 @@ async def main() -> None:
         " Type 'done' to exit.\n"
     )
 
-    history: list = []
+    history: list[Any] = []
 
     while True:
         try:

@@ -5,14 +5,14 @@ from __future__ import annotations
 import asyncio
 import logging
 import traceback as _traceback
-from typing import Awaitable, Callable, Optional
+from typing import Any, Awaitable, Callable, Optional
 
 from rich.console import Console
 
 logger = logging.getLogger("planning-agent")
 
 ConfirmFn = Callable[[str, str], Awaitable[bool]]
-DebugFn = Callable[[str, dict], Awaitable[None]]
+DebugFn = Callable[[str, dict[str, Any]], Awaitable[None]]
 
 from pydantic_ai import Agent, RunContext
 
@@ -29,11 +29,6 @@ def _tool_status(
     _console.print(msg)
 
 
-def _tool_result(result: str) -> None:
-    """Print a tool result to the terminal."""
-    _console.print(f"    [dim]{result}[/dim]")
-
-
 async def _default_confirm(
     name: str, detail: str = "",
 ) -> bool:
@@ -47,15 +42,12 @@ async def _default_confirm(
         return False
     return answer in ("y", "yes")
 
-from planning_context.conversations import save_summary
 from planning_context.memories import (
     add_memory as _add_memory,
     resolve_memory as _resolve_memory,
 )
-from planning_context.values import (
-    read_values,
-    write_values,
-)
+from planning_context.values import write_values
+from todoist_api_python.api import TodoistAPI
 from todoist_mcp import tools as _tools
 from todoist_mcp.tools import RescheduleItem
 
@@ -215,10 +207,12 @@ time to do what matters.\
 """
 
 
-def _format_memories(memories: list[dict]) -> str:
+def _format_memories(
+    memories: list[dict[str, Any]],
+) -> str:
     if not memories:
         return "(no active memories)"
-    lines = []
+    lines: list[str] = []
     for m in memories:
         line = (
             f"[{m['id']}] ({m.get('category', '?')}) "
@@ -231,14 +225,16 @@ def _format_memories(memories: list[dict]) -> str:
 
 
 def _format_conversations(
-    conversations: list[dict],
+    conversations: list[dict[str, Any]],
 ) -> str:
     if not conversations:
         return "(no recent conversations)"
-    lines = []
+    lines: list[str] = []
     for conv in conversations:
-        d = conv.get("date", "?")
-        entries = conv.get("entries", [])
+        d: str = conv.get("date", "?")
+        entries: list[dict[str, Any]] = conv.get(
+            "entries", []
+        )
         for entry in entries:
             lines.append(
                 f"[{d}] {entry.get('summary', '(no summary)')}"
@@ -248,8 +244,7 @@ def _format_conversations(
 
 # -- Agent creation --
 
-def _get_api():
-    from todoist_api_python.api import TodoistAPI
+def _get_api() -> TodoistAPI:
     if not TODOIST_API_KEY:
         raise RuntimeError("TODOIST_API_KEY not set")
     return TodoistAPI(TODOIST_API_KEY)
@@ -258,7 +253,7 @@ def _get_api():
 def create_agent(
     confirm: ConfirmFn | None = None,
     debug_fn: DebugFn | None = None,
-) -> Agent:
+) -> Agent[PlanningContext, str]:
     """Build and return the planning agent.
 
     Deferred so import doesn't require API keys.
@@ -310,9 +305,9 @@ def create_agent(
     async def _run_tool(
         name: str,
         detail: str,
-        fn: Callable,
-        *args,
-        **kwargs,
+        fn: Callable[..., Any],
+        *args: Any,
+        **kwargs: Any,
     ) -> str:
         if debug_fn:
             await debug_fn(
@@ -449,7 +444,7 @@ def create_agent(
         project_id: Limit results to a specific project.
         label: Limit results to tasks carrying this label.
         """
-        parts = []
+        parts: list[str] = []
         if query:
             parts.append(f"query={query!r}")
         if search:

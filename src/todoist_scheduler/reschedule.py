@@ -1,6 +1,7 @@
 import re
 import logging
 from datetime import date, datetime
+from typing import Any
 
 from todoist_api_python.api import TodoistAPI
 from todoist_api_python.models import Task
@@ -61,8 +62,8 @@ def reschedule_task(
         return
 
     # Save reminders before the update drops them
-    token = api._token
-    reminders = []
+    token: str = api._token  # pyright: ignore[reportPrivateUsage]
+    reminders: list[dict[str, Any]] = []
     old_date = _parse_task_date(task)
     try:
         reminders = fetch_reminders(token, task.id)
@@ -82,7 +83,7 @@ def reschedule_task(
         due_string,
     )
 
-    update_kwargs: dict = {
+    update_kwargs: dict[str, Any] = {
         "task_id": task.id,
         "due_string": due_string,
     }

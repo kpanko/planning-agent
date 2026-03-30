@@ -14,7 +14,7 @@ from todoist_mcp.tools import RescheduleItem
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 _token = os.environ.get("TODOIST_API_KEY", "")
-_api = TodoistAPI(_token) if _token else None
+_api: TodoistAPI | None = TodoistAPI(_token) if _token else None
 
 mcp = FastMCP("Todoist")
 
@@ -23,10 +23,16 @@ mcp = FastMCP("Todoist")
 # Read tools
 # ---------------------------------------------------------------------------
 
+def _require_api() -> TodoistAPI:
+    if _api is None:
+        raise RuntimeError("TODOIST_API_KEY not set")
+    return _api
+
+
 @mcp.tool()
 def get_task(task_id: str) -> str:
     """Fetch a single task by ID."""
-    return _tools.get_task(_api, task_id)
+    return _tools.get_task(_require_api(), task_id)
 
 
 @mcp.tool()
@@ -47,7 +53,7 @@ def find_tasks(
     label: Limit results to tasks carrying this label.
     """
     return _tools.find_tasks(
-        _api, query, search, project_id, label,
+        _require_api(), query, search, project_id, label,
     )
 
 
@@ -62,20 +68,27 @@ def find_tasks_by_date(
     end_date: YYYY-MM-DD (optional). If omitted, returns tasks due
               on start_date only.
     """
-    return _tools.find_tasks_by_date(_api, start_date, end_date)
+    return _tools.find_tasks_by_date(_require_api(), start_date, end_date)
 
 
 @mcp.tool()
 def get_projects() -> str:
     """List all projects."""
-    return _tools.get_projects(_api)
+    return _tools.get_projects(_require_api())
 
 
 @mcp.tool()
 def get_sections(project_id: str) -> str:
     """List all sections in a project."""
     try:
-        sections = _api.get_sections(project_id=project_id)
+        api = _require_api()
+        sections = [
+            s
+            for page in api.get_sections(
+                project_id=project_id,
+            )
+            for s in page
+        ]
         if not sections:
             return "No sections found."
         return "\n".join(
@@ -89,7 +102,14 @@ def get_sections(project_id: str) -> str:
 def get_comments(task_id: str) -> str:
     """Get comments on a task."""
     try:
-        comments = _api.get_comments(task_id=task_id)
+        api = _require_api()
+        comments = [
+            c
+            for page in api.get_comments(
+                task_id=task_id,
+            )
+            for c in page
+        ]
         if not comments:
             return "No comments."
         return "\n".join(
@@ -108,21 +128,28 @@ def get_overview(project_id: Optional[str] = None) -> str:
                 If omitted, shows overdue and today's tasks.
     """
     try:
-        lines = []
+        lines: list[str] = []
+        api = _require_api()
         if project_id:
-            tasks = list(_api.get_tasks(project_id=project_id))
+            tasks = [
+                t
+                for page in api.get_tasks(
+                    project_id=project_id,
+                )
+                for t in page
+            ]
             lines.append(f"Tasks in project ({len(tasks)} total):")
             for t in tasks:
                 lines.append(f"  {_tools.fmt_task(t)}")
         else:
             overdue = [
                 task
-                for page in _api.filter_tasks(query="overdue")
+                for page in api.filter_tasks(query="overdue")
                 for task in page
             ]
             today = [
                 task
-                for page in _api.filter_tasks(query="today")
+                for page in api.filter_tasks(query="today")
                 for task in page
             ]
             if overdue:
@@ -159,7 +186,7 @@ def add_task(
     priority: 1=lowest (p4), 2=p3, 3=p2, 4=highest (p1).
     """
     return _tools.add_task(
-        _api,
+        _require_api(),
         content,
         description,
         project_id,
@@ -187,27 +214,29 @@ def update_task(
     priority: 1=lowest (p4), 2=p3, 3=p2, 4=highest (p1).
     """
     return _tools.update_task(
-        _api, task_id, content, description, priority, labels,
+        _require_api(),
+        task_id, content, description, priority, labels,
     )
 
 
 @mcp.tool()
 def complete_task(task_id: str) -> str:
     """Mark a task as complete."""
-    return _tools.complete_task(_api, task_id)
+    return _tools.complete_task(_require_api(), task_id)
 
 
 @mcp.tool()
 def delete_task(task_id: str) -> str:
     """Permanently delete a task."""
-    return _tools.delete_task(_api, task_id)
+    return _tools.delete_task(_require_api(), task_id)
 
 
 @mcp.tool()
 def add_project(name: str, is_favorite: bool = False) -> str:
     """Create a new project."""
     try:
-        project = _api.add_project(
+        api = _require_api()
+        project = api.add_project(
             name=name, is_favorite=is_favorite
         )
         return f"Created project: [{project.id}] {project.name}"
@@ -219,7 +248,8 @@ def add_project(name: str, is_favorite: bool = False) -> str:
 def add_section(name: str, project_id: str) -> str:
     """Create a new section in a project."""
     try:
-        section = _api.add_section(
+        api = _require_api()
+        section = api.add_section(
             name=name, project_id=project_id
         )
         return f"Created section: [{section.id}] {section.name}"
@@ -231,7 +261,8 @@ def add_section(name: str, project_id: str) -> str:
 def add_comment(task_id: str, content: str) -> str:
     """Add a comment to a task."""
     try:
-        comment = _api.add_comment(
+        api = _require_api()
+        comment = api.add_comment(
             task_id=task_id, content=content
         )
         return f"Comment added: [{comment.id}]"
@@ -253,7 +284,7 @@ def reschedule_tasks(tasks: list[RescheduleItem]) -> str:
            "today", or "tomorrow"; time is optional HH:MM (e.g. "09:30").
     """
     return _tools.reschedule_tasks(
-        _api,
+        _require_api(),
         [
             {"task_id": t.task_id, "date": t.date, "time": t.time}
             for t in tasks

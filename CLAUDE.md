@@ -11,10 +11,13 @@
 ## Build & Test
 
 ```bash
-uv sync          # install deps
-uv run pytest    # run all tests
-uv run pytest -v # verbose
+uv sync            # install deps
+uv run pytest      # run all tests
+uv run pytest -v   # verbose
+uv run pyright     # type-check (strict mode)
 ```
+
+Run pyright before committing. Do not introduce new type errors.
 
 ## Project Structure
 
@@ -51,3 +54,7 @@ Planning docs live in `project-plans/`.
 - Always use `reschedule_task` / `reschedule_tasks` for date changes
   on Todoist tasks — never `update_task` with due dates directly.
   This preserves recurring patterns and reminders.
+- Todoist SDK v3 returns paginated `Iterator[list[T]]` for
+  `get_tasks`, `get_projects`, `get_sections`, `get_comments`,
+  and `filter_tasks`. Always flatten:
+  `[x for page in api.get_tasks() for x in page]`

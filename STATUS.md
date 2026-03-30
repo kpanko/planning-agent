@@ -1,6 +1,6 @@
 # Status
 
-**Last updated:** 2026-03-29
+**Last updated:** 2026-03-30
 **Active milestone:** Milestone 3 — Observability, Evaluation, and System Verification
 
 ## Recently Completed
@@ -15,6 +15,10 @@
 - Logout button added to web UI
 - `get_projects` tool added to PydanticAI agent
 - Agent system prompt updated with project query guidance
+- Fixed `find_tasks` pagination bug (`get_tasks` returns pages)
+- Fixed `get_sections` / `get_comments` pagination bugs
+- Added pyright strict mode + type annotations across codebase
+- Made debug summary text selectable in web UI
 
 ## In Progress
 
@@ -22,9 +26,12 @@
   Branch: `milestone-3-eval`
 - Completed: #38, #39, #46, #47
 - GCal reads verified working in prod after OAuth re-auth
+- Pyright strict mode: 60 errors remaining (down from 358),
+  mostly third-party library stubs (Google APIs, Todoist SDK)
 
 ## Next Up
 
+- Finish resolving remaining pyright errors (library stub issues)
 - #48 — Fix agent not using get_projects to discover Inbox ID
 - #40 — Verify memory files persist across container restarts
 - #41 — Verify Todoist reads, GCal reads, and reschedule write in prod
@@ -50,8 +57,9 @@
 - Branch `milestone-3-eval` is the active working branch for M3.
 - Web UI has logout button (GET /logout clears session cookie).
 - `reschedule_task` now preserves task duration on API calls.
-- Todoist SDK `get_projects()` returns `Iterator[list[Project]]`
-  (paginated), not a flat list — must flatten like `filter_tasks`.
+- Todoist SDK v3 returns paginated `Iterator[list[T]]` for
+  `get_tasks`, `get_projects`, `get_sections`, `get_comments`,
+  and `filter_tasks` — always flatten with nested comprehension.
 - Debug mode is per-session via the UI toggle; `DEBUG_MODE` env var
   sets the default. Documented in DEPLOY.md.
 - Starlette TestClient does not reliably propagate WebSocket
