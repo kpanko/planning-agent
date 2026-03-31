@@ -185,6 +185,18 @@
       color: #f59e0b;
     }
 
+    #disconnect-btn {
+      padding: 0.25rem 0.6rem;
+      background: transparent;
+      border: 1px solid #444;
+      border-radius: 5px;
+      color: #888;
+      font-size: 0.75rem;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    #disconnect-btn:hover { border-color: #666; color: #ccc; }
+
     #logout-link {
       padding: 0.25rem 0.6rem;
       color: #888;
@@ -242,6 +254,7 @@
   <div id="status-dot" class="connecting"></div>
   <span id="status-label">Connecting…</span>
   <button id="debug-toggle">Debug</button>
+  <button id="disconnect-btn">Disconnect</button>
   <a href="/logout" id="logout-link">Log out</a>
 </header>
 
@@ -276,11 +289,13 @@
   const confirmText   = document.getElementById("confirm-text");
   const confirmYes    = document.getElementById("confirm-yes");
   const confirmNo     = document.getElementById("confirm-no");
-  const debugToggle   = document.getElementById("debug-toggle");
+  const debugToggle      = document.getElementById("debug-toggle");
+  const disconnectBtn    = document.getElementById("disconnect-btn");
 
   let ws = null;
   let pendingConfirmId = null;
   let debugMode = false;
+  let manualDisconnect = false;
 
   // ── helpers ──────────────────────────────────────────
 
@@ -373,7 +388,12 @@
     };
 
     ws.onclose = () => {
-      setStatus("error", "Disconnected — reload to reconnect");
+      if (manualDisconnect) {
+        setStatus("error", "Disconnected");
+        disconnectBtn.textContent = "Reconnect";
+      } else {
+        setStatus("error", "Disconnected — reload to reconnect");
+      }
       setInputEnabled(false);
     };
 
@@ -434,6 +454,18 @@
         type: "set_debug",
         enabled: debugMode,
       }));
+    }
+  });
+
+  disconnectBtn.addEventListener("click", () => {
+    if (!ws || ws.readyState === WebSocket.CLOSED) {
+      manualDisconnect = false;
+      disconnectBtn.textContent = "Disconnect";
+      setStatus("connecting", "Connecting…");
+      connect();
+    } else {
+      manualDisconnect = true;
+      ws.close();
     }
   });
 
