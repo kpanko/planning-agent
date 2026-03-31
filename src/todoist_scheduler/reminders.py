@@ -83,7 +83,7 @@ def delete_reminders(
     if not reminder_ids:
         return
 
-    commands = [
+    commands: list[dict[str, Any]] = [
         {
             "type": "reminder_delete",
             "uuid": str(uuid.uuid4()),
@@ -122,7 +122,7 @@ def restore_reminders(
     if not reminders:
         return
 
-    commands = []
+    commands: list[dict[str, Any]] = []
     for r in reminders:
         args: dict[str, Any] = {
             "item_id": r["item_id"],

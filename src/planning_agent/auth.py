@@ -130,11 +130,11 @@ def verify_email(creds: "Credentials") -> str:
 def save_credentials(creds: "Credentials") -> None:
     """Persist credentials to the Calendar credentials file."""
     data: dict[str, Any] = {
-        "token": creds.token,
-        "refresh_token": creds.refresh_token,
-        "token_uri": creds.token_uri,
-        "client_id": creds.client_id,
-        "client_secret": creds.client_secret,
+        "token": creds.token,  # pyright: ignore[reportUnknownMemberType]
+        "refresh_token": creds.refresh_token,  # pyright: ignore[reportUnknownMemberType]
+        "token_uri": creds.token_uri,  # pyright: ignore[reportUnknownMemberType]
+        "client_id": creds.client_id,  # pyright: ignore[reportUnknownMemberType]
+        "client_secret": creds.client_secret,  # pyright: ignore[reportUnknownMemberType]
         "scopes": list(creds.scopes or []),  # type: ignore[arg-type]
     }
     GOOGLE_CALENDAR_CREDENTIALS.parent.mkdir(

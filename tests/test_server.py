@@ -325,10 +325,10 @@ class TestUpdateTask:
 # ---------------------------------------------------------------------------
 
 class TestCompleteTask:
-    def test_calls_close_task(self, mock_api):
+    def test_calls_complete_task(self, mock_api):
         mock_api.get_task.return_value = _task(content="Done item")
         result = complete_task("1")
-        mock_api.close_task.assert_called_once_with(task_id="1")
+        mock_api.complete_task.assert_called_once_with(task_id="1")
         assert "Done item" in result
 
     def test_api_error_returned(self, mock_api):

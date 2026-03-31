@@ -19,6 +19,9 @@
 - Fixed `get_sections` / `get_comments` pagination bugs
 - Added pyright strict mode + type annotations across codebase
 - Made debug summary text selectable in web UI
+- Resolved all 60 remaining pyright errors (casts, annotations,
+  targeted ignores for untyped third-party stubs)
+- Fixed `close_task` → `complete_task` bug (SDK method renamed)
 
 ## In Progress
 
@@ -26,13 +29,10 @@
   Branch: `milestone-3-eval`
 - Completed: #38, #39, #46, #47
 - GCal reads verified working in prod after OAuth re-auth
-- Pyright strict mode added: 60 errors remaining (down from 358),
-  all from third-party library stubs (Google APIs, Todoist SDK).
-  No errors in our own code.
+- Pyright strict mode: 0 errors, 187 tests passing
 
 ## Next Up
 
-- Resolve remaining 60 pyright errors (third-party library stubs)
 - #48 — Fix agent not using get_projects to discover Inbox ID
 - #40 — Verify memory files persist across container restarts
 - #41 — Verify Todoist reads, GCal reads, and reschedule write in prod
@@ -66,3 +66,5 @@
 - Starlette TestClient does not reliably propagate WebSocket
   disconnect through the handler's `finally` block —
   `end_session()` was extracted for direct testability.
+- Todoist SDK v3 renamed `close_task` to `complete_task`. Use
+  `api.complete_task(task_id=...)` to mark tasks done.

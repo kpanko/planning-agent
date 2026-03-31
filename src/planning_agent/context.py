@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 from planning_context.conversations import get_recent
 from planning_context.memories import get_active
@@ -41,7 +41,8 @@ def _compute_day_type() -> str:
 def _fmt_task(task: Task) -> str:
     """Format a Todoist task for display."""
     due: str = (
-        str(task.due.date) if task.due else "no due date"
+        str(task.due.date)  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+        if task.due else "no due date"
     )
     recurring = (
         " (recurring)"
@@ -112,14 +113,14 @@ def _fetch_calendar_snapshot() -> str:
         return "(Google Calendar not connected)"
 
     try:
-        from google.oauth2.credentials import Credentials
-        from googleapiclient.discovery import build as gcal_build
+        from google.oauth2.credentials import Credentials  # pyright: ignore[reportUnknownVariableType]
+        from googleapiclient.discovery import build as gcal_build  # pyright: ignore[reportUnknownVariableType]
 
-        creds: Any = Credentials.from_authorized_user_file(
+        creds: Any = Credentials.from_authorized_user_file(  # pyright: ignore[reportUnknownMemberType]
             str(GOOGLE_CALENDAR_CREDENTIALS),
             scopes=["https://www.googleapis.com/auth/calendar.readonly"],
         )
-        service: Any = gcal_build(
+        service: Any = gcal_build(  # pyright: ignore[reportUnknownVariableType]
             "calendar", "v3", credentials=creds
         )
 
@@ -138,8 +139,9 @@ def _fetch_calendar_snapshot() -> str:
             .isoformat() + "Z"
         )
 
-        events_result: dict[str, Any] = (
-            service.events()
+        events_result: dict[str, Any] = cast(
+            dict[str, Any],
+            service.events()  # pyright: ignore[reportUnknownMemberType]
             .list(
                 calendarId="primary",
                 timeMin=time_min,
@@ -147,10 +149,11 @@ def _fetch_calendar_snapshot() -> str:
                 singleEvents=True,
                 orderBy="startTime",
             )
-            .execute()
+            .execute(),
         )
-        events: list[dict[str, Any]] = (
-            events_result.get("items", [])
+        events: list[dict[str, Any]] = cast(
+            list[dict[str, Any]],
+            events_result.get("items", []),
         )
 
         if not events:
@@ -158,10 +161,16 @@ def _fetch_calendar_snapshot() -> str:
 
         lines: list[str] = []
         for ev in events:
-            start: str = ev["start"].get(
-                "dateTime", ev["start"].get("date", "?")
+            start_obj: dict[str, str] = ev.get(
+                "start", {}
             )
-            summary: str = ev.get("summary", "(no title)")
+            start: str = start_obj.get(
+                "dateTime",
+                start_obj.get("date", "?"),
+            )
+            summary: str = str(
+                ev.get("summary", "(no title)")
+            )
             # Trim to just date+time for readability
             if "T" in start:
                 dt = datetime.fromisoformat(

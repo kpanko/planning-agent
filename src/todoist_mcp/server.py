@@ -113,7 +113,7 @@ def get_comments(task_id: str) -> str:
         if not comments:
             return "No comments."
         return "\n".join(
-            f"[{c.id}] {c.posted_at}: {c.content}"
+            f"[{c.id}] {c.posted_at}: {c.content}"  # pyright: ignore[reportUnknownMemberType]
             for c in comments
         )
     except Exception as e:

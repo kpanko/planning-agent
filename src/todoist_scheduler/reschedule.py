@@ -17,7 +17,7 @@ def _parse_task_date(task: Task) -> date | None:
     """Extract the date from a task's due info."""
     if not task.due:
         return None
-    date_str = str(task.due.date)
+    date_str = str(task.due.date)  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
     if len(date_str) > 10:
         return datetime.fromisoformat(date_str).date()
     return date.fromisoformat(date_str)
@@ -29,7 +29,7 @@ def compute_due_string(task: Task, day: date) -> str | None:
     Returns None if the task is already scheduled for that day.
     Preserves time for datetime tasks and recurrence patterns for recurring tasks.
     """
-    due_date = str(task.due.date) if task.due else None
+    due_date = str(task.due.date) if task.due else None  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
     if due_date and due_date[:10] == day.strftime('%Y-%m-%d'):
         return None
 

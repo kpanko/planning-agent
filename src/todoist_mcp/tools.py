@@ -37,7 +37,8 @@ from todoist_scheduler.reschedule import (
 
 def fmt_task(task: Task) -> str:
     due: str = (
-        str(task.due.date) if task.due else "no due date"
+        str(task.due.date)  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+        if task.due else "no due date"
     )
     recurring = (
         " (recurring)"
@@ -245,7 +246,7 @@ def complete_task(
 ) -> str:
     try:
         task = api.get_task(task_id=task_id)
-        api.close_task(task_id=task_id)
+        api.complete_task(task_id=task_id)
         return f"Completed: {task.content}"
     except Exception as e:
         return f"Error: {e}"
@@ -272,7 +273,7 @@ def reschedule_tasks(
     where date is YYYY-MM-DD, "today", or "tomorrow"
     and time is optional HH:MM.
     """
-    results = []
+    results: list[str] = []
     for item in tasks:
         task_id = item["task_id"]
         try:

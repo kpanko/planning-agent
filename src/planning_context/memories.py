@@ -16,10 +16,10 @@ def _memories_path() -> Path:
     return get_data_dir() / "memories.json"
 
 
-def _load_memories() -> list[Any]:
+def _load_memories() -> list[dict[str, Any]]:
     data = read_json(_memories_path())
     assert isinstance(data, list)
-    return data
+    return data  # type: ignore[return-value]
 
 
 def _save_memories(memories: list[dict[str, Any]]) -> None:
@@ -45,7 +45,7 @@ def get_active() -> list[dict[str, Any]]:
     """Return all non-resolved, non-expired memories."""
     today = date.today().isoformat()
     memories = _load_memories()
-    active = []
+    active: list[dict[str, Any]] = []
     for m in memories:
         if m.get("resolved"):
             continue

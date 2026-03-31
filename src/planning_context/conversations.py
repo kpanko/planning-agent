@@ -57,9 +57,9 @@ def get_recent(count: int = 3) -> list[dict[str, Any]]:
         return []
 
     files = sorted(conv_dir.glob("*.json"), reverse=True)
-    results = []
+    results: list[dict[str, Any]] = []
     for f in files[:count]:
         data = read_json(f)
-        if data:
+        if isinstance(data, dict):
             results.append(data)
     return results

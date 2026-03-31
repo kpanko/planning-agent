@@ -39,7 +39,7 @@ class Memory(BaseModel):
 class ExtractionResult(BaseModel):
     """Structured output from extraction agent."""
 
-    new_memories: list[Memory] = Field(
+    new_memories: list[Memory] = Field(  # pyright: ignore[reportUnknownVariableType]
         default_factory=list,
         description="New memories to save",
     )

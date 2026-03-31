@@ -269,7 +269,7 @@ def create_agent(
     )
 
     @planning_agent.system_prompt
-    async def build_system_prompt(
+    async def build_system_prompt(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
     ) -> str:
         deps = ctx.deps
@@ -338,7 +338,7 @@ def create_agent(
     # ---------------------------------------------------------------
 
     @planning_agent.tool
-    async def reschedule_tasks(
+    async def reschedule_tasks(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
         tasks: list[RescheduleItem],
     ) -> str:
@@ -356,7 +356,7 @@ def create_agent(
         )
 
     @planning_agent.tool
-    async def complete_task(
+    async def complete_task(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
         task_id: str,
     ) -> str:
@@ -372,7 +372,7 @@ def create_agent(
         )
 
     @planning_agent.tool
-    async def delete_task(
+    async def delete_task(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
         task_id: str,
     ) -> str:
@@ -388,7 +388,7 @@ def create_agent(
         )
 
     @planning_agent.tool
-    async def add_task(
+    async def add_task(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
         content: str,
         due_string: Optional[str] = None,
@@ -425,7 +425,7 @@ def create_agent(
         )
 
     @planning_agent.tool
-    async def find_tasks(
+    async def find_tasks(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
         query: Optional[str] = None,
         search: Optional[str] = None,
@@ -468,7 +468,7 @@ def create_agent(
         )
 
     @planning_agent.tool
-    async def find_tasks_by_date(
+    async def find_tasks_by_date(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
         start_date: str,
         end_date: Optional[str] = None,
@@ -493,7 +493,7 @@ def create_agent(
         )
 
     @planning_agent.tool
-    async def get_task(
+    async def get_task(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
         task_id: str,
     ) -> str:
@@ -509,7 +509,7 @@ def create_agent(
         )
 
     @planning_agent.tool
-    async def get_projects(
+    async def get_projects(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
     ) -> str:
         """List all Todoist projects with their IDs."""
@@ -525,7 +525,7 @@ def create_agent(
     # ---------------------------------------------------------------
 
     @planning_agent.tool
-    async def add_memory(
+    async def add_memory(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
         content: str,
         category: str,
@@ -573,7 +573,7 @@ def create_agent(
             return f"Error: {e}"
 
     @planning_agent.tool
-    async def resolve_memory(
+    async def resolve_memory(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
         memory_id: str,
     ) -> str:
@@ -591,7 +591,7 @@ def create_agent(
         )
 
     @planning_agent.tool
-    async def update_values_doc(
+    async def update_values_doc(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
         content: str,
     ) -> str:
