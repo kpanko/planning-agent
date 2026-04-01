@@ -10,7 +10,12 @@ from pathlib import Path
 from collections.abc import AsyncIterable
 from typing import Any
 
-from pydantic_ai.messages import PartDeltaEvent, TextPartDelta
+from pydantic_ai.messages import (
+    PartDeltaEvent,
+    PartStartEvent,
+    TextPart,
+    TextPartDelta,
+)
 
 from fastapi import Depends, FastAPI, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -252,6 +257,21 @@ async def websocket_endpoint(ws: WebSocket) -> None:
                 ) -> None:
                     async for event in events:
                         if (
+                            isinstance(event, PartStartEvent)
+                            and isinstance(
+                                event.part, TextPart
+                            )
+                            and event.part.content
+                        ):
+                            await ws.send_json(
+                                {
+                                    "type": "chunk",
+                                    "content": (
+                                        event.part.content
+                                    ),
+                                }
+                            )
+                        elif (
                             isinstance(event, PartDeltaEvent)
                             and isinstance(
                                 event.delta, TextPartDelta
