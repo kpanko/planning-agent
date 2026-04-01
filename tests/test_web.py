@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -21,13 +22,21 @@ def _session_cookies() -> dict[str, str]:
 
 
 def _make_mock_agent(reply: str = "Hello from agent"):
-    """Return a mock PydanticAI agent that answers reply."""
+    """Return a mock agent that streams reply as one chunk."""
+
+    async def _chunks():
+        yield reply
+
     mock_result = MagicMock()
-    mock_result.output = reply
+    mock_result.stream_text.return_value = _chunks()
     mock_result.all_messages.return_value = []
 
+    cm = MagicMock()
+    cm.__aenter__ = AsyncMock(return_value=mock_result)
+    cm.__aexit__ = AsyncMock(return_value=False)
+
     mock_agent = MagicMock()
-    mock_agent.run = AsyncMock(return_value=mock_result)
+    mock_agent.run_stream.return_value = cm
     return mock_agent
 
 
@@ -121,10 +130,15 @@ class TestWebSocketChat:
                             "content": "Plan my week",
                         }
                     )
-                    data = ws.receive_json()
+                    chunks: list[str] = []
+                    while True:
+                        data = ws.receive_json()
+                        if data["type"] == "chunk":
+                            chunks.append(data["content"])
+                        elif data["type"] == "message_done":
+                            break
 
-        assert data["type"] == "message"
-        assert data["content"] == "Here's your plan."
+        assert "".join(chunks) == "Here's your plan."
 
     def test_agent_run_called_with_user_message(self):
         mock_agent = _make_mock_agent()
@@ -157,16 +171,22 @@ class TestWebSocketChat:
                             "content": "Hello",
                         }
                     )
-                    ws.receive_json()
+                    while ws.receive_json().get(
+                        "type"
+                    ) != "message_done":
+                        pass
 
-        call_args = mock_agent.run.call_args
+        call_args = mock_agent.run_stream.call_args
         assert call_args.args[0] == "Hello"
 
     def test_agent_error_returns_error_message(self):
         mock_agent = MagicMock()
-        mock_agent.run = AsyncMock(
+        cm = MagicMock()
+        cm.__aenter__ = AsyncMock(
             side_effect=RuntimeError("LLM failed")
         )
+        cm.__aexit__ = AsyncMock(return_value=False)
+        mock_agent.run_stream.return_value = cm
 
         with (
             patch(
@@ -287,27 +307,32 @@ class TestWebSocketConfirm:
         """Agent gets True when user approves a tool."""
         confirm_result: list[bool] = []
 
-        async def mock_run(msg, *, deps, message_history):
-            # Exercise the confirm callback injected by
-            # the WebSocket handler.
-            call_confirm = mock_run._confirm
+        @asynccontextmanager
+        async def mock_run_stream(
+            msg, *, deps, message_history
+        ):
+            call_confirm = mock_run_stream._confirm
             result_val = await call_confirm(
                 "reschedule_tasks", "task_1"
             )
             confirm_result.append(result_val)
-            r = MagicMock()
-            r.output = "Done."
-            r.all_messages.return_value = []
-            return r
+
+            async def _chunks():
+                yield "Done."
+
+            mock_result = MagicMock()
+            mock_result.stream_text.return_value = _chunks()
+            mock_result.all_messages.return_value = []
+            yield mock_result
 
         mock_agent = MagicMock()
-        mock_agent.run = mock_run
+        mock_agent.run_stream = mock_run_stream
 
         # Capture the confirm fn injected into create_agent
         created_agents: list = []
 
         def capture_create_agent(confirm=None, debug_fn=None):
-            mock_run._confirm = confirm
+            mock_run_stream._confirm = confirm
             created_agents.append(mock_agent)
             return mock_agent
 
@@ -355,9 +380,11 @@ class TestWebSocketConfirm:
                             "approved": True,
                         }
                     )
-                    # Now get the final message
-                    data = ws.receive_json()
-                    assert data["type"] == "message"
+                    # Drain chunks until message_done
+                    while ws.receive_json().get(
+                        "type"
+                    ) != "message_done":
+                        pass
 
         assert confirm_result == [True]
 
@@ -365,20 +392,27 @@ class TestWebSocketConfirm:
         """Agent gets False when user denies a tool."""
         confirm_result: list[bool] = []
 
-        async def mock_run(msg, *, deps, message_history):
-            call_confirm = mock_run._confirm
+        @asynccontextmanager
+        async def mock_run_stream(
+            msg, *, deps, message_history
+        ):
+            call_confirm = mock_run_stream._confirm
             result_val = await call_confirm("add_task", "x")
             confirm_result.append(result_val)
-            r = MagicMock()
-            r.output = "Cancelled."
-            r.all_messages.return_value = []
-            return r
+
+            async def _chunks():
+                yield "Cancelled."
+
+            mock_result = MagicMock()
+            mock_result.stream_text.return_value = _chunks()
+            mock_result.all_messages.return_value = []
+            yield mock_result
 
         mock_agent = MagicMock()
-        mock_agent.run = mock_run
+        mock_agent.run_stream = mock_run_stream
 
         def capture_create_agent(confirm=None, debug_fn=None):
-            mock_run._confirm = confirm
+            mock_run_stream._confirm = confirm
             return mock_agent
 
         with (
@@ -418,6 +452,9 @@ class TestWebSocketConfirm:
                             "approved": False,
                         }
                     )
-                    ws.receive_json()  # final message
+                    while ws.receive_json().get(
+                        "type"
+                    ) != "message_done":
+                        pass
 
         assert confirm_result == [False]

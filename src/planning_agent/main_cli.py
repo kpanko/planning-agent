@@ -7,6 +7,7 @@ import logging
 from typing import Any
 
 from rich.console import Console
+from rich.live import Live
 from rich.markdown import Markdown
 
 from .agent import create_agent
@@ -62,14 +63,27 @@ async def main() -> None:
             break
 
         try:
-            result = await agent.run(
+            console.print()
+            full_text = ""
+            async with agent.run_stream(
                 user_input,
                 deps=ctx,
                 message_history=history,
-            )
+            ) as result:
+                with Live(
+                    console=console,
+                    refresh_per_second=10,
+                ) as live:
+                    async for chunk in result.stream_text(
+                        delta=True,
+                    ):
+                        full_text += chunk
+                        live.update(Markdown(full_text))
+                history = result.all_messages()
+            console.print()
         except Exception as exc:
             logging.getLogger("planning-agent").exception(
-                "agent.run failed"
+                "agent.run_stream failed"
             )
             console.print(
                 f"\n[red]Error:[/red]"
@@ -81,10 +95,6 @@ async def main() -> None:
                 " ~/.planning-agent/agent.log[/dim]\n"
             )
             continue
-        console.print()
-        console.print(Markdown(result.output))
-        console.print()
-        history = result.all_messages()
 
     if history:
         print("Extracting memories...")

@@ -296,6 +296,8 @@
   let pendingConfirmId = null;
   let debugMode = false;
   let manualDisconnect = false;
+  let streamBubble = null;
+  let streamRaw = "";
 
   // ── helpers ──────────────────────────────────────────
 
@@ -403,12 +405,27 @@
 
     ws.onmessage = (evt) => {
       const data = JSON.parse(evt.data);
-      if (data.type === "message") {
+      if (data.type === "chunk") {
+        if (!streamBubble) {
+          streamBubble = document.createElement("div");
+          streamBubble.className = "bubble agent";
+          messages.appendChild(streamBubble);
+        }
+        streamRaw += data.content;
+        streamBubble.innerHTML = marked.parse(streamRaw);
+        messages.scrollTop = messages.scrollHeight;
+      } else if (data.type === "message_done") {
+        streamBubble = null;
+        streamRaw = "";
+        setInputEnabled(true);
+      } else if (data.type === "message") {
         addBubble("agent", data.content);
         setInputEnabled(true);
       } else if (data.type === "confirm") {
         showConfirm(data.id, data.tool, data.detail || "");
       } else if (data.type === "error") {
+        streamBubble = null;
+        streamRaw = "";
         addBubble("error", `Error: ${data.content}`);
         setInputEnabled(true);
       } else if (data.type === "debug_state") {

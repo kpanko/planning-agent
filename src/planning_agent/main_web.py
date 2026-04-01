@@ -239,22 +239,28 @@ async def websocket_endpoint(ws: WebSocket) -> None:
             if user_msg is None:
                 break
             try:
-                result = await agent.run(
+                async with agent.run_stream(
                     user_msg,
                     deps=ctx,
                     message_history=history,
-                )
-                await ws.send_json(
-                    {
-                        "type": "message",
-                        "content": result.output,
-                    }
-                )
-                history = result.all_messages()
+                ) as result:
+                    async for chunk in result.stream_text(
+                        delta=True,
+                    ):
+                        await ws.send_json(
+                            {
+                                "type": "chunk",
+                                "content": chunk,
+                            }
+                        )
+                    await ws.send_json(
+                        {"type": "message_done"}
+                    )
+                    history = result.all_messages()
             except WebSocketDisconnect:
                 break
             except Exception as exc:
-                logger.exception("agent.run failed")
+                logger.exception("agent.run_stream failed")
                 await send_debug(
                     "exception",
                     {"traceback": traceback.format_exc()},
