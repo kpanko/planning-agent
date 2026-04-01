@@ -7,7 +7,9 @@ primary_region = "ord"          # Chicago — pick closest: sea, lax, iad, ewr, 
 [build]
 
 [env]
+  DEBUG_MODE = "1"
   PLANNING_AGENT_DATA_DIR = "/data"
+  USER_TZ = "America/New_York"
 
 [http_service]
   internal_port = 8080

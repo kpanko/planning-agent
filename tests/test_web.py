@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from itsdangerous import URLSafeTimedSerializer
+from pydantic_ai.messages import PartDeltaEvent, TextPartDelta
 from starlette.testclient import TestClient
 
 from planning_agent.main_web import app
@@ -22,21 +24,29 @@ def _session_cookies() -> dict[str, str]:
 
 
 def _make_mock_agent(reply: str = "Hello from agent"):
-    """Return a mock agent that streams reply as one chunk."""
-
-    async def _chunks():
-        yield reply
-
+    """Return a mock agent that streams reply via event_stream_handler."""
     mock_result = MagicMock()
-    mock_result.stream_text.return_value = _chunks()
     mock_result.all_messages.return_value = []
 
-    cm = MagicMock()
-    cm.__aenter__ = AsyncMock(return_value=mock_result)
-    cm.__aexit__ = AsyncMock(return_value=False)
+    async def _run_impl(
+        msg: str,
+        *,
+        deps: Any,
+        message_history: Any,
+        event_stream_handler: Any = None,
+        **kwargs: Any,
+    ) -> Any:
+        if event_stream_handler is not None:
+            async def _events() -> AsyncIterator[Any]:
+                yield PartDeltaEvent(
+                    index=0,
+                    delta=TextPartDelta(content_delta=reply),
+                )
+            await event_stream_handler(None, _events())
+        return mock_result
 
     mock_agent = MagicMock()
-    mock_agent.run_stream.return_value = cm
+    mock_agent.run = AsyncMock(side_effect=_run_impl)
     return mock_agent
 
 
@@ -176,17 +186,14 @@ class TestWebSocketChat:
                     ) != "message_done":
                         pass
 
-        call_args = mock_agent.run_stream.call_args
+        call_args = mock_agent.run.call_args
         assert call_args.args[0] == "Hello"
 
     def test_agent_error_returns_error_message(self):
         mock_agent = MagicMock()
-        cm = MagicMock()
-        cm.__aenter__ = AsyncMock(
+        mock_agent.run = AsyncMock(
             side_effect=RuntimeError("LLM failed")
         )
-        cm.__aexit__ = AsyncMock(return_value=False)
-        mock_agent.run_stream.return_value = cm
 
         with (
             patch(
@@ -307,32 +314,44 @@ class TestWebSocketConfirm:
         """Agent gets True when user approves a tool."""
         confirm_result: list[bool] = []
 
-        @asynccontextmanager
-        async def mock_run_stream(
-            msg, *, deps, message_history
-        ):
-            call_confirm = mock_run_stream._confirm
+        async def mock_run(
+            msg: str,
+            *,
+            deps: Any,
+            message_history: Any,
+            event_stream_handler: Any = None,
+            **kwargs: Any,
+        ) -> Any:
+            call_confirm = mock_run._confirm  # type: ignore[attr-defined]
             result_val = await call_confirm(
                 "reschedule_tasks", "task_1"
             )
             confirm_result.append(result_val)
 
-            async def _chunks():
-                yield "Done."
+            if event_stream_handler is not None:
+                async def _events() -> AsyncIterator[Any]:
+                    yield PartDeltaEvent(
+                        index=0,
+                        delta=TextPartDelta(
+                            content_delta="Done."
+                        ),
+                    )
+                await event_stream_handler(None, _events())
 
             mock_result = MagicMock()
-            mock_result.stream_text.return_value = _chunks()
             mock_result.all_messages.return_value = []
-            yield mock_result
+            return mock_result
 
         mock_agent = MagicMock()
-        mock_agent.run_stream = mock_run_stream
+        mock_agent.run = mock_run
 
         # Capture the confirm fn injected into create_agent
-        created_agents: list = []
+        created_agents: list[Any] = []
 
-        def capture_create_agent(confirm=None, debug_fn=None):
-            mock_run_stream._confirm = confirm
+        def capture_create_agent(
+            confirm: Any = None, debug_fn: Any = None
+        ) -> Any:
+            mock_run._confirm = confirm  # type: ignore[attr-defined]
             created_agents.append(mock_agent)
             return mock_agent
 
@@ -392,27 +411,39 @@ class TestWebSocketConfirm:
         """Agent gets False when user denies a tool."""
         confirm_result: list[bool] = []
 
-        @asynccontextmanager
-        async def mock_run_stream(
-            msg, *, deps, message_history
-        ):
-            call_confirm = mock_run_stream._confirm
+        async def mock_run(
+            msg: str,
+            *,
+            deps: Any,
+            message_history: Any,
+            event_stream_handler: Any = None,
+            **kwargs: Any,
+        ) -> Any:
+            call_confirm = mock_run._confirm  # type: ignore[attr-defined]
             result_val = await call_confirm("add_task", "x")
             confirm_result.append(result_val)
 
-            async def _chunks():
-                yield "Cancelled."
+            if event_stream_handler is not None:
+                async def _events() -> AsyncIterator[Any]:
+                    yield PartDeltaEvent(
+                        index=0,
+                        delta=TextPartDelta(
+                            content_delta="Cancelled."
+                        ),
+                    )
+                await event_stream_handler(None, _events())
 
             mock_result = MagicMock()
-            mock_result.stream_text.return_value = _chunks()
             mock_result.all_messages.return_value = []
-            yield mock_result
+            return mock_result
 
         mock_agent = MagicMock()
-        mock_agent.run_stream = mock_run_stream
+        mock_agent.run = mock_run
 
-        def capture_create_agent(confirm=None, debug_fn=None):
-            mock_run_stream._confirm = confirm
+        def capture_create_agent(
+            confirm: Any = None, debug_fn: Any = None
+        ) -> Any:
+            mock_run._confirm = confirm  # type: ignore[attr-defined]
             return mock_agent
 
         with (

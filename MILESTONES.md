@@ -90,15 +90,15 @@ new features.
 - [x] Investigate and fix debug mode toggle reliability; decide on `DEBUG_MODE`
   fly.io secret (#38)
 - [x] Verify `run_extraction()` fires on WebSocket disconnect in production (#39)
-- [ ] Verify memory and conversation files persist across container restarts (#40)
+- [x] Verify memory and conversation files persist across container restarts (#40)
 - [x] Fix Google Calendar OAuth refresh token (#46)
-- [ ] Verify Todoist reads, GCal reads, and reschedule write in production (#41)
+- [x] Verify Todoist reads, GCal reads, and reschedule write in production (#41)
 - [ ] Run full "plan my week" session on live app and document results (#42)
 - [ ] Curate seed evaluation dataset from real sessions (#43)
 - [ ] Write LLM-as-judge scorer for planning response quality (#44)
 - [ ] Add deterministic checks for rescheduled task validity (#45)
 - [x] Test reschedule logic with task durations (#47)
-- [ ] Fix agent not using get_projects to discover Inbox ID (#48)
+- [x] Fix agent not using get_projects to discover Inbox ID (#48)
 
 
 ## Milestone 4: Nightly Replan Job — `in-progress`

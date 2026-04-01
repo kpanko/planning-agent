@@ -14,6 +14,7 @@ from planning_agent.context import (
     PlanningContext,
     _compute_day_type,
     _fetch_calendar_snapshot,
+    _fetch_inbox_project,
     _fmt_task,
     build_context,
 )
@@ -43,46 +44,39 @@ class TestConfig:
 
 
 class TestComputeDayType:
-    @patch("planning_agent.context.date")
-    def test_weekend_saturday(self, mock_date):
-        mock_date.today.return_value = date(2026, 3, 14)
-        mock_date.side_effect = lambda *a, **k: date(*a, **k)
+    @patch("planning_agent.context.datetime")
+    def test_weekend_saturday(self, mock_dt):
+        mock_dt.now.return_value = datetime(2026, 3, 14)
         assert _compute_day_type() == "weekend"
 
-    @patch("planning_agent.context.date")
-    def test_weekend_sunday(self, mock_date):
-        mock_date.today.return_value = date(2026, 3, 15)
-        mock_date.side_effect = lambda *a, **k: date(*a, **k)
+    @patch("planning_agent.context.datetime")
+    def test_weekend_sunday(self, mock_dt):
+        mock_dt.now.return_value = datetime(2026, 3, 15)
         assert _compute_day_type() == "weekend"
 
-    @patch("planning_agent.context.date")
-    def test_remote_monday(self, mock_date):
-        mock_date.today.return_value = date(2026, 3, 9)
-        mock_date.side_effect = lambda *a, **k: date(*a, **k)
+    @patch("planning_agent.context.datetime")
+    def test_remote_monday(self, mock_dt):
+        mock_dt.now.return_value = datetime(2026, 3, 9)
         assert _compute_day_type() == "remote"
 
-    @patch("planning_agent.context.date")
-    def test_remote_friday(self, mock_date):
-        mock_date.today.return_value = date(2026, 3, 13)
-        mock_date.side_effect = lambda *a, **k: date(*a, **k)
+    @patch("planning_agent.context.datetime")
+    def test_remote_friday(self, mock_dt):
+        mock_dt.now.return_value = datetime(2026, 3, 13)
         assert _compute_day_type() == "remote"
 
-    @patch("planning_agent.context.date")
-    def test_office_tuesday(self, mock_date):
-        mock_date.today.return_value = date(2026, 3, 10)
-        mock_date.side_effect = lambda *a, **k: date(*a, **k)
+    @patch("planning_agent.context.datetime")
+    def test_office_tuesday(self, mock_dt):
+        mock_dt.now.return_value = datetime(2026, 3, 10)
         assert _compute_day_type() == "office"
 
-    @patch("planning_agent.context.date")
-    def test_office_wednesday(self, mock_date):
-        mock_date.today.return_value = date(2026, 3, 11)
-        mock_date.side_effect = lambda *a, **k: date(*a, **k)
+    @patch("planning_agent.context.datetime")
+    def test_office_wednesday(self, mock_dt):
+        mock_dt.now.return_value = datetime(2026, 3, 11)
         assert _compute_day_type() == "office"
 
-    @patch("planning_agent.context.date")
-    def test_office_thursday(self, mock_date):
-        mock_date.today.return_value = date(2026, 3, 12)
-        mock_date.side_effect = lambda *a, **k: date(*a, **k)
+    @patch("planning_agent.context.datetime")
+    def test_office_thursday(self, mock_dt):
+        mock_dt.now.return_value = datetime(2026, 3, 12)
         assert _compute_day_type() == "office"
 
 
@@ -201,6 +195,43 @@ class TestFetchCalendarSnapshot:
         assert "auth error" in result
 
 
+class TestFetchInboxProject:
+    def test_returns_inbox_project_info(self):
+        mock_api = MagicMock()
+        inbox = MagicMock()
+        inbox.is_inbox_project = True
+        inbox.name = "Inbox"
+        inbox.id = "123456"
+        other = MagicMock()
+        other.is_inbox_project = False
+        mock_api.get_projects.return_value = [
+            [other, inbox],
+        ]
+
+        result = _fetch_inbox_project(mock_api)
+        assert "Inbox" in result
+        assert "123456" in result
+
+    def test_returns_fallback_when_no_inbox(self):
+        mock_api = MagicMock()
+        proj = MagicMock()
+        proj.is_inbox_project = False
+        mock_api.get_projects.return_value = [[proj]]
+
+        result = _fetch_inbox_project(mock_api)
+        assert "not found" in result
+
+    def test_returns_error_on_exception(self):
+        mock_api = MagicMock()
+        mock_api.get_projects.side_effect = RuntimeError(
+            "API down"
+        )
+
+        result = _fetch_inbox_project(mock_api)
+        assert "Could not look up Inbox" in result
+        assert "API down" in result
+
+
 class TestBuildContext:
     @patch("planning_agent.context.TODOIST_API_KEY", "")
     @patch("planning_agent.context.get_recent")
@@ -220,6 +251,7 @@ class TestBuildContext:
         assert ctx.memories == []
         assert ctx.recent_conversations == []
         assert "(Todoist not connected)" in ctx.todoist_snapshot
+        assert "(Todoist not connected)" in ctx.inbox_project
         assert "(Google Calendar not connected)" in ctx.calendar_snapshot
         assert ctx.day_type in (
             "remote", "office", "weekend",

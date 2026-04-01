@@ -7,7 +7,10 @@ import logging
 import traceback
 import uuid
 from pathlib import Path
+from collections.abc import AsyncIterable
 from typing import Any
+
+from pydantic_ai.messages import PartDeltaEvent, TextPartDelta
 
 from fastapi import Depends, FastAPI, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -239,24 +242,35 @@ async def websocket_endpoint(ws: WebSocket) -> None:
             if user_msg is None:
                 break
             try:
-                async with agent.run_stream(
+                async def _stream_handler(
+                    _run_ctx: Any,
+                    events: AsyncIterable[Any],
+                ) -> None:
+                    async for event in events:
+                        if (
+                            isinstance(event, PartDeltaEvent)
+                            and isinstance(
+                                event.delta, TextPartDelta
+                            )
+                            and event.delta.content_delta
+                        ):
+                            await ws.send_json(
+                                {
+                                    "type": "chunk",
+                                    "content": (
+                                        event.delta.content_delta
+                                    ),
+                                }
+                            )
+
+                result = await agent.run(
                     user_msg,
                     deps=ctx,
                     message_history=history,
-                ) as result:
-                    async for chunk in result.stream_text(
-                        delta=True,
-                    ):
-                        await ws.send_json(
-                            {
-                                "type": "chunk",
-                                "content": chunk,
-                            }
-                        )
-                    await ws.send_json(
-                        {"type": "message_done"}
-                    )
-                    history = result.all_messages()
+                    event_stream_handler=_stream_handler,
+                )
+                await ws.send_json({"type": "message_done"})
+                history = result.all_messages()
             except WebSocketDisconnect:
                 break
             except Exception as exc:

@@ -5,8 +5,12 @@ logic lives in one place.
 """
 from __future__ import annotations
 
-from datetime import date, timedelta
+import os
+from datetime import date, datetime, timedelta
 from typing import Any, Optional
+from zoneinfo import ZoneInfo
+
+_USER_TZ = os.environ.get("USER_TZ", "America/New_York")
 
 from pydantic import BaseModel, Field
 from todoist_api_python.api import TodoistAPI
@@ -61,7 +65,7 @@ def fmt_task(task: Task) -> str:
 
 def parse_date(value: str) -> date:
     lower = value.lower()
-    today = date.today()
+    today = datetime.now(ZoneInfo(_USER_TZ)).date()
     if lower == "today":
         return today
     if lower == "tomorrow":

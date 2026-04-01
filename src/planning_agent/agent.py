@@ -288,6 +288,9 @@ def create_agent(
 ### Recent conversations
 {_format_conversations(deps.recent_conversations)}
 
+### Todoist projects
+{deps.inbox_project}
+
 ### Tasks this week
 {deps.todoist_snapshot}
 

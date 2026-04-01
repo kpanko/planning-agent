@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 TODOIST_API_KEY = os.environ.get("TODOIST_API_KEY", "")
+USER_TZ = os.environ.get("USER_TZ", "America/New_York")
 
 # Web auth
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")

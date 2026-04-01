@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import AsyncIterable
 from typing import Any
 
+from pydantic_ai.messages import PartDeltaEvent, TextPartDelta
 from rich.console import Console
 from rich.live import Live
 from rich.markdown import Markdown
@@ -65,21 +67,35 @@ async def main() -> None:
         try:
             console.print()
             full_text = ""
-            async with agent.run_stream(
-                user_input,
-                deps=ctx,
-                message_history=history,
-            ) as result:
-                with Live(
-                    console=console,
-                    refresh_per_second=10,
-                ) as live:
-                    async for chunk in result.stream_text(
-                        delta=True,
-                    ):
-                        full_text += chunk
-                        live.update(Markdown(full_text))
-                history = result.all_messages()
+
+            with Live(
+                console=console,
+                refresh_per_second=10,
+            ) as live:
+                async def _stream_handler(
+                    _run_ctx: Any,
+                    events: AsyncIterable[Any],
+                ) -> None:
+                    nonlocal full_text
+                    async for event in events:
+                        if (
+                            isinstance(event, PartDeltaEvent)
+                            and isinstance(
+                                event.delta, TextPartDelta
+                            )
+                            and event.delta.content_delta
+                        ):
+                            full_text += event.delta.content_delta
+                            live.update(Markdown(full_text))
+
+                result = await agent.run(
+                    user_input,
+                    deps=ctx,
+                    message_history=history,
+                    event_stream_handler=_stream_handler,
+                )
+
+            history = result.all_messages()
             console.print()
         except Exception as exc:
             logging.getLogger("planning-agent").exception(

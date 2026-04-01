@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Any, cast
+from zoneinfo import ZoneInfo
 
 from planning_context.conversations import get_recent
 from planning_context.memories import get_active
@@ -12,7 +13,11 @@ from planning_context.values import read_values
 from todoist_api_python.api import TodoistAPI
 from todoist_api_python.models import Task
 
-from .config import GOOGLE_CALENDAR_CREDENTIALS, TODOIST_API_KEY
+from .config import (
+    GOOGLE_CALENDAR_CREDENTIALS,
+    TODOIST_API_KEY,
+    USER_TZ,
+)
 
 
 @dataclass
@@ -26,11 +31,12 @@ class PlanningContext:
     calendar_snapshot: str
     current_datetime: str
     day_type: str
+    inbox_project: str
 
 
 def _compute_day_type() -> str:
     """Determine day type from current weekday."""
-    weekday = date.today().weekday()
+    weekday = datetime.now(ZoneInfo(USER_TZ)).weekday()
     if weekday in (5, 6):
         return "weekend"
     if weekday in (0, 4):  # Mon, Fri
@@ -78,7 +84,7 @@ def _fetch_todoist_snapshot(api: TodoistAPI) -> str:
             for t in overdue:
                 lines.append(f"  {_fmt_task(t)}")
 
-        today = date.today()
+        today = datetime.now(ZoneInfo(USER_TZ)).date()
         end = today + timedelta(days=7)
         after = (today - timedelta(days=1)).strftime("%Y-%m-%d")
         before = (end + timedelta(days=1)).strftime("%Y-%m-%d")
@@ -124,7 +130,7 @@ def _fetch_calendar_snapshot() -> str:
             "calendar", "v3", credentials=creds
         )
 
-        today = date.today()
+        today = datetime.now(ZoneInfo(USER_TZ)).date()
         monday = today - timedelta(days=today.weekday())
         sunday = monday + timedelta(days=6)
         time_min = (
@@ -185,6 +191,18 @@ def _fetch_calendar_snapshot() -> str:
         return f"(Google Calendar error: {exc})"
 
 
+def _fetch_inbox_project(api: TodoistAPI) -> str:
+    """Look up the Inbox project ID at startup."""
+    try:
+        for page in api.get_projects():
+            for p in page:
+                if p.is_inbox_project:
+                    return f"Inbox project: {p.name} (ID: {p.id})"
+    except Exception as exc:
+        return f"(Could not look up Inbox: {exc})"
+    return "(Inbox project not found)"
+
+
 def build_context() -> PlanningContext:
     """Assemble full planning context for a conversation."""
     values_doc = read_values()
@@ -194,12 +212,14 @@ def build_context() -> PlanningContext:
     if TODOIST_API_KEY:
         api = TodoistAPI(TODOIST_API_KEY)
         todoist_snapshot = _fetch_todoist_snapshot(api)
+        inbox_project = _fetch_inbox_project(api)
     else:
         todoist_snapshot = "(Todoist not connected)"
+        inbox_project = "(Todoist not connected)"
 
     calendar_snapshot = _fetch_calendar_snapshot()
 
-    now = datetime.now()
+    now = datetime.now(ZoneInfo(USER_TZ))
     current_datetime = now.strftime("%A, %B %d, %Y %I:%M %p")
     day_type = _compute_day_type()
 
@@ -211,4 +231,5 @@ def build_context() -> PlanningContext:
         calendar_snapshot=calendar_snapshot,
         current_datetime=current_datetime,
         day_type=day_type,
+        inbox_project=inbox_project,
     )
