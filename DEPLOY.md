@@ -36,7 +36,14 @@ flyctl secrets set \
 ## Deploy
 
 ```bash
-flyctl deploy
+flyctl deploy --build-arg GIT_COMMIT=$(git rev-parse --short HEAD)
+```
+
+After deploy, verify the new version is running:
+
+```bash
+curl -s https://planning-agent.fly.dev/health
+# → {"status":"ok","version":"abc1234"}
 ```
 
 ## How auth works

@@ -33,6 +33,7 @@ from .auth import (
 )
 from .context import build_context
 from .extraction import run_extraction
+from .version import GIT_COMMIT
 
 logger = logging.getLogger("planning-agent")
 
@@ -47,7 +48,10 @@ app = FastAPI(title="Planning Agent")
 
 @app.get("/health")
 async def health() -> JSONResponse:
-    return JSONResponse({"status": "ok"})
+    return JSONResponse({
+        "status": "ok",
+        "version": GIT_COMMIT,
+    })
 
 
 # ---------------------------------------------------------------------------
