@@ -7,7 +7,12 @@ import logging
 from collections.abc import AsyncIterable
 from typing import Any
 
-from pydantic_ai.messages import PartDeltaEvent, TextPartDelta
+from pydantic_ai.messages import (
+    PartDeltaEvent,
+    PartStartEvent,
+    TextPart,
+    TextPartDelta,
+)
 from rich.console import Console
 from rich.live import Live
 from rich.markdown import Markdown
@@ -79,6 +84,17 @@ async def main() -> None:
                     nonlocal full_text
                     async for event in events:
                         if (
+                            isinstance(event, PartStartEvent)
+                            and isinstance(
+                                event.part, TextPart
+                            )
+                            and event.part.content
+                        ):
+                            full_text += event.part.content
+                            live.update(
+                                Markdown(full_text)
+                            )
+                        elif (
                             isinstance(event, PartDeltaEvent)
                             and isinstance(
                                 event.delta, TextPartDelta
@@ -86,7 +102,9 @@ async def main() -> None:
                             and event.delta.content_delta
                         ):
                             full_text += event.delta.content_delta
-                            live.update(Markdown(full_text))
+                            live.update(
+                                Markdown(full_text)
+                            )
 
                 result = await agent.run(
                     user_input,
