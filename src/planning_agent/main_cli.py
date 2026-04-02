@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import AsyncIterable
-from typing import Any
+from typing import Any, Optional
 
 from pydantic_ai.messages import (
     PartDeltaEvent,
@@ -22,6 +22,7 @@ from .context import build_context
 from .extraction import run_extraction
 
 console = Console()
+_stderr = Console(stderr=True)
 
 
 def _setup_logging() -> None:
@@ -47,7 +48,38 @@ async def main() -> None:
     _setup_logging()
     console.print("Building context...")
     ctx = build_context()
-    agent = create_agent()
+
+    # Mutable holder so the confirm callback can
+    # pause/resume the Live display during prompts.
+    active_live: dict[str, Optional[Live]] = {
+        "live": None,
+    }
+
+    async def cli_confirm(
+        name: str, detail: str = "",
+    ) -> bool:
+        """Pause Live, prompt, then resume."""
+        live = active_live["live"]
+        if live:
+            live.stop()
+        _stderr.print(
+            f"  [dim]tool:[/dim]"
+            f" [cyan]{name}[/cyan]"
+            + (f" [dim]{detail}[/dim]" if detail else "")
+        )
+        try:
+            answer = await asyncio.to_thread(
+                lambda: input("  Run? [y/N] ")
+                .strip().lower()
+            )
+        except (EOFError, KeyboardInterrupt):
+            return False
+        finally:
+            if live:
+                live.start()
+        return answer in ("y", "yes")
+
+    agent = create_agent(confirm=cli_confirm)
     console.print(
         "Planning agent ready."
         " Type 'done' to exit.\n"
@@ -73,10 +105,14 @@ async def main() -> None:
             console.print()
             full_text = ""
 
-            with Live(
+            live = Live(
                 console=console,
                 refresh_per_second=10,
-            ) as live:
+            )
+            active_live["live"] = live
+            live.start()
+
+            try:
                 async def _stream_handler(
                     _run_ctx: Any,
                     events: AsyncIterable[Any],
@@ -84,24 +120,33 @@ async def main() -> None:
                     nonlocal full_text
                     async for event in events:
                         if (
-                            isinstance(event, PartStartEvent)
+                            isinstance(
+                                event, PartStartEvent
+                            )
                             and isinstance(
                                 event.part, TextPart
                             )
                             and event.part.content
                         ):
-                            full_text += event.part.content
+                            full_text += (
+                                event.part.content
+                            )
                             live.update(
                                 Markdown(full_text)
                             )
                         elif (
-                            isinstance(event, PartDeltaEvent)
+                            isinstance(
+                                event, PartDeltaEvent
+                            )
                             and isinstance(
-                                event.delta, TextPartDelta
+                                event.delta,
+                                TextPartDelta,
                             )
                             and event.delta.content_delta
                         ):
-                            full_text += event.delta.content_delta
+                            full_text += (
+                                event.delta.content_delta
+                            )
                             live.update(
                                 Markdown(full_text)
                             )
@@ -110,8 +155,13 @@ async def main() -> None:
                     user_input,
                     deps=ctx,
                     message_history=history,
-                    event_stream_handler=_stream_handler,
+                    event_stream_handler=(
+                        _stream_handler
+                    ),
                 )
+            finally:
+                live.stop()
+                active_live["live"] = None
 
             history = result.all_messages()
             console.print()

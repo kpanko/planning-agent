@@ -294,6 +294,7 @@
 
   let ws = null;
   let pendingConfirmId = null;
+  let confirmQueue = [];
   let debugMode = false;
   let manualDisconnect = false;
   let streamBubble = null;
@@ -353,18 +354,25 @@
   }
 
   function showConfirm(id, tool, detail) {
-    pendingConfirmId = id;
-    confirmText.innerHTML =
-      `Run <strong>${tool}</strong>` +
-      (detail ? ` <code>${detail}</code>` : "") + `?`;
-    confirmBanner.classList.add("visible");
-    setInputEnabled(false);
+    confirmQueue.push({ id, tool, detail });
+    if (!pendingConfirmId) showNextConfirm();
   }
 
-  function hideConfirm() {
-    confirmBanner.classList.remove("visible");
-    pendingConfirmId = null;
-    setInputEnabled(true);
+  function showNextConfirm() {
+    if (confirmQueue.length === 0) {
+      confirmBanner.classList.remove("visible");
+      pendingConfirmId = null;
+      return;
+    }
+    const next = confirmQueue.shift();
+    pendingConfirmId = next.id;
+    confirmText.innerHTML =
+      `Run <strong>${next.tool}</strong>` +
+      (next.detail
+        ? ` <code>${next.detail}</code>`
+        : "") + `?`;
+    confirmBanner.classList.add("visible");
+    setInputEnabled(false);
   }
 
   function sendConfirm(approved) {
@@ -374,7 +382,8 @@
       id: pendingConfirmId,
       approved,
     }));
-    hideConfirm();
+    pendingConfirmId = null;
+    showNextConfirm();
   }
 
   // ── WebSocket ─────────────────────────────────────────

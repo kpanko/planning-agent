@@ -80,10 +80,12 @@ to inform your scheduling decisions.
 When the user asks you to plan their week (or when it's \
 clearly a planning session):
 
-1. **Survey everything.** Pull all tasks due in the next \
-7-10 days, any overdue tasks, and the calendar for the \
-week. Also check for undated tasks that have deadlines \
-approaching.
+1. **Use the pre-loaded data.** Your system prompt already \
+contains this week's tasks (overdue + next 7 days), \
+calendar events, and project list. Do NOT call \
+`find_tasks`, `find_tasks_by_date`, or `get_projects` \
+to re-fetch what you already have. Only call tools if \
+you need data outside the pre-loaded window.
 
 2. **Propose a concrete schedule.** Assign specific days \
 to tasks. For important or time-sensitive tasks, suggest \
@@ -318,7 +320,9 @@ def create_agent(
                 {"tool": name, "args": detail},
             )
         try:
-            result = fn(*args, **kwargs)
+            result = await asyncio.to_thread(
+                fn, *args, **kwargs
+            )
             if debug_fn:
                 await debug_fn(
                     "tool_result",
@@ -457,8 +461,6 @@ def create_agent(
         if label:
             parts.append(f"label={label}")
         detail = ", ".join(parts) or ""
-        if not await confirm("find_tasks", detail):
-            return "Cancelled by user."
         return await _run_tool(
             "find_tasks",
             detail,
@@ -484,8 +486,6 @@ def create_agent(
         detail = start_date
         if end_date:
             detail += f" to {end_date}"
-        if not await confirm("find_tasks_by_date", detail):
-            return "Cancelled by user."
         return await _run_tool(
             "find_tasks_by_date",
             detail,
@@ -501,8 +501,6 @@ def create_agent(
         task_id: str,
     ) -> str:
         """Fetch a single task by ID."""
-        if not await confirm("get_task", task_id):
-            return "Cancelled by user."
         return await _run_tool(
             "get_task",
             task_id,
