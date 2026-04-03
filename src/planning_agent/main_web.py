@@ -10,6 +10,7 @@ from pathlib import Path
 from collections.abc import AsyncIterable
 from typing import Any
 
+import logfire
 from pydantic_ai.messages import (
     PartDeltaEvent,
     PartStartEvent,
@@ -44,7 +45,14 @@ logger = logging.getLogger("planning-agent")
 
 _STATIC = Path(__file__).parent / "static"
 
+logfire.configure(
+    service_name="planning-agent",
+    send_to_logfire="if-token-present",
+)
+logfire.instrument_pydantic_ai()
+
 app = FastAPI(title="Planning Agent")
+logfire.instrument_fastapi(app)
 
 
 # ---------------------------------------------------------------------------

@@ -7,6 +7,7 @@ import logging
 from collections.abc import AsyncIterable
 from typing import Any, Optional
 
+import logfire
 from pydantic_ai.messages import (
     PartDeltaEvent,
     PartStartEvent,
@@ -46,6 +47,11 @@ def _setup_logging() -> None:
 async def main() -> None:
     """Run the planning agent in the terminal."""
     _setup_logging()
+    logfire.configure(
+        service_name="planning-agent-cli",
+        send_to_logfire="if-token-present",
+    )
+    logfire.instrument_pydantic_ai()
     console.print("Building context...")
     ctx = build_context()
 
