@@ -84,8 +84,8 @@ new features.
   dataset and produce scores.
 
 **Tasks:**
-- [ ] Integrate tracing platform (Langfuse) and instrument all LLM calls (#36)
-- [ ] Add session/conversation trace IDs spanning the full multi-turn
+- [x] Integrate tracing platform (Logfire) and instrument all LLM calls (#36)
+- [x] Add session/conversation trace IDs spanning the full multi-turn
   interaction (#37)
 - [x] Investigate and fix debug mode toggle reliability; decide on `DEBUG_MODE`
   fly.io secret (#38)
@@ -93,11 +93,13 @@ new features.
 - [x] Verify memory and conversation files persist across container restarts (#40)
 - [x] Fix Google Calendar OAuth refresh token (#46)
 - [x] Verify Todoist reads, GCal reads, and reschedule write in production (#41)
-- [ ] Run full "plan my week" session on live app and document results (#42)
+- [x] Run full "plan my week" session on live app and document results (#42)
 - [ ] Curate seed evaluation dataset from real sessions (#43)
 - [ ] Write LLM-as-judge scorer for planning response quality (#44)
 - [ ] Add deterministic checks for rescheduled task validity (#45)
 - [x] Test reschedule logic with task durations (#47)
+- [ ] Fix agent missing overdue tasks during weekly planning (#50)
+- [ ] Extend planning horizon to two weeks (#51)
 - [x] Fix agent not using get_projects to discover Inbox ID (#48)
 
 
