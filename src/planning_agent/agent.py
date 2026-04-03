@@ -15,6 +15,9 @@ ConfirmFn = Callable[[str, str], Awaitable[bool]]
 DebugFn = Callable[[str, dict[str, Any]], Awaitable[None]]
 
 from pydantic_ai import Agent, RunContext
+from pydantic_ai.models.anthropic import (
+    AnthropicModelSettings,
+)
 
 _console = Console(stderr=True)
 
@@ -268,6 +271,10 @@ def create_agent(
     planning_agent = Agent(
         LLM_MODEL,
         deps_type=PlanningContext,
+        model_settings=AnthropicModelSettings(
+            anthropic_cache_instructions=True,
+            anthropic_cache_messages=True,
+        ),
     )
 
     @planning_agent.system_prompt
