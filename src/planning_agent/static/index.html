@@ -205,6 +205,13 @@
     }
     #logout-link:hover { color: #ccc; }
 
+    #version-label {
+      font-size: 0.65rem;
+      color: #555;
+      font-weight: 400;
+      font-family: monospace;
+    }
+
     /* Debug events */
     .debug-item {
       font-family: monospace;
@@ -255,6 +262,7 @@
   <span id="status-label">Connecting…</span>
   <button id="debug-toggle">Debug</button>
   <button id="disconnect-btn">Disconnect</button>
+  <span id="version-label"></span>
   <a href="/logout" id="logout-link">Log out</a>
 </header>
 
@@ -494,6 +502,11 @@
       ws.close();
     }
   });
+
+  const vLabel = document.getElementById("version-label");
+  if (vLabel && vLabel.dataset.v) {
+    vLabel.textContent = vLabel.dataset.v;
+  }
 
   connect();
 </script>

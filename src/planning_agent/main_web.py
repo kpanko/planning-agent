@@ -137,8 +137,12 @@ async def index(
     _: str = Depends(require_session),
 ) -> str:
     """Serve the chat UI (requires login)."""
-    return (_STATIC / "index.html").read_text(
+    html = (_STATIC / "index.html").read_text(
         encoding="utf-8"
+    )
+    return html.replace(
+        'id="version-label"',
+        f'id="version-label" data-v="{GIT_COMMIT}"',
     )
 
 
