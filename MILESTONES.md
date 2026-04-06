@@ -59,29 +59,27 @@ This milestone completes v1 DoD item 4.
 - [x] Document how to run the web server in `README.md`. (#13)
 
 
-## Milestone 3: Observability, Evaluation, and System Verification — `in-progress`
-**Goal:** Instrument the live system with tracing, resolve open bugs from STATUS.md,
-and run a structured end-to-end verification pass on the deployed app before adding
-new features.
+## Milestone 3: Observability and Planning Quality — `in-progress`
+**Goal:** Instrument the live system with tracing, resolve open bugs, and
+fix planning quality issues so the agent is useful for daily use.
 
 **Acceptance Criteria:**
-- Every LLM call emits a trace with inputs, outputs, latency, and token cost to a
-  persistent platform.
-- Traces are grouped by session ID; a past interaction can be replayed in the
-  tracing UI.
-- Debug mode toggle works reliably in the UI; `DEBUG_MODE` behavior on fly.io is
-  documented and intentional.
-- WebSocket disconnect reliably triggers `run_extraction()` on the live app;
-  verified with a real session.
-- Memory extraction writes files to the `/data` volume and they survive a container
-  restart.
-- A real "plan my week" session runs end-to-end on the live app with no errors.
-- Todoist task reads, Google Calendar reads, and a Todoist reschedule write all
-  verified working in production.
-- A seed evaluation dataset of ≥10 representative queries exists with
-  expected/actual outputs recorded.
-- At least one LLM-as-judge scorer and one deterministic check run against the
-  dataset and produce scores.
+- Every LLM call emits a trace with inputs, outputs, latency, and token
+  cost to a persistent platform.
+- Traces are grouped by session ID; a past interaction can be replayed in
+  the tracing UI.
+- Debug mode toggle works reliably in the UI; `DEBUG_MODE` behavior on
+  fly.io is documented and intentional.
+- WebSocket disconnect reliably triggers `run_extraction()` on the live
+  app; verified with a real session.
+- Memory extraction writes files to the `/data` volume and they survive a
+  container restart.
+- A real "plan my week" session runs end-to-end on the live app with no
+  errors.
+- Todoist task reads, Google Calendar reads, and a Todoist reschedule
+  write all verified working in production.
+- Overdue tasks are included in the planning context and scheduled.
+- Planning horizon covers two weeks instead of one.
 
 **Tasks:**
 - [x] Integrate tracing platform (Logfire) and instrument all LLM calls (#36)
@@ -94,13 +92,10 @@ new features.
 - [x] Fix Google Calendar OAuth refresh token (#46)
 - [x] Verify Todoist reads, GCal reads, and reschedule write in production (#41)
 - [x] Run full "plan my week" session on live app and document results (#42)
-- [ ] Curate seed evaluation dataset from real sessions (#43)
-- [ ] Write LLM-as-judge scorer for planning response quality (#44)
-- [ ] Add deterministic checks for rescheduled task validity (#45)
 - [x] Test reschedule logic with task durations (#47)
+- [x] Fix agent not using get_projects to discover Inbox ID (#48)
 - [ ] Fix agent missing overdue tasks during weekly planning (#50)
 - [ ] Extend planning horizon to two weeks (#51)
-- [x] Fix agent not using get_projects to discover Inbox ID (#48)
 
 
 ## Milestone 4: Nightly Replan Job — `in-progress`
@@ -202,3 +197,21 @@ observed behavior.
 - [ ] Add "Learned Patterns" section to `STATIC_PROMPT` in
   `agent.py`. (#33)
 - [ ] Add tests for pattern loading, updating, and consolidation. (#34)
+
+
+## Milestone 7: Evaluation Suite — `planned`
+**Goal:** Build automated evaluation tooling so system prompt and context
+changes can be measured rather than eyeballed. Uses real session data
+already captured by Logfire.
+
+**Acceptance Criteria:**
+- A seed evaluation dataset of ≥10 representative queries exists with
+  expected/actual outputs recorded.
+- At least one LLM-as-judge scorer and one deterministic check run
+  against the dataset and produce scores.
+- Running the eval suite is a single command.
+
+**Tasks:**
+- [ ] Curate seed evaluation dataset from real sessions (#43)
+- [ ] Write LLM-as-judge scorer for planning response quality (#44)
+- [ ] Add deterministic checks for rescheduled task validity (#45)

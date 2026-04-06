@@ -1,33 +1,29 @@
 # Status
 
-**Last updated:** 2026-04-02
-**Active milestone:** Milestone 3 — Observability, Evaluation, and System Verification
+**Last updated:** 2026-04-05
+**Active milestone:** Milestone 3 — Observability and Planning Quality
 
 ## Recently Completed
 
-- #36 — Logfire tracing integrated (PydanticAI + FastAPI instrumented)
-- #37 — Session trace IDs via OTel context propagation (free with Logfire)
 - #48 — Agent uses get_projects to discover Inbox ID
-- #49 — Timezone bug fix for off-by-one reschedules
 - #46 — GCal OAuth refresh token fix (prompt=consent)
 - #47 — Reschedule preserves task durations
 - Prompt caching enabled for Anthropic API calls
+- Milestone reorg: eval tasks (#43, #44, #45) moved to new Milestone 7
 
 ## In Progress
 
-- **Milestone 3** — Observability, Evaluation, and System Verification
+- **Milestone 3** — Observability and Planning Quality
   Branch: `milestone-3-eval`
 - Completed: #36, #37, #38, #39, #40, #41, #42, #46, #47, #48
-  (10 of 14)
-- Remaining: #43, #44, #45, #50, #51
+  (10 of 12)
+- Remaining: #50, #51
 
 ## Next Up
 
-- #43 — Curate seed evaluation dataset
-- #44 — LLM-as-judge scorer
-- #45 — Deterministic checks for rescheduled task validity
 - #50 — Fix agent missing overdue tasks during weekly planning
 - #51 — Extend planning horizon to two weeks
+- Then: Milestone 4 — Nightly Replan Job
 
 ## Blockers / Open Questions
 
