@@ -70,8 +70,10 @@ def _fmt_task(task: Task) -> str:
 
 
 def _fetch_todoist_snapshot(api: TodoistAPI) -> str:
-    """Fetch overdue + next 7 days of tasks."""
+    """Fetch overdue + next 14 days of tasks."""
     lines: list[str] = []
+    n_overdue = 0
+    n_upcoming = 0
 
     try:
         overdue = [
@@ -79,37 +81,50 @@ def _fetch_todoist_snapshot(api: TodoistAPI) -> str:
             for page in api.filter_tasks(query="overdue")
             for task in page
         ]
+        n_overdue = len(overdue)
         if overdue:
             lines.append(f"Overdue ({len(overdue)}):")
             for t in overdue:
                 lines.append(f"  {_fmt_task(t)}")
 
         today = datetime.now(ZoneInfo(USER_TZ)).date()
-        end = today + timedelta(days=7)
-        after = (today - timedelta(days=1)).strftime("%Y-%m-%d")
-        before = (end + timedelta(days=1)).strftime("%Y-%m-%d")
+        end = today + timedelta(days=14)
+        after = (
+            (today - timedelta(days=1))
+            .strftime("%Y-%m-%d")
+        )
+        before = (
+            (end + timedelta(days=1))
+            .strftime("%Y-%m-%d")
+        )
         query = (
             f"due after: {after} & due before: {before}"
         )
-        week_tasks = [
+        upcoming = [
             task
             for page in api.filter_tasks(query=query)
             for task in page
         ]
-        if week_tasks:
+        n_upcoming = len(upcoming)
+        if upcoming:
             lines.append(
-                f"\nThis week ({len(week_tasks)}):"
+                f"\nNext 14 days ({len(upcoming)}):"
             )
-            for t in week_tasks:
+            for t in upcoming:
                 lines.append(f"  {_fmt_task(t)}")
+
+        lines.append(
+            f"\nTotal: {n_overdue} overdue,"
+            f" {n_upcoming} upcoming"
+        )
     except Exception as exc:
         lines.append(f"Error loading Todoist tasks: {exc}")
 
-    return "\n".join(lines) if lines else "No tasks found."
+    return "\n".join(lines)
 
 
 def _fetch_calendar_snapshot() -> str:
-    """Fetch this week's Google Calendar events.
+    """Fetch next 14 days of Google Calendar events.
 
     Returns a formatted string of events, or a short
     fallback message if credentials are absent or the
@@ -131,15 +146,14 @@ def _fetch_calendar_snapshot() -> str:
         )
 
         today = datetime.now(ZoneInfo(USER_TZ)).date()
-        monday = today - timedelta(days=today.weekday())
-        sunday = monday + timedelta(days=6)
+        end_date = today + timedelta(days=13)
         time_min = (
-            datetime.combine(monday, datetime.min.time())
+            datetime.combine(today, datetime.min.time())
             .isoformat() + "Z"
         )
         time_max = (
             datetime.combine(
-                sunday,
+                end_date,
                 datetime.max.time().replace(microsecond=0),
             )
             .isoformat() + "Z"
@@ -163,7 +177,7 @@ def _fetch_calendar_snapshot() -> str:
         )
 
         if not events:
-            return "No calendar events this week."
+            return "No calendar events in next 14 days."
 
         lines: list[str] = []
         for ev in events:
@@ -185,7 +199,7 @@ def _fetch_calendar_snapshot() -> str:
                 start = dt.strftime("%a %b %d %I:%M %p")
             lines.append(f"  {start}: {summary}")
 
-        return "This week:\n" + "\n".join(lines)
+        return "Next 14 days:\n" + "\n".join(lines)
 
     except Exception as exc:
         return f"(Google Calendar error: {exc})"

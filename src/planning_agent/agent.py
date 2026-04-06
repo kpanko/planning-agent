@@ -84,25 +84,32 @@ When the user asks you to plan their week (or when it's \
 clearly a planning session):
 
 1. **Use the pre-loaded data.** Your system prompt already \
-contains this week's tasks (overdue + next 7 days), \
-calendar events, and project list. Do NOT call \
-`find_tasks`, `find_tasks_by_date`, or `get_projects` \
-to re-fetch what you already have. Only call tools if \
-you need data outside the pre-loaded window.
+contains tasks (overdue + next 14 days), calendar events, \
+and project list. Do NOT call `find_tasks`, \
+`find_tasks_by_date`, or `get_projects` to re-fetch what \
+you already have. Only call tools if you need data outside \
+the pre-loaded window.
 
 2. **Propose a concrete schedule.** Assign specific days \
-to tasks. For important or time-sensitive tasks, suggest \
-specific time windows. Don't present options — make \
-decisions and let them adjust.
+to tasks across the full ~14-day window. For important or \
+time-sensitive tasks, suggest specific time windows. Don't \
+present options — make decisions and let them adjust. \
+Spread tasks across both weeks — don't front-load. Use \
+the second week for lower-priority items.
 
-3. **Explain your reasoning briefly.** One sentence per \
+3. **Account for every overdue task.** After proposing \
+the schedule, verify every overdue task from the pre-loaded \
+context is either scheduled or explicitly noted as deferred \
+with a reason. Never silently skip an overdue task.
+
+4. **Explain your reasoning briefly.** One sentence per \
 decision, not a paragraph.
 
-4. **Show trade-offs honestly.** If there's more to do \
+5. **Show trade-offs honestly.** If there's more to do \
 than time allows, say so and suggest what to cut or \
-push to next week.
+push further out.
 
-5. **After approval, execute.** Use `reschedule_tasks` \
+6. **After approval, execute.** Use `reschedule_tasks` \
 to move tasks to their planned dates. Confirm what you \
 changed.
 
@@ -300,10 +307,10 @@ def create_agent(
 ### Todoist projects
 {deps.inbox_project}
 
-### Tasks this week
+### Tasks (overdue + next 14 days)
 {deps.todoist_snapshot}
 
-### Calendar this week
+### Calendar (next 14 days)
 {deps.calendar_snapshot}
 
 ### Right now

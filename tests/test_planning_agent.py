@@ -15,6 +15,7 @@ from planning_agent.context import (
     _compute_day_type,
     _fetch_calendar_snapshot,
     _fetch_inbox_project,
+    _fetch_todoist_snapshot,
     _fmt_task,
     build_context,
 )
@@ -114,6 +115,72 @@ class TestFmtTask:
         assert "p1" in result
 
 
+class TestFetchTodoistSnapshot:
+    def test_includes_overdue_and_upcoming(self):
+        mock_api = MagicMock()
+        overdue_task = create_task(
+            "1", "Overdue errand",
+            due_date_str="2026-03-01",
+        )
+        upcoming_task = create_task(
+            "2", "Upcoming errand",
+            due_date_str="2026-03-20",
+        )
+        mock_api.filter_tasks.side_effect = [
+            [[overdue_task]],       # overdue query
+            [[upcoming_task]],      # date range query
+        ]
+
+        result = _fetch_todoist_snapshot(mock_api)
+
+        assert "Overdue (1):" in result
+        assert "Overdue errand" in result
+        assert "Next 14 days (1):" in result
+        assert "Upcoming errand" in result
+
+    def test_summary_line_with_counts(self):
+        mock_api = MagicMock()
+        t1 = create_task(
+            "1", "Old task", due_date_str="2026-03-01",
+        )
+        t2 = create_task(
+            "2", "Soon task", due_date_str="2026-03-20",
+        )
+        t3 = create_task(
+            "3", "Also soon", due_date_str="2026-03-21",
+        )
+        mock_api.filter_tasks.side_effect = [
+            [[t1]],          # overdue
+            [[t2, t3]],      # upcoming
+        ]
+
+        result = _fetch_todoist_snapshot(mock_api)
+
+        assert "Total: 1 overdue, 2 upcoming" in result
+
+    def test_no_tasks(self):
+        mock_api = MagicMock()
+        mock_api.filter_tasks.side_effect = [
+            [[]],   # overdue — empty page
+            [[]],   # upcoming — empty page
+        ]
+
+        result = _fetch_todoist_snapshot(mock_api)
+
+        assert "Total: 0 overdue, 0 upcoming" in result
+
+    def test_api_error(self):
+        mock_api = MagicMock()
+        mock_api.filter_tasks.side_effect = RuntimeError(
+            "API down"
+        )
+
+        result = _fetch_todoist_snapshot(mock_api)
+
+        assert "Error loading Todoist tasks" in result
+        assert "API down" in result
+
+
 class TestFetchCalendarSnapshot:
     @patch("planning_agent.context.GOOGLE_CALENDAR_CREDENTIALS")
     def test_no_credentials_returns_fallback(self, mock_path):
@@ -154,7 +221,7 @@ class TestFetchCalendarSnapshot:
 
         result = _fetch_calendar_snapshot()
 
-        assert "This week:" in result
+        assert "Next 14 days:" in result
         assert "Team meeting" in result
         assert "All-day event" in result
 
@@ -178,7 +245,7 @@ class TestFetchCalendarSnapshot:
 
         result = _fetch_calendar_snapshot()
 
-        assert result == "No calendar events this week."
+        assert result == "No calendar events in next 14 days."
 
     @patch(
         "google.oauth2.credentials.Credentials"

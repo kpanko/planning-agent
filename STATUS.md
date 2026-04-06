@@ -1,29 +1,27 @@
 # Status
 
 **Last updated:** 2026-04-05
-**Active milestone:** Milestone 3 — Observability and Planning Quality
+**Active milestone:** Milestone 3 — complete, pending PR merge
 
 ## Recently Completed
 
+- #50 — Fix agent missing overdue tasks (summary counts + prompt)
+- #51 — Extend planning horizon to two weeks (14-day window)
 - #48 — Agent uses get_projects to discover Inbox ID
 - #46 — GCal OAuth refresh token fix (prompt=consent)
 - #47 — Reschedule preserves task durations
 - Prompt caching enabled for Anthropic API calls
-- Milestone reorg: eval tasks (#43, #44, #45) moved to new Milestone 7
+- Milestone reorg: eval tasks (#43, #44, #45) moved to M7
 
 ## In Progress
 
 - **Milestone 3** — Observability and Planning Quality
   Branch: `milestone-3-eval`
-- Completed: #36, #37, #38, #39, #40, #41, #42, #46, #47, #48
-  (10 of 12)
-- Remaining: #50, #51
+  All 12 tasks complete. Ready for PR merge.
 
 ## Next Up
 
-- #50 — Fix agent missing overdue tasks during weekly planning
-- #51 — Extend planning horizon to two weeks
-- Then: Milestone 4 — Nightly Replan Job
+- Milestone 4 — Nightly Replan Job
 
 ## Blockers / Open Questions
 

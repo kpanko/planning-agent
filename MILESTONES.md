@@ -59,7 +59,7 @@ This milestone completes v1 DoD item 4.
 - [x] Document how to run the web server in `README.md`. (#13)
 
 
-## Milestone 3: Observability and Planning Quality — `in-progress`
+## Milestone 3: Observability and Planning Quality — `done`
 **Goal:** Instrument the live system with tracing, resolve open bugs, and
 fix planning quality issues so the agent is useful for daily use.
 
@@ -94,8 +94,8 @@ fix planning quality issues so the agent is useful for daily use.
 - [x] Run full "plan my week" session on live app and document results (#42)
 - [x] Test reschedule logic with task durations (#47)
 - [x] Fix agent not using get_projects to discover Inbox ID (#48)
-- [ ] Fix agent missing overdue tasks during weekly planning (#50)
-- [ ] Extend planning horizon to two weeks (#51)
+- [x] Fix agent missing overdue tasks during weekly planning (#50)
+- [x] Extend planning horizon to two weeks (#51)
 
 
 ## Milestone 4: Nightly Replan Job — `in-progress`
