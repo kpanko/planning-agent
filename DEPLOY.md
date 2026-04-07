@@ -11,6 +11,9 @@
    http://localhost:8080/oauth/callback   ← for local dev
    ```
 4. Note your **Client ID** and **Client Secret**.
+5. Go to **OAuth consent screen** and set the publishing status to
+   **In production** (not "Testing"). In Testing mode, refresh
+   tokens expire after 7 days and calendar access will break.
 
 ## One-time Fly setup
 
@@ -49,11 +52,18 @@ curl -s https://planning-agent.fly.dev/health
 ## How auth works
 
 - Visiting the app redirects to `/login` if not signed in.
-- Clicking **Sign in with Google** starts an OAuth2 flow.
-- Only the `ALLOWED_GOOGLE_EMAIL` account is admitted; all others get 403.
-- On first login the Google OAuth token is saved to the data volume and
-  used automatically for Google Calendar — no separate Calendar setup needed.
-- Session cookies are signed with `WEB_SECRET` and expire after 30 days.
+- Clicking **Sign in with Google** starts an OAuth2 flow with PKCE.
+- Only the `ALLOWED_GOOGLE_EMAIL` account is admitted; all others
+  get 403.
+- On first login the Google OAuth tokens (access + refresh) are
+  saved to the data volume. Google Calendar reads use these
+  automatically.
+- Access tokens are refreshed transparently and persisted back to
+  disk after each successful calendar API call.
+- If the refresh token itself expires or is revoked, a reconnect
+  banner appears in the chat UI linking to `/login/google`.
+- Session cookies are signed with `WEB_SECRET` and expire after
+  30 days.
 
 ## Local development
 
