@@ -11,19 +11,22 @@
    http://localhost:8080/oauth/callback   ← for local dev
    ```
 4. Note your **Client ID** and **Client Secret**.
+5. Go to **OAuth consent screen** and set the publishing status to
+   **In production** (not "Testing"). In Testing mode, refresh
+   tokens expire after 7 days and calendar access will break.
 
 ## One-time Fly setup
 
 ```bash
-# Install flyctl: https://fly.io/docs/hands-on/install-flyctl/
-fly auth login
-fly launch --no-deploy   # creates the app, skips first deploy
+# Install flyctl: https://fly.io/docs/flyctl/install/
+flyctl auth login
+flyctl launch --no-deploy   # creates the app, skips first deploy
 
 # Create persistent volume for app data
-fly volumes create planning_agent_data --size 1 --region ord
+flyctl volumes create planning_agent_data --size 1 --region ord
 
 # Set secrets
-fly secrets set \
+flyctl secrets set \
   GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com" \
   GOOGLE_CLIENT_SECRET="your-client-secret" \
   ALLOWED_GOOGLE_EMAIL="you@gmail.com" \
@@ -36,17 +39,31 @@ fly secrets set \
 ## Deploy
 
 ```bash
-fly deploy
+flyctl deploy --build-arg GIT_COMMIT=$(git rev-parse --short HEAD)
+```
+
+After deploy, verify the new version is running:
+
+```bash
+curl -s https://planning-agent.fly.dev/health
+# → {"status":"ok","version":"abc1234"}
 ```
 
 ## How auth works
 
 - Visiting the app redirects to `/login` if not signed in.
-- Clicking **Sign in with Google** starts an OAuth2 flow.
-- Only the `ALLOWED_GOOGLE_EMAIL` account is admitted; all others get 403.
-- On first login the Google OAuth token is saved to the data volume and
-  used automatically for Google Calendar — no separate Calendar setup needed.
-- Session cookies are signed with `WEB_SECRET` and expire after 30 days.
+- Clicking **Sign in with Google** starts an OAuth2 flow with PKCE.
+- Only the `ALLOWED_GOOGLE_EMAIL` account is admitted; all others
+  get 403.
+- On first login the Google OAuth tokens (access + refresh) are
+  saved to the data volume. Google Calendar reads use these
+  automatically.
+- Access tokens are refreshed transparently and persisted back to
+  disk after each successful calendar API call.
+- If the refresh token itself expires or is revoked, a reconnect
+  banner appears in the chat UI linking to `/login/google`.
+- Session cookies are signed with `WEB_SECRET` and expire after
+  30 days.
 
 ## Local development
 
@@ -59,6 +76,28 @@ WEB_SECRET=dev-secret
 BASE_URL=http://localhost:8080
 
 uv run planning-agent-web
+```
+
+## Debug mode
+
+Debug mode shows tool calls, tool results, and exceptions in the
+chat UI. It is controlled per-session via the **Debug** toggle
+button in the web interface.
+
+The `DEBUG_MODE` environment variable sets the default state for
+new sessions. When unset (the default on fly.io), debug starts
+off and the user can toggle it on. There is no need to add
+`DEBUG_MODE` as a fly.io secret — the UI toggle is sufficient
+for on-demand debugging.
+
+To default debug on for all sessions (e.g. during development):
+
+```bash
+# Local
+DEBUG_MODE=1 uv run planning-agent-web
+
+# Fly.io (optional, not recommended for normal use)
+flyctl secrets set DEBUG_MODE=1
 ```
 
 ## Regions

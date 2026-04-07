@@ -7,6 +7,16 @@ import logging
 import traceback
 import uuid
 from pathlib import Path
+from collections.abc import AsyncIterable
+from typing import Any
+
+import logfire
+from pydantic_ai.messages import (
+    PartDeltaEvent,
+    PartStartEvent,
+    TextPart,
+    TextPartDelta,
+)
 
 from fastapi import Depends, FastAPI, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -27,14 +37,25 @@ from .auth import (
     verify_state_cookie,
     get_verifier_cookie,
 )
-from .context import build_context
+from .context import (
+    CALENDAR_NEEDS_RECONNECT,
+    build_context,
+)
 from .extraction import run_extraction
+from .version import GIT_COMMIT
 
 logger = logging.getLogger("planning-agent")
 
 _STATIC = Path(__file__).parent / "static"
 
+logfire.configure(
+    service_name="planning-agent",
+    send_to_logfire="if-token-present",
+)
+logfire.instrument_pydantic_ai()
+
 app = FastAPI(title="Planning Agent")
+logfire.instrument_fastapi(app)
 
 
 # ---------------------------------------------------------------------------
@@ -43,7 +64,10 @@ app = FastAPI(title="Planning Agent")
 
 @app.get("/health")
 async def health() -> JSONResponse:
-    return JSONResponse({"status": "ok"})
+    return JSONResponse({
+        "status": "ok",
+        "version": GIT_COMMIT,
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -98,6 +122,15 @@ async def oauth_callback(
     return response
 
 
+@app.get("/logout")
+async def logout() -> Response:
+    response = RedirectResponse(
+        url="/login", status_code=303
+    )
+    response.delete_cookie("pa_session")
+    return response
+
+
 # ---------------------------------------------------------------------------
 # Chat UI
 # ---------------------------------------------------------------------------
@@ -107,8 +140,12 @@ async def index(
     _: str = Depends(require_session),
 ) -> str:
     """Serve the chat UI (requires login)."""
-    return (_STATIC / "index.html").read_text(
+    html = (_STATIC / "index.html").read_text(
         encoding="utf-8"
+    )
+    return html.replace(
+        'id="version-label"',
+        f'id="version-label" data-v="{GIT_COMMIT}"',
     )
 
 
@@ -138,18 +175,26 @@ async def websocket_endpoint(ws: WebSocket) -> None:
     await ws.accept()
 
     ctx = build_context()
-    history: list = []
+    history: list[Any] = []
+
+    if ctx.calendar_snapshot == CALENDAR_NEEDS_RECONNECT:
+        await ws.send_json({
+            "type": "calendar_reconnect",
+            "url": "/login/google",
+        })
 
     # Mutable so the receive loop can toggle it.
-    debug_state: dict = {"enabled": DEBUG_MODE}
+    debug_state: dict[str, bool] = {"enabled": DEBUG_MODE}
 
-    if DEBUG_MODE:
+    # Tell the client the initial debug state so
+    # the toggle reflects reality on connect.
+    await ws.send_json({
+        "type": "debug_state",
+        "enabled": debug_state["enabled"],
+    })
+
+    if debug_state["enabled"]:
         logger.info("Debug mode enabled for session")
-        await ws.send_json({
-            "type": "debug",
-            "event": "connected",
-            "content": "Debug mode ON",
-        })
 
     # Futures keyed by confirm-id, resolved when the
     # client sends a confirm_response.
@@ -162,7 +207,7 @@ async def websocket_endpoint(ws: WebSocket) -> None:
     )
 
     async def send_debug(
-        event: str, data: dict
+        event: str, data: dict[str, Any],
     ) -> None:
         if not debug_state["enabled"]:
             return
@@ -227,22 +272,54 @@ async def websocket_endpoint(ws: WebSocket) -> None:
             if user_msg is None:
                 break
             try:
+                async def _stream_handler(
+                    _run_ctx: Any,
+                    events: AsyncIterable[Any],
+                ) -> None:
+                    async for event in events:
+                        if (
+                            isinstance(event, PartStartEvent)
+                            and isinstance(
+                                event.part, TextPart
+                            )
+                            and event.part.content
+                        ):
+                            await ws.send_json(
+                                {
+                                    "type": "chunk",
+                                    "content": (
+                                        event.part.content
+                                    ),
+                                }
+                            )
+                        elif (
+                            isinstance(event, PartDeltaEvent)
+                            and isinstance(
+                                event.delta, TextPartDelta
+                            )
+                            and event.delta.content_delta
+                        ):
+                            await ws.send_json(
+                                {
+                                    "type": "chunk",
+                                    "content": (
+                                        event.delta.content_delta
+                                    ),
+                                }
+                            )
+
                 result = await agent.run(
                     user_msg,
                     deps=ctx,
                     message_history=history,
+                    event_stream_handler=_stream_handler,
                 )
-                await ws.send_json(
-                    {
-                        "type": "message",
-                        "content": result.output,
-                    }
-                )
+                await ws.send_json({"type": "message_done"})
                 history = result.all_messages()
             except WebSocketDisconnect:
                 break
             except Exception as exc:
-                logger.exception("agent.run failed")
+                logger.exception("agent.run_stream failed")
                 await send_debug(
                     "exception",
                     {"traceback": traceback.format_exc()},
@@ -261,14 +338,43 @@ async def websocket_endpoint(ws: WebSocket) -> None:
                     break
     finally:
         recv_task.cancel()
-        if history:
-            await run_extraction(history)
+        await end_session(history)
+
+
+async def end_session(history: list[Any]) -> None:
+    """Run post-session cleanup: extract memories if the
+    session had any messages."""
+    if history:
+        logger.info(
+            "Session ended, triggering extraction"
+        )
+        await run_extraction(history)
+    else:
+        logger.info(
+            "Session ended with no messages,"
+            " skipping extraction"
+        )
+
+
+def _setup_logging() -> None:
+    """Configure the planning-agent logger for the web
+    server. Writes to stderr so fly.io captures it."""
+    import sys
+
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter(
+        "%(asctime)s %(levelname)s %(name)s: %(message)s"
+    ))
+    pa_logger = logging.getLogger("planning-agent")
+    pa_logger.addHandler(handler)
+    pa_logger.setLevel(logging.INFO)
 
 
 def main() -> None:
     """Entry point for the planning-agent-web command."""
     import uvicorn
 
+    _setup_logging()
     uvicorn.run(
         "planning_agent.main_web:app",
         host="0.0.0.0",

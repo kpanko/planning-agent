@@ -1,49 +1,44 @@
 # Status
 
-**Last updated:** 2026-03-25
-**Active milestone:** Milestone 3 — Nightly Replan Job
+**Last updated:** 2026-04-05
+**Active milestone:** Milestone 4 — Nightly Replan Job
 
 ## Recently Completed
 
-- **Milestone 1** — All 6 tasks done, landed on `main`
-- **Milestone 2** — All 7 tasks done, merged to `main`
-- **Fly.io deployment** — app live at https://planning-agent.fly.dev
-  - `.dockerignore`, `GET /health` endpoint, health check in `fly.toml`
-  - Fixed stale "free tier" comments in `fly.toml` and `DEPLOY.md`
-  - Fixed 4 pre-existing WebSocket test failures (DEBUG_MODE not patched)
-  - VM memory bumped to 512mb after OOM kill on first boot
+- Milestone 3 complete — all 12 tasks done, PR #52 open
+- #50 — Fix agent missing overdue tasks (summary counts + prompt)
+- #51 — Extend planning horizon to two weeks (14-day window)
+- Version label added to chat UI header (git commit hash)
 
 ## In Progress
 
-Nothing actively in progress.
+- **Milestone 4** — Nightly Replan Job (`planned`, not yet started)
 
 ## Next Up
 
-- **Milestone 3** — Nightly Replan Job (#14–#19)
-  Branch: `milestone-3`
-- **Debug mode UI bugs** — debug toggle doesn't light up reliably; debug
-  mode itself not reliably active (investigate separately)
-- **Session end UX** — clarify whether ending a web session requires
-  typing "done" or if disconnect is sufficient to trigger memory
-  extraction
+- Milestone 4 tasks: #14, #15, #16, #17, #18, #19
+- Fix Google Calendar token refresh (see Blockers)
 
 ## Blockers / Open Questions
 
-- Debug mode on fly.io: `DEBUG_MODE` env var not set as a secret, so
-  debug is off in production. Need to decide if that's intentional or
-  if it should be settable per-session via the UI toggle.
-- Session end: `run_extraction()` is called in the `finally` block of
-  the WebSocket handler, so disconnect should trigger it — but needs
-  verification on the live app.
+- **Google Calendar disconnected.** OAuth refresh token is expired
+  and there is no way to re-authenticate from the deployed app.
+  The original token was generated locally and copied to the
+  volume. Needs a proper re-auth flow or a way to refresh from
+  the app.
 
 ## Key Context
 
 - Deployed on fly.io: `planning-agent` app, `ord` region, 512mb
   shared-cpu-1x, 1GB volume at `/data`.
-- After Google OAuth login, credentials are saved to the data volume
-  and reused for Google Calendar — no separate Calendar setup needed.
+- Deploy command: `flyctl deploy -a planning-agent --build-arg GIT_COMMIT=$(git rev-parse --short HEAD)`
+- Logfire tracing active in prod. Write token set as `LOGFIRE_TOKEN`
+  fly.io secret. Dashboard at logfire-us.pydantic.dev/pankok/planning-agent.
+  LLM spans are nested under WebSocket `/ws` trace.
 - Branching strategy: one branch + PR per milestone.
-- All agent tools are `async def`; confirm callback is injectable
-  `async (name, detail) -> bool`.
-- `uv run` at container start rebuilds the editable install on each
-  boot (adds ~5s startup time) — acceptable for now.
+- Branch `milestone-3-eval` has open PR #52 for M3.
+- Debug mode is per-session via the UI toggle; `DEBUG_MODE` env var
+  sets the default. Documented in DEPLOY.md.
+- Todoist SDK v3 returns paginated `Iterator[list[T]]` for
+  `get_tasks`, `get_projects`, `get_sections`, `get_comments`,
+  and `filter_tasks` — always flatten with nested comprehension.

@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from itsdangerous import URLSafeTimedSerializer
+from pydantic_ai.messages import PartDeltaEvent, TextPartDelta
 from starlette.testclient import TestClient
 
 from planning_agent.main_web import app
@@ -21,13 +24,29 @@ def _session_cookies() -> dict[str, str]:
 
 
 def _make_mock_agent(reply: str = "Hello from agent"):
-    """Return a mock PydanticAI agent that answers reply."""
+    """Return a mock agent that streams reply via event_stream_handler."""
     mock_result = MagicMock()
-    mock_result.output = reply
     mock_result.all_messages.return_value = []
 
+    async def _run_impl(
+        msg: str,
+        *,
+        deps: Any,
+        message_history: Any,
+        event_stream_handler: Any = None,
+        **kwargs: Any,
+    ) -> Any:
+        if event_stream_handler is not None:
+            async def _events() -> AsyncIterator[Any]:
+                yield PartDeltaEvent(
+                    index=0,
+                    delta=TextPartDelta(content_delta=reply),
+                )
+            await event_stream_handler(None, _events())
+        return mock_result
+
     mock_agent = MagicMock()
-    mock_agent.run = AsyncMock(return_value=mock_result)
+    mock_agent.run = AsyncMock(side_effect=_run_impl)
     return mock_agent
 
 
@@ -114,16 +133,22 @@ class TestWebSocketChat:
             with TestClient(app) as client:
                 client.cookies.update(_session_cookies())
                 with client.websocket_connect("/ws") as ws:
+                    ws.receive_json()  # debug_state
                     ws.send_json(
                         {
                             "type": "chat",
                             "content": "Plan my week",
                         }
                     )
-                    data = ws.receive_json()
+                    chunks: list[str] = []
+                    while True:
+                        data = ws.receive_json()
+                        if data["type"] == "chunk":
+                            chunks.append(data["content"])
+                        elif data["type"] == "message_done":
+                            break
 
-        assert data["type"] == "message"
-        assert data["content"] == "Here's your plan."
+        assert "".join(chunks) == "Here's your plan."
 
     def test_agent_run_called_with_user_message(self):
         mock_agent = _make_mock_agent()
@@ -149,13 +174,17 @@ class TestWebSocketChat:
             with TestClient(app) as client:
                 client.cookies.update(_session_cookies())
                 with client.websocket_connect("/ws") as ws:
+                    ws.receive_json()  # debug_state
                     ws.send_json(
                         {
                             "type": "chat",
                             "content": "Hello",
                         }
                     )
-                    ws.receive_json()
+                    while ws.receive_json().get(
+                        "type"
+                    ) != "message_done":
+                        pass
 
         call_args = mock_agent.run.call_args
         assert call_args.args[0] == "Hello"
@@ -188,6 +217,7 @@ class TestWebSocketChat:
             with TestClient(app) as client:
                 client.cookies.update(_session_cookies())
                 with client.websocket_connect("/ws") as ws:
+                    ws.receive_json()  # debug_state
                     ws.send_json(
                         {
                             "type": "chat",
@@ -199,11 +229,81 @@ class TestWebSocketChat:
         assert data["type"] == "error"
         assert "LLM failed" in data["content"]
 
+    def test_debug_state_sent_on_connect(self):
+        """First WS message is debug_state with enabled flag."""
+        mock_agent = _make_mock_agent()
+        with (
+            patch(
+                "planning_agent.auth.WEB_SECRET",
+                _TEST_SECRET,
+            ),
+            patch(
+                "planning_agent.main_web.DEBUG_MODE",
+                False,
+            ),
+            patch(
+                "planning_agent.main_web.create_agent",
+                return_value=mock_agent,
+            ),
+            patch(
+                "planning_agent.main_web.build_context",
+                return_value=_make_mock_context(),
+            ),
+            patch(
+                "planning_agent.main_web.run_extraction",
+                new_callable=AsyncMock,
+            ),
+        ):
+            with TestClient(app) as client:
+                client.cookies.update(_session_cookies())
+                with client.websocket_connect("/ws") as ws:
+                    data = ws.receive_json()
+        assert data == {
+            "type": "debug_state",
+            "enabled": False,
+        }
+
     def test_unauthenticated_ws_is_rejected(self):
         with TestClient(app) as client:
             with pytest.raises(Exception):
                 with client.websocket_connect("/ws"):
                     pass
+
+
+# ── WebSocket: extraction on disconnect ────────────────────
+
+
+class TestEndSession:
+    @pytest.mark.anyio
+    async def test_calls_extraction_with_history(self):
+        """end_session calls run_extraction when history
+        is non-empty."""
+        from planning_agent.main_web import end_session
+
+        mock_extract = AsyncMock()
+        history = [{"role": "user", "content": "hi"}]
+        with patch(
+            "planning_agent.main_web.run_extraction",
+            mock_extract,
+        ):
+            await end_session(history)
+        mock_extract.assert_called_once_with(history)
+
+    @pytest.mark.anyio
+    async def test_skips_extraction_with_empty_history(
+        self,
+    ):
+        """end_session skips extraction when history is
+        empty."""
+        from planning_agent.main_web import end_session
+
+        mock_extract = AsyncMock()
+        with patch(
+            "planning_agent.main_web.run_extraction",
+            mock_extract,
+        ):
+            await end_session([])
+        mock_extract.assert_not_called()
 
 
 # ── WebSocket: tool confirmation ──────────────────────────
@@ -214,27 +314,44 @@ class TestWebSocketConfirm:
         """Agent gets True when user approves a tool."""
         confirm_result: list[bool] = []
 
-        async def mock_run(msg, *, deps, message_history):
-            # Exercise the confirm callback injected by
-            # the WebSocket handler.
-            call_confirm = mock_run._confirm
+        async def mock_run(
+            msg: str,
+            *,
+            deps: Any,
+            message_history: Any,
+            event_stream_handler: Any = None,
+            **kwargs: Any,
+        ) -> Any:
+            call_confirm = mock_run._confirm  # type: ignore[attr-defined]
             result_val = await call_confirm(
                 "reschedule_tasks", "task_1"
             )
             confirm_result.append(result_val)
-            r = MagicMock()
-            r.output = "Done."
-            r.all_messages.return_value = []
-            return r
+
+            if event_stream_handler is not None:
+                async def _events() -> AsyncIterator[Any]:
+                    yield PartDeltaEvent(
+                        index=0,
+                        delta=TextPartDelta(
+                            content_delta="Done."
+                        ),
+                    )
+                await event_stream_handler(None, _events())
+
+            mock_result = MagicMock()
+            mock_result.all_messages.return_value = []
+            return mock_result
 
         mock_agent = MagicMock()
         mock_agent.run = mock_run
 
         # Capture the confirm fn injected into create_agent
-        created_agents: list = []
+        created_agents: list[Any] = []
 
-        def capture_create_agent(confirm=None, debug_fn=None):
-            mock_run._confirm = confirm
+        def capture_create_agent(
+            confirm: Any = None, debug_fn: Any = None
+        ) -> Any:
+            mock_run._confirm = confirm  # type: ignore[attr-defined]
             created_agents.append(mock_agent)
             return mock_agent
 
@@ -260,6 +377,7 @@ class TestWebSocketConfirm:
             with TestClient(app) as client:
                 client.cookies.update(_session_cookies())
                 with client.websocket_connect("/ws") as ws:
+                    ws.receive_json()  # debug_state
                     ws.send_json(
                         {
                             "type": "chat",
@@ -281,9 +399,11 @@ class TestWebSocketConfirm:
                             "approved": True,
                         }
                     )
-                    # Now get the final message
-                    data = ws.receive_json()
-                    assert data["type"] == "message"
+                    # Drain chunks until message_done
+                    while ws.receive_json().get(
+                        "type"
+                    ) != "message_done":
+                        pass
 
         assert confirm_result == [True]
 
@@ -291,20 +411,39 @@ class TestWebSocketConfirm:
         """Agent gets False when user denies a tool."""
         confirm_result: list[bool] = []
 
-        async def mock_run(msg, *, deps, message_history):
-            call_confirm = mock_run._confirm
+        async def mock_run(
+            msg: str,
+            *,
+            deps: Any,
+            message_history: Any,
+            event_stream_handler: Any = None,
+            **kwargs: Any,
+        ) -> Any:
+            call_confirm = mock_run._confirm  # type: ignore[attr-defined]
             result_val = await call_confirm("add_task", "x")
             confirm_result.append(result_val)
-            r = MagicMock()
-            r.output = "Cancelled."
-            r.all_messages.return_value = []
-            return r
+
+            if event_stream_handler is not None:
+                async def _events() -> AsyncIterator[Any]:
+                    yield PartDeltaEvent(
+                        index=0,
+                        delta=TextPartDelta(
+                            content_delta="Cancelled."
+                        ),
+                    )
+                await event_stream_handler(None, _events())
+
+            mock_result = MagicMock()
+            mock_result.all_messages.return_value = []
+            return mock_result
 
         mock_agent = MagicMock()
         mock_agent.run = mock_run
 
-        def capture_create_agent(confirm=None, debug_fn=None):
-            mock_run._confirm = confirm
+        def capture_create_agent(
+            confirm: Any = None, debug_fn: Any = None
+        ) -> Any:
+            mock_run._confirm = confirm  # type: ignore[attr-defined]
             return mock_agent
 
         with (
@@ -329,6 +468,7 @@ class TestWebSocketConfirm:
             with TestClient(app) as client:
                 client.cookies.update(_session_cookies())
                 with client.websocket_connect("/ws") as ws:
+                    ws.receive_json()  # debug_state
                     ws.send_json(
                         {
                             "type": "chat",
@@ -343,6 +483,9 @@ class TestWebSocketConfirm:
                             "approved": False,
                         }
                     )
-                    ws.receive_json()  # final message
+                    while ws.receive_json().get(
+                        "type"
+                    ) != "message_done":
+                        pass
 
         assert confirm_result == [False]

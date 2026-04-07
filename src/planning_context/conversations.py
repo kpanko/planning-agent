@@ -1,15 +1,16 @@
 """Conversation history read/write operations."""
 
 import logging
-import os
 from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
 
 from .storage import commit_data, get_data_dir, read_json, write_json
 
 logger = logging.getLogger("planning-context")
 
 
-def _conversations_dir():
+def _conversations_dir() -> Path:
     return get_data_dir() / "conversations"
 
 
@@ -49,16 +50,16 @@ def save_summary(summary: str) -> str:
     return f"Conversation summary saved for {today_str}"
 
 
-def get_recent(count: int = 3) -> list[dict]:
+def get_recent(count: int = 3) -> list[dict[str, Any]]:
     """Return the most recent `count` conversation files, newest first."""
     conv_dir = _conversations_dir()
     if not conv_dir.exists():
         return []
 
     files = sorted(conv_dir.glob("*.json"), reverse=True)
-    results = []
+    results: list[dict[str, Any]] = []
     for f in files[:count]:
         data = read_json(f)
-        if data:
+        if isinstance(data, dict):
             results.append(data)
     return results

@@ -5,6 +5,7 @@ import logging
 import os
 import subprocess
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger("planning-context")
 
@@ -67,7 +68,7 @@ def _ensure_git(data_dir: Path) -> None:
         logger.warning("Git init failed: %s", exc.stderr.strip())
 
 
-def _git(data_dir: Path, *args: str) -> subprocess.CompletedProcess:
+def _git(data_dir: Path, *args: str) -> subprocess.CompletedProcess[str]:
     """Run a git command in the data directory."""
     return subprocess.run(
         ["git", *args],
@@ -107,7 +108,7 @@ def commit_data(data_dir: Path, message: str) -> None:
         logger.warning("Git error during commit: %s", exc.stderr.strip())
 
 
-def read_json(path: Path) -> list | dict:
+def read_json(path: Path) -> list[Any] | dict[str, Any]:
     """Read a JSON file, returning an empty list if missing or corrupt."""
     try:
         text = path.read_text(encoding="utf-8")
@@ -121,7 +122,7 @@ def read_json(path: Path) -> list | dict:
         return []
 
 
-def write_json(path: Path, data: list | dict) -> None:
+def write_json(path: Path, data: list[Any] | dict[str, Any]) -> None:
     """Write data to a JSON file with pretty formatting."""
     try:
         path.write_text(

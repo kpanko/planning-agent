@@ -19,6 +19,8 @@ dependencies = [
     "fastapi>=0.110",
     "uvicorn[standard]>=0.29",
     "websockets>=12.0",
+    "tzdata>=2024.1",
+    "logfire[fastapi,pydantic-ai]>=4.29.0",
 ]
 
 [project.scripts]
@@ -49,4 +51,5 @@ pythonpath = ["src"]
 dev = [
     "pytest>=8.0",
     "httpx>=0.27",
+    "pyright>=1.1",
 ]

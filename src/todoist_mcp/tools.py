@@ -5,11 +5,16 @@ logic lives in one place.
 """
 from __future__ import annotations
 
-from datetime import date, timedelta
-from typing import Optional
+import os
+from datetime import date, datetime, timedelta
+from typing import Any, Optional
+from zoneinfo import ZoneInfo
+
+_USER_TZ = os.environ.get("USER_TZ", "America/New_York")
 
 from pydantic import BaseModel, Field
 from todoist_api_python.api import TodoistAPI
+from todoist_api_python.models import Task
 
 
 class RescheduleItem(BaseModel):
@@ -34,8 +39,11 @@ from todoist_scheduler.reschedule import (
 )
 
 
-def fmt_task(task) -> str:
-    due = task.due.date if task.due else "no due date"
+def fmt_task(task: Task) -> str:
+    due: str = (
+        str(task.due.date)  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+        if task.due else "no due date"
+    )
     recurring = (
         " (recurring)"
         if task.due and task.due.is_recurring
@@ -57,7 +65,7 @@ def fmt_task(task) -> str:
 
 def parse_date(value: str) -> date:
     lower = value.lower()
-    today = date.today()
+    today = datetime.now(ZoneInfo(_USER_TZ)).date()
     if lower == "today":
         return today
     if lower == "tomorrow":
@@ -95,17 +103,45 @@ def find_tasks(
         elif search:
             needle = search.lower()
             tasks = [
-                t for t in api.get_tasks()
+                t
+                for page in api.get_tasks()
+                for t in page
                 if needle in t.content.lower()
             ]
         else:
-            tasks = list(api.get_tasks(
-                project_id=project_id,
-                label=label,
-            ))
+            tasks = [
+                t
+                for page in api.get_tasks(
+                    project_id=project_id,
+                    label=label,
+                )
+                for t in page
+            ]
         if not tasks:
             return "No tasks found."
         return "\n".join(fmt_task(t) for t in tasks)
+    except Exception as e:
+        return f"Error: {e}"
+
+
+def get_projects(api: TodoistAPI) -> str:
+    try:
+        projects = [
+            p
+            for page in api.get_projects()
+            for p in page
+        ]
+        if not projects:
+            return "No projects found."
+        return "\n".join(
+            f"[{p.id}] {p.name}"
+            + (
+                " (favorite)"
+                if p.is_favorite
+                else ""
+            )
+            for p in projects
+        )
     except Exception as e:
         return f"Error: {e}"
 
@@ -160,7 +196,7 @@ def add_task(
     labels: Optional[list[str]] = None,
 ) -> str:
     try:
-        kwargs: dict = {"content": content}
+        kwargs: dict[str, Any] = {"content": content}
         if description is not None:
             kwargs["description"] = description
         if project_id is not None:
@@ -190,7 +226,7 @@ def update_task(
     labels: Optional[list[str]] = None,
 ) -> str:
     try:
-        kwargs: dict = {}
+        kwargs: dict[str, Any] = {}
         if content is not None:
             kwargs["content"] = content
         if description is not None:
@@ -214,21 +250,34 @@ def complete_task(
 ) -> str:
     try:
         task = api.get_task(task_id=task_id)
-        api.close_task(task_id=task_id)
+        api.complete_task(task_id=task_id)
         return f"Completed: {task.content}"
+    except Exception as e:
+        return f"Error: {e}"
+
+
+def delete_task(
+    api: TodoistAPI,
+    task_id: str,
+) -> str:
+    try:
+        task = api.get_task(task_id=task_id)
+        name = task.content
+        api.delete_task(task_id=task_id)
+        return f"Deleted: {name}"
     except Exception as e:
         return f"Error: {e}"
 
 
 def reschedule_tasks(
     api: TodoistAPI,
-    tasks: list[dict],
+    tasks: list[dict[str, Any]],
 ) -> str:
     """tasks: list of {task_id, date, time?}
     where date is YYYY-MM-DD, "today", or "tomorrow"
     and time is optional HH:MM.
     """
-    results = []
+    results: list[str] = []
     for item in tasks:
         task_id = item["task_id"]
         try:

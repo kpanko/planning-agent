@@ -25,9 +25,9 @@ class Scheduler:
 
     def _sort_tasks(self, tasks: List[Task]) -> None:
         """Sorts tasks by priority (desc) and then due date (asc)."""
-        tasks.sort(key=lambda t: (
+        tasks.sort(key=lambda t: (  # pyright: ignore[reportUnknownLambdaType]
             -t.priority,
-            t.due.date if t.due else None
+            t.due.date if t.due else None  # pyright: ignore[reportUnknownMemberType]
         ))
 
     def _get_tasks_for(self, day: date) -> List[Task]:

@@ -1,6 +1,7 @@
 import re
 import logging
 from datetime import date, datetime
+from typing import Any
 
 from todoist_api_python.api import TodoistAPI
 from todoist_api_python.models import Task
@@ -16,7 +17,7 @@ def _parse_task_date(task: Task) -> date | None:
     """Extract the date from a task's due info."""
     if not task.due:
         return None
-    date_str = str(task.due.date)
+    date_str = str(task.due.date)  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
     if len(date_str) > 10:
         return datetime.fromisoformat(date_str).date()
     return date.fromisoformat(date_str)
@@ -28,7 +29,7 @@ def compute_due_string(task: Task, day: date) -> str | None:
     Returns None if the task is already scheduled for that day.
     Preserves time for datetime tasks and recurrence patterns for recurring tasks.
     """
-    due_date = str(task.due.date) if task.due else None
+    due_date = str(task.due.date) if task.due else None  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
     if due_date and due_date[:10] == day.strftime('%Y-%m-%d'):
         return None
 
@@ -61,8 +62,8 @@ def reschedule_task(
         return
 
     # Save reminders before the update drops them
-    token = api._token
-    reminders = []
+    token: str = api._token  # pyright: ignore[reportPrivateUsage]
+    reminders: list[dict[str, Any]] = []
     old_date = _parse_task_date(task)
     try:
         reminders = fetch_reminders(token, task.id)
@@ -82,10 +83,15 @@ def reschedule_task(
         due_string,
     )
 
-    is_success = api.update_task(
-        task_id=task.id,
-        due_string=due_string,
-    )
+    update_kwargs: dict[str, Any] = {
+        "task_id": task.id,
+        "due_string": due_string,
+    }
+    if task.duration:
+        update_kwargs["duration"] = task.duration.amount
+        update_kwargs["duration_unit"] = task.duration.unit
+
+    is_success = api.update_task(**update_kwargs)
     if not is_success:
         raise Exception(
             f"Failed to reschedule task: {task.content}"

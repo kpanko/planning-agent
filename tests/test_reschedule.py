@@ -2,6 +2,8 @@ import unittest
 from unittest.mock import MagicMock, patch
 from datetime import date
 
+from todoist_api_python.models import Duration
+
 from todoist_scheduler.reschedule import (
     compute_due_string,
     reschedule_task,
@@ -85,6 +87,25 @@ class TestComputeDueString(unittest.TestCase):
         result = compute_due_string(task, date(2024, 1, 15))
         self.assertEqual(result, '2024-01-15')
 
+    def test_date_only_with_duration(self):
+        task = create_task(
+            '1', 'Task',
+            due_date_str='2024-01-10',
+            duration=Duration(amount=30, unit='minute'),
+        )
+        result = compute_due_string(task, date(2024, 1, 15))
+        self.assertEqual(result, '2024-01-15')
+
+    def test_datetime_with_duration(self):
+        task = create_task(
+            '1', 'Task',
+            due_date_str='2024-01-10',
+            due_datetime_str='2024-01-10T17:00:00Z',
+            duration=Duration(amount=60, unit='minute'),
+        )
+        result = compute_due_string(task, date(2024, 1, 15))
+        self.assertEqual(result, '2024-01-15 17:00')
+
 
 class TestRescheduleTask(unittest.TestCase):
 
@@ -111,6 +132,43 @@ class TestRescheduleTask(unittest.TestCase):
         with self.assertRaises(Exception):
             reschedule_task(self.api, task, date(2024, 1, 15))
 
+    def test_preserves_duration(self):
+        task = create_task(
+            '1', 'Task',
+            due_date_str='2024-01-10',
+            duration=Duration(amount=30, unit='minute'),
+        )
+        reschedule_task(self.api, task, date(2024, 1, 15))
+        self.api.update_task.assert_called_once_with(
+            task_id='1',
+            due_string='2024-01-15',
+            duration=30,
+            duration_unit='minute',
+        )
+
+    def test_preserves_day_duration(self):
+        task = create_task(
+            '1', 'Task',
+            due_date_str='2024-01-10',
+            duration=Duration(amount=1, unit='day'),
+        )
+        reschedule_task(self.api, task, date(2024, 1, 15))
+        self.api.update_task.assert_called_once_with(
+            task_id='1',
+            due_string='2024-01-15',
+            duration=1,
+            duration_unit='day',
+        )
+
+    def test_no_duration_omits_params(self):
+        task = create_task(
+            '1', 'Task', due_date_str='2024-01-10',
+        )
+        reschedule_task(self.api, task, date(2024, 1, 15))
+        self.api.update_task.assert_called_once_with(
+            task_id='1',
+            due_string='2024-01-15',
+        )
 
     @patch(
         "todoist_scheduler.reschedule.fetch_reminders"

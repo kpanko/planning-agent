@@ -185,6 +185,33 @@
       color: #f59e0b;
     }
 
+    #disconnect-btn {
+      padding: 0.25rem 0.6rem;
+      background: transparent;
+      border: 1px solid #444;
+      border-radius: 5px;
+      color: #888;
+      font-size: 0.75rem;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    #disconnect-btn:hover { border-color: #666; color: #ccc; }
+
+    #logout-link {
+      padding: 0.25rem 0.6rem;
+      color: #888;
+      font-size: 0.75rem;
+      text-decoration: none;
+    }
+    #logout-link:hover { color: #ccc; }
+
+    #version-label {
+      font-size: 0.65rem;
+      color: #555;
+      font-weight: 400;
+      font-family: monospace;
+    }
+
     /* Debug events */
     .debug-item {
       font-family: monospace;
@@ -196,7 +223,7 @@
     }
     .debug-item summary {
       cursor: pointer;
-      user-select: none;
+      user-select: text;
       list-style: none;
       padding: 0.15rem 0;
     }
@@ -219,6 +246,8 @@
       border-radius: 4px;
       max-height: 300px;
       overflow-y: auto;
+      user-select: text;
+      -webkit-user-select: text;
     }
     .debug-item.exc {
       border-left-color: #dc2626;
@@ -232,6 +261,9 @@
   <div id="status-dot" class="connecting"></div>
   <span id="status-label">Connecting…</span>
   <button id="debug-toggle">Debug</button>
+  <button id="disconnect-btn">Disconnect</button>
+  <span id="version-label"></span>
+  <a href="/logout" id="logout-link">Log out</a>
 </header>
 
 <div id="messages"></div>
@@ -265,11 +297,16 @@
   const confirmText   = document.getElementById("confirm-text");
   const confirmYes    = document.getElementById("confirm-yes");
   const confirmNo     = document.getElementById("confirm-no");
-  const debugToggle   = document.getElementById("debug-toggle");
+  const debugToggle      = document.getElementById("debug-toggle");
+  const disconnectBtn    = document.getElementById("disconnect-btn");
 
   let ws = null;
   let pendingConfirmId = null;
+  let confirmQueue = [];
   let debugMode = false;
+  let manualDisconnect = false;
+  let streamBubble = null;
+  let streamRaw = "";
 
   // ── helpers ──────────────────────────────────────────
 
@@ -281,6 +318,7 @@
   function setInputEnabled(enabled) {
     input.disabled   = !enabled;
     sendBtn.disabled = !enabled;
+    if (enabled) input.focus();
   }
 
   function addBubble(role, html) {
@@ -324,18 +362,25 @@
   }
 
   function showConfirm(id, tool, detail) {
-    pendingConfirmId = id;
-    confirmText.innerHTML =
-      `Run <strong>${tool}</strong>` +
-      (detail ? ` <code>${detail}</code>` : "") + `?`;
-    confirmBanner.classList.add("visible");
-    setInputEnabled(false);
+    confirmQueue.push({ id, tool, detail });
+    if (!pendingConfirmId) showNextConfirm();
   }
 
-  function hideConfirm() {
-    confirmBanner.classList.remove("visible");
-    pendingConfirmId = null;
-    setInputEnabled(true);
+  function showNextConfirm() {
+    if (confirmQueue.length === 0) {
+      confirmBanner.classList.remove("visible");
+      pendingConfirmId = null;
+      return;
+    }
+    const next = confirmQueue.shift();
+    pendingConfirmId = next.id;
+    confirmText.innerHTML =
+      `Run <strong>${next.tool}</strong>` +
+      (next.detail
+        ? ` <code>${next.detail}</code>`
+        : "") + `?`;
+    confirmBanner.classList.add("visible");
+    setInputEnabled(false);
   }
 
   function sendConfirm(approved) {
@@ -345,7 +390,8 @@
       id: pendingConfirmId,
       approved,
     }));
-    hideConfirm();
+    pendingConfirmId = null;
+    showNextConfirm();
   }
 
   // ── WebSocket ─────────────────────────────────────────
@@ -361,7 +407,12 @@
     };
 
     ws.onclose = () => {
-      setStatus("error", "Disconnected — reload to reconnect");
+      if (manualDisconnect) {
+        setStatus("error", "Disconnected");
+        disconnectBtn.textContent = "Reconnect";
+      } else {
+        setStatus("error", "Disconnected — reload to reconnect");
+      }
       setInputEnabled(false);
     };
 
@@ -371,16 +422,58 @@
 
     ws.onmessage = (evt) => {
       const data = JSON.parse(evt.data);
-      if (data.type === "message") {
+      if (data.type === "chunk") {
+        if (!streamBubble) {
+          streamBubble = document.createElement("div");
+          streamBubble.className = "bubble agent";
+          messages.appendChild(streamBubble);
+        }
+        streamRaw += data.content;
+        streamBubble.innerHTML = marked.parse(streamRaw);
+        messages.scrollTop = messages.scrollHeight;
+      } else if (data.type === "message_done") {
+        streamBubble = null;
+        streamRaw = "";
+        setInputEnabled(true);
+      } else if (data.type === "message") {
         addBubble("agent", data.content);
         setInputEnabled(true);
       } else if (data.type === "confirm") {
         showConfirm(data.id, data.tool, data.detail || "");
       } else if (data.type === "error") {
+        streamBubble = null;
+        streamRaw = "";
         addBubble("error", `Error: ${data.content}`);
         setInputEnabled(true);
+      } else if (data.type === "debug_state") {
+        debugMode = !!data.enabled;
+        debugToggle.classList.toggle(
+          "active", debugMode
+        );
       } else if (data.type === "debug") {
         addDebug(data.event, data);
+      } else if (data.type === "calendar_reconnect") {
+        const old = document.getElementById(
+          "gcal-reconnect"
+        );
+        if (old) old.remove();
+        const bar = document.createElement("div");
+        bar.id = "gcal-reconnect";
+        bar.style.cssText =
+          "background:#f59e0b;color:#000;padding:8px 16px;"
+          + "text-align:center;font-size:14px;";
+        bar.innerHTML =
+          "Google Calendar disconnected. "
+          + '<a href="' + data.url
+          + '" style="font-weight:600;'
+          + 'text-decoration:underline">'
+          + "Reconnect</a>"
+          + ' <button onclick='
+          + '"this.parentElement.remove()"'
+          + ' style="margin-left:12px;background:none;'
+          + 'border:none;cursor:pointer;font-size:16px"'
+          + ">&times;</button>";
+        document.body.prepend(bar);
       }
     };
   }
@@ -419,6 +512,23 @@
       }));
     }
   });
+
+  disconnectBtn.addEventListener("click", () => {
+    if (!ws || ws.readyState === WebSocket.CLOSED) {
+      manualDisconnect = false;
+      disconnectBtn.textContent = "Disconnect";
+      setStatus("connecting", "Connecting…");
+      connect();
+    } else {
+      manualDisconnect = true;
+      ws.close();
+    }
+  });
+
+  const vLabel = document.getElementById("version-label");
+  if (vLabel && vLabel.dataset.v) {
+    vLabel.textContent = vLabel.dataset.v;
+  }
 
   connect();
 </script>

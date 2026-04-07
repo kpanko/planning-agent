@@ -21,6 +21,9 @@ RUN uv pip install --no-deps -e .
 RUN mkdir -p /data
 ENV PLANNING_AGENT_DATA_DIR=/data
 
+ARG GIT_COMMIT=unknown
+ENV GIT_COMMIT=$GIT_COMMIT
+
 EXPOSE 8080
 
 CMD ["uv", "run", "planning-agent-web"]

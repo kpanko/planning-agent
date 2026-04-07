@@ -174,7 +174,7 @@ class TestFindTasks:
 
     def test_project_id_uses_get_tasks(self, mock_api):
         t = _task(content="Project task")
-        mock_api.get_tasks.return_value = [t]
+        mock_api.get_tasks.return_value = [[t]]
         result = find_tasks(project_id="proj1")
         mock_api.get_tasks.assert_called_once_with(
             project_id="proj1", label=None
@@ -183,7 +183,7 @@ class TestFindTasks:
 
     def test_label_uses_get_tasks(self, mock_api):
         t = _task(content="Labeled task")
-        mock_api.get_tasks.return_value = [t]
+        mock_api.get_tasks.return_value = [[t]]
         result = find_tasks(label="work")
         mock_api.get_tasks.assert_called_once_with(
             project_id=None, label="work"
@@ -191,7 +191,7 @@ class TestFindTasks:
         assert "Labeled task" in result
 
     def test_empty_returns_no_tasks_found(self, mock_api):
-        mock_api.get_tasks.return_value = []
+        mock_api.get_tasks.return_value = [[]]
         result = find_tasks()
         assert result == "No tasks found."
 
@@ -251,7 +251,7 @@ class TestFindTasksByDate:
 class TestGetOverview:
     def test_project_mode_lists_tasks(self, mock_api):
         t = _task(content="Sprint task")
-        mock_api.get_tasks.return_value = [t]
+        mock_api.get_tasks.return_value = [[t]]
         result = get_overview(project_id="proj1")
         assert "Sprint task" in result
         assert "1 total" in result
@@ -325,10 +325,10 @@ class TestUpdateTask:
 # ---------------------------------------------------------------------------
 
 class TestCompleteTask:
-    def test_calls_close_task(self, mock_api):
+    def test_calls_complete_task(self, mock_api):
         mock_api.get_task.return_value = _task(content="Done item")
         result = complete_task("1")
-        mock_api.close_task.assert_called_once_with(task_id="1")
+        mock_api.complete_task.assert_called_once_with(task_id="1")
         assert "Done item" in result
 
     def test_api_error_returned(self, mock_api):
@@ -430,7 +430,7 @@ class TestGetProjects:
         p.id = "p1"
         p.name = "Inbox"
         p.is_favorite = False
-        mock_api.get_projects.return_value = [p]
+        mock_api.get_projects.return_value = [[p]]
         result = get_projects()
         assert "Inbox" in result
 
@@ -439,7 +439,7 @@ class TestGetProjects:
         p.id = "p1"
         p.name = "Inbox"
         p.is_favorite = True
-        mock_api.get_projects.return_value = [p]
+        mock_api.get_projects.return_value = [[p]]
         assert "(favorite)" in get_projects()
 
     def test_empty(self, mock_api):
@@ -456,12 +456,12 @@ class TestGetSections:
         s = MagicMock()
         s.id = "s1"
         s.name = "Backlog"
-        mock_api.get_sections.return_value = [s]
+        mock_api.get_sections.return_value = [[s]]
         result = get_sections("proj1")
         assert "Backlog" in result
 
     def test_empty(self, mock_api):
-        mock_api.get_sections.return_value = []
+        mock_api.get_sections.return_value = [[]]
         assert get_sections("proj1") == "No sections found."
 
     def test_api_error_returned(self, mock_api):
@@ -475,12 +475,12 @@ class TestGetComments:
         c.id = "c1"
         c.posted_at = "2026-03-08"
         c.content = "Nice work"
-        mock_api.get_comments.return_value = [c]
+        mock_api.get_comments.return_value = [[c]]
         result = get_comments("task1")
         assert "Nice work" in result
 
     def test_empty(self, mock_api):
-        mock_api.get_comments.return_value = []
+        mock_api.get_comments.return_value = [[]]
         assert get_comments("task1") == "No comments."
 
     def test_api_error_returned(self, mock_api):

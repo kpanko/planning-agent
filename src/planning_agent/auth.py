@@ -6,7 +6,7 @@ import base64
 import hashlib
 import json
 import os
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from fastapi import HTTPException, Request, Response
 from itsdangerous import BadSignature, URLSafeTimedSerializer
@@ -40,7 +40,7 @@ _STATE_MAX_AGE = 60 * 10  # 10 minutes
 # OAuth flow
 # ---------------------------------------------------------------------------
 
-def _flow(state: str | None = None):
+def _flow(state: str | None = None) -> Any:
     """Build a google_auth_oauthlib Flow."""
     from google_auth_oauthlib.flow import Flow
 
@@ -59,10 +59,10 @@ def _flow(state: str | None = None):
             ],
         }
     }
-    kwargs = {}
+    kwargs: dict[str, str] = {}
     if state is not None:
         kwargs["state"] = state
-    return Flow.from_client_config(
+    return Flow.from_client_config(  # type: ignore[no-any-return]
         client_config,
         scopes=_SCOPES,
         redirect_uri=f"{BASE_URL}/oauth/callback",
@@ -94,7 +94,7 @@ def build_auth_url() -> tuple[str, str, str]:
     url, state = flow.authorization_url(
         access_type="offline",
         include_granted_scopes="true",
-        prompt="select_account",
+        prompt="consent",
         code_challenge=challenge,
         code_challenge_method="S256",
     )
@@ -117,11 +117,10 @@ def verify_email(creds: "Credentials") -> str:
     """Return the authenticated email address."""
     import requests as _requests
 
+    token: str = creds.token  # type: ignore[assignment]
     resp = _requests.get(
         "https://www.googleapis.com/oauth2/v1/userinfo",
-        headers={
-            "Authorization": f"Bearer {creds.token}"
-        },
+        headers={"Authorization": f"Bearer {token}"},
         timeout=10,
     )
     resp.raise_for_status()
@@ -130,13 +129,13 @@ def verify_email(creds: "Credentials") -> str:
 
 def save_credentials(creds: "Credentials") -> None:
     """Persist credentials to the Calendar credentials file."""
-    data = {
-        "token": creds.token,
-        "refresh_token": creds.refresh_token,
-        "token_uri": creds.token_uri,
-        "client_id": creds.client_id,
-        "client_secret": creds.client_secret,
-        "scopes": list(creds.scopes or []),
+    data: dict[str, Any] = {
+        "token": creds.token,  # pyright: ignore[reportUnknownMemberType]
+        "refresh_token": creds.refresh_token,  # pyright: ignore[reportUnknownMemberType]
+        "token_uri": creds.token_uri,  # pyright: ignore[reportUnknownMemberType]
+        "client_id": creds.client_id,  # pyright: ignore[reportUnknownMemberType]
+        "client_secret": creds.client_secret,  # pyright: ignore[reportUnknownMemberType]
+        "scopes": list(creds.scopes or []),  # type: ignore[arg-type]
     }
     GOOGLE_CALENDAR_CREDENTIALS.parent.mkdir(
         parents=True, exist_ok=True

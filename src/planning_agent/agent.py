@@ -5,16 +5,19 @@ from __future__ import annotations
 import asyncio
 import logging
 import traceback as _traceback
-from typing import Awaitable, Callable, Optional
+from typing import Any, Awaitable, Callable, Optional
 
 from rich.console import Console
 
 logger = logging.getLogger("planning-agent")
 
 ConfirmFn = Callable[[str, str], Awaitable[bool]]
-DebugFn = Callable[[str, dict], Awaitable[None]]
+DebugFn = Callable[[str, dict[str, Any]], Awaitable[None]]
 
 from pydantic_ai import Agent, RunContext
+from pydantic_ai.models.anthropic import (
+    AnthropicModelSettings,
+)
 
 _console = Console(stderr=True)
 
@@ -27,11 +30,6 @@ def _tool_status(
     if detail:
         msg += f" [dim]{detail}[/dim]"
     _console.print(msg)
-
-
-def _tool_result(result: str) -> None:
-    """Print a tool result to the terminal."""
-    _console.print(f"    [dim]{result}[/dim]")
 
 
 async def _default_confirm(
@@ -47,15 +45,12 @@ async def _default_confirm(
         return False
     return answer in ("y", "yes")
 
-from planning_context.conversations import save_summary
 from planning_context.memories import (
     add_memory as _add_memory,
     resolve_memory as _resolve_memory,
 )
-from planning_context.values import (
-    read_values,
-    write_values,
-)
+from planning_context.values import write_values
+from todoist_api_python.api import TodoistAPI
 from todoist_mcp import tools as _tools
 from todoist_mcp.tools import RescheduleItem
 
@@ -88,24 +83,33 @@ to inform your scheduling decisions.
 When the user asks you to plan their week (or when it's \
 clearly a planning session):
 
-1. **Survey everything.** Pull all tasks due in the next \
-7-10 days, any overdue tasks, and the calendar for the \
-week. Also check for undated tasks that have deadlines \
-approaching.
+1. **Use the pre-loaded data.** Your system prompt already \
+contains tasks (overdue + next 14 days), calendar events, \
+and project list. Do NOT call `find_tasks`, \
+`find_tasks_by_date`, or `get_projects` to re-fetch what \
+you already have. Only call tools if you need data outside \
+the pre-loaded window.
 
 2. **Propose a concrete schedule.** Assign specific days \
-to tasks. For important or time-sensitive tasks, suggest \
-specific time windows. Don't present options — make \
-decisions and let them adjust.
+to tasks across the full ~14-day window. For important or \
+time-sensitive tasks, suggest specific time windows. Don't \
+present options — make decisions and let them adjust. \
+Spread tasks across both weeks — don't front-load. Use \
+the second week for lower-priority items.
 
-3. **Explain your reasoning briefly.** One sentence per \
+3. **Account for every overdue task.** After proposing \
+the schedule, verify every overdue task from the pre-loaded \
+context is either scheduled or explicitly noted as deferred \
+with a reason. Never silently skip an overdue task.
+
+4. **Explain your reasoning briefly.** One sentence per \
 decision, not a paragraph.
 
-4. **Show trade-offs honestly.** If there's more to do \
+5. **Show trade-offs honestly.** If there's more to do \
 than time allows, say so and suggest what to cut or \
-push to next week.
+push further out.
 
-5. **After approval, execute.** Use `reschedule_tasks` \
+6. **After approval, execute.** Use `reschedule_tasks` \
 to move tasks to their planned dates. Confirm what you \
 changed.
 
@@ -153,20 +157,25 @@ relevant.
 
 ### Reading Tasks
 - `find_tasks(query)` — Todoist filter syntax \
-  (e.g. "today", "overdue", "p1 & @home"). \
+  (e.g. "today", "overdue", "p1 & @home", \
+  "#Inbox", "#ProjectName"). \
   **Not** for searching by task name.
 - `find_tasks(search)` — case-insensitive substring \
   search against task titles. Use this when looking \
   up a task by name.
+- `find_tasks(project_id)` — all tasks in a project. \
+  Use `get_projects()` first to look up the ID.
 - `find_tasks_by_date(start_date, end_date)` — date \
   range.
 - `get_task(task_id)` — details on one task.
+- `get_projects()` — list all projects with IDs.
 
 ### Modifying Tasks
 - `reschedule_tasks(tasks)` — move tasks to new dates. \
 **Always use this for date changes** — preserves \
 recurring patterns and reminders.
 - `complete_task(task_id)` — mark done.
+- `delete_task(task_id)` — permanently delete a task.
 - `add_task(content, due_string, ...)` — create a task.
 
 ### Critical: Recurring Task Rescheduling
@@ -210,10 +219,12 @@ time to do what matters.\
 """
 
 
-def _format_memories(memories: list[dict]) -> str:
+def _format_memories(
+    memories: list[dict[str, Any]],
+) -> str:
     if not memories:
         return "(no active memories)"
-    lines = []
+    lines: list[str] = []
     for m in memories:
         line = (
             f"[{m['id']}] ({m.get('category', '?')}) "
@@ -226,14 +237,16 @@ def _format_memories(memories: list[dict]) -> str:
 
 
 def _format_conversations(
-    conversations: list[dict],
+    conversations: list[dict[str, Any]],
 ) -> str:
     if not conversations:
         return "(no recent conversations)"
-    lines = []
+    lines: list[str] = []
     for conv in conversations:
-        d = conv.get("date", "?")
-        entries = conv.get("entries", [])
+        d: str = conv.get("date", "?")
+        entries: list[dict[str, Any]] = conv.get(
+            "entries", []
+        )
         for entry in entries:
             lines.append(
                 f"[{d}] {entry.get('summary', '(no summary)')}"
@@ -243,8 +256,7 @@ def _format_conversations(
 
 # -- Agent creation --
 
-def _get_api():
-    from todoist_api_python.api import TodoistAPI
+def _get_api() -> TodoistAPI:
     if not TODOIST_API_KEY:
         raise RuntimeError("TODOIST_API_KEY not set")
     return TodoistAPI(TODOIST_API_KEY)
@@ -253,7 +265,7 @@ def _get_api():
 def create_agent(
     confirm: ConfirmFn | None = None,
     debug_fn: DebugFn | None = None,
-) -> Agent:
+) -> Agent[PlanningContext, str]:
     """Build and return the planning agent.
 
     Deferred so import doesn't require API keys.
@@ -266,10 +278,14 @@ def create_agent(
     planning_agent = Agent(
         LLM_MODEL,
         deps_type=PlanningContext,
+        model_settings=AnthropicModelSettings(
+            anthropic_cache_instructions=True,
+            anthropic_cache_messages=True,
+        ),
     )
 
     @planning_agent.system_prompt
-    async def build_system_prompt(
+    async def build_system_prompt(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
     ) -> str:
         deps = ctx.deps
@@ -288,10 +304,13 @@ def create_agent(
 ### Recent conversations
 {_format_conversations(deps.recent_conversations)}
 
-### Tasks this week
+### Todoist projects
+{deps.inbox_project}
+
+### Tasks (overdue + next 14 days)
 {deps.todoist_snapshot}
 
-### Calendar this week
+### Calendar (next 14 days)
 {deps.calendar_snapshot}
 
 ### Right now
@@ -305,9 +324,9 @@ def create_agent(
     async def _run_tool(
         name: str,
         detail: str,
-        fn: Callable,
-        *args,
-        **kwargs,
+        fn: Callable[..., Any],
+        *args: Any,
+        **kwargs: Any,
     ) -> str:
         if debug_fn:
             await debug_fn(
@@ -315,7 +334,9 @@ def create_agent(
                 {"tool": name, "args": detail},
             )
         try:
-            result = fn(*args, **kwargs)
+            result = await asyncio.to_thread(
+                fn, *args, **kwargs
+            )
             if debug_fn:
                 await debug_fn(
                     "tool_result",
@@ -338,7 +359,7 @@ def create_agent(
     # ---------------------------------------------------------------
 
     @planning_agent.tool
-    async def reschedule_tasks(
+    async def reschedule_tasks(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
         tasks: list[RescheduleItem],
     ) -> str:
@@ -356,7 +377,7 @@ def create_agent(
         )
 
     @planning_agent.tool
-    async def complete_task(
+    async def complete_task(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
         task_id: str,
     ) -> str:
@@ -372,7 +393,23 @@ def create_agent(
         )
 
     @planning_agent.tool
-    async def add_task(
+    async def delete_task(  # pyright: ignore[reportUnusedFunction]
+        ctx: RunContext[PlanningContext],
+        task_id: str,
+    ) -> str:
+        """Permanently delete a task."""
+        if not await confirm("delete_task", task_id):
+            return "Cancelled by user."
+        return await _run_tool(
+            "delete_task",
+            task_id,
+            _tools.delete_task,
+            _get_api(),
+            task_id,
+        )
+
+    @planning_agent.tool
+    async def add_task(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
         content: str,
         due_string: Optional[str] = None,
@@ -409,7 +446,7 @@ def create_agent(
         )
 
     @planning_agent.tool
-    async def find_tasks(
+    async def find_tasks(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
         query: Optional[str] = None,
         search: Optional[str] = None,
@@ -428,7 +465,7 @@ def create_agent(
         project_id: Limit results to a specific project.
         label: Limit results to tasks carrying this label.
         """
-        parts = []
+        parts: list[str] = []
         if query:
             parts.append(f"query={query!r}")
         if search:
@@ -438,8 +475,6 @@ def create_agent(
         if label:
             parts.append(f"label={label}")
         detail = ", ".join(parts) or ""
-        if not await confirm("find_tasks", detail):
-            return "Cancelled by user."
         return await _run_tool(
             "find_tasks",
             detail,
@@ -452,7 +487,7 @@ def create_agent(
         )
 
     @planning_agent.tool
-    async def find_tasks_by_date(
+    async def find_tasks_by_date(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
         start_date: str,
         end_date: Optional[str] = None,
@@ -465,8 +500,6 @@ def create_agent(
         detail = start_date
         if end_date:
             detail += f" to {end_date}"
-        if not await confirm("find_tasks_by_date", detail):
-            return "Cancelled by user."
         return await _run_tool(
             "find_tasks_by_date",
             detail,
@@ -477,13 +510,11 @@ def create_agent(
         )
 
     @planning_agent.tool
-    async def get_task(
+    async def get_task(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
         task_id: str,
     ) -> str:
         """Fetch a single task by ID."""
-        if not await confirm("get_task", task_id):
-            return "Cancelled by user."
         return await _run_tool(
             "get_task",
             task_id,
@@ -492,12 +523,24 @@ def create_agent(
             task_id,
         )
 
+    @planning_agent.tool
+    async def get_projects(  # pyright: ignore[reportUnusedFunction]
+        ctx: RunContext[PlanningContext],
+    ) -> str:
+        """List all Todoist projects with their IDs."""
+        return await _run_tool(
+            "get_projects",
+            "",
+            _tools.get_projects,
+            _get_api(),
+        )
+
     # ---------------------------------------------------------------
     # Planning context tools
     # ---------------------------------------------------------------
 
     @planning_agent.tool
-    async def add_memory(
+    async def add_memory(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
         content: str,
         category: str,
@@ -545,7 +588,7 @@ def create_agent(
             return f"Error: {e}"
 
     @planning_agent.tool
-    async def resolve_memory(
+    async def resolve_memory(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
         memory_id: str,
     ) -> str:
@@ -563,7 +606,7 @@ def create_agent(
         )
 
     @planning_agent.tool
-    async def update_values_doc(
+    async def update_values_doc(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
         content: str,
     ) -> str:

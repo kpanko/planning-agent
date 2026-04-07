@@ -2,6 +2,8 @@
 
 import logging
 from datetime import date, datetime, timezone
+from pathlib import Path
+from typing import Any
 
 from .storage import commit_data, get_data_dir, read_json, write_json
 
@@ -10,19 +12,21 @@ logger = logging.getLogger("planning-context")
 VALID_CATEGORIES = ("fact", "observation", "open_thread", "preference")
 
 
-def _memories_path():
+def _memories_path() -> Path:
     return get_data_dir() / "memories.json"
 
 
-def _load_memories() -> list[dict]:
-    return read_json(_memories_path())
+def _load_memories() -> list[dict[str, Any]]:
+    data = read_json(_memories_path())
+    assert isinstance(data, list)
+    return data  # type: ignore[return-value]
 
 
-def _save_memories(memories: list[dict]) -> None:
+def _save_memories(memories: list[dict[str, Any]]) -> None:
     write_json(_memories_path(), memories)
 
 
-def _next_id(memories: list[dict]) -> str:
+def _next_id(memories: list[dict[str, Any]]) -> str:
     """Generate the next m_NNN id."""
     max_n = 0
     for m in memories:
@@ -37,11 +41,11 @@ def _next_id(memories: list[dict]) -> str:
     return f"m_{max_n + 1:03d}"
 
 
-def get_active() -> list[dict]:
+def get_active() -> list[dict[str, Any]]:
     """Return all non-resolved, non-expired memories."""
     today = date.today().isoformat()
     memories = _load_memories()
-    active = []
+    active: list[dict[str, Any]] = []
     for m in memories:
         if m.get("resolved"):
             continue
@@ -56,7 +60,7 @@ def add_memory(
     content: str,
     category: str,
     expiry_date: str | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """Add a new memory. Returns the created memory dict."""
     if category not in VALID_CATEGORIES:
         raise ValueError(
@@ -97,7 +101,7 @@ def add_memory(
     return memory
 
 
-def resolve_memory(memory_id: str) -> dict | None:
+def resolve_memory(memory_id: str) -> dict[str, Any] | None:
     """Mark a memory as resolved. Returns the updated memory, or None if not found."""
     memories = _load_memories()
     for m in memories:

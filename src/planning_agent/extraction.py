@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import logging
+from typing import Any
+
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 
@@ -13,6 +16,8 @@ from planning_context.memories import (
 from planning_context.values import write_values
 
 from .config import EXTRACTION_MODEL
+
+logger = logging.getLogger("planning-agent")
 
 
 class Memory(BaseModel):
@@ -34,7 +39,7 @@ class Memory(BaseModel):
 class ExtractionResult(BaseModel):
     """Structured output from extraction agent."""
 
-    new_memories: list[Memory] = Field(
+    new_memories: list[Memory] = Field(  # pyright: ignore[reportUnknownVariableType]
         default_factory=list,
         description="New memories to save",
     )
@@ -84,7 +89,7 @@ be useful in future planning conversations. Don't save \
 things that are already in Todoist as tasks.\
 """
 
-def _make_extraction_agent() -> Agent:
+def _make_extraction_agent() -> Agent[None, ExtractionResult]:
     return Agent(
         EXTRACTION_MODEL,
         output_type=ExtractionResult,
@@ -92,7 +97,7 @@ def _make_extraction_agent() -> Agent:
 
 
 async def run_extraction(
-    message_history: list,
+    message_history: list[Any],
 ) -> ExtractionResult | None:
     """Run extraction on a conversation and apply
     results.
@@ -100,6 +105,11 @@ async def run_extraction(
     Returns the ExtractionResult, or None if extraction
     fails.
     """
+    n_msgs = len(message_history)
+    logger.info(
+        "Starting memory extraction (%d messages)",
+        n_msgs,
+    )
     try:
         extraction_agent = _make_extraction_agent()
         result = await extraction_agent.run(
@@ -107,10 +117,15 @@ async def run_extraction(
             message_history=message_history,
         )
         _apply(result.output)
+        logger.info(
+            "Extraction complete: %d new memories,"
+            " %d resolved, summary saved",
+            len(result.output.new_memories),
+            len(result.output.resolved_memory_ids),
+        )
         return result.output
     except Exception:
-        import logging
-        logging.getLogger("planning-agent").warning(
+        logger.warning(
             "Extraction failed", exc_info=True
         )
         return None

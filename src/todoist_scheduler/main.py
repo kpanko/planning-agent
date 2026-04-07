@@ -40,7 +40,7 @@ def main() -> None:
     overdue_tasks = [
         t for t in overdue_tasks if
           t.due is not None and
-          t.due.date != today_str
+          t.due.date != today_str  # pyright: ignore[reportUnknownMemberType]
     ]
 
     scheduler_instance.schedule_and_push_down(overdue_tasks)
