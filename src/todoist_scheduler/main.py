@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 from todoist_api_python.api import TodoistAPI
 
 import todoist_scheduler.config as config
+from todoist_scheduler.overdue import fetch_overdue_tasks
 from todoist_scheduler.scheduler import Scheduler
 
 logging.basicConfig(level=logging.DEBUG)
@@ -22,26 +23,9 @@ def main() -> None:
         ignore_tag=config.IGNORE_TASK_TAG,
     )
 
-    logging.info("Getting overdue tasks...")
-    overdue_tasks = [
-        task
-        for page in api.filter_tasks(
-            query=(
-                "overdue & ! p1"
-                f" & ! @{config.IGNORE_TASK_TAG}"
-            )
-        )
-        for task in page
-    ]
-
-    today_str = today.strftime("%Y-%m-%d")
-    # filter out tasks that are due today because Todoist
-    # has a weird idea about what overdue means
-    overdue_tasks = [
-        t for t in overdue_tasks if
-          t.due is not None and
-          t.due.date != today_str  # pyright: ignore[reportUnknownMemberType]
-    ]
+    overdue_tasks = fetch_overdue_tasks(
+        api, today, config.IGNORE_TASK_TAG,
+    )
 
     scheduler_instance.schedule_and_push_down(overdue_tasks)
 

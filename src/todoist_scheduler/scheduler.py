@@ -17,11 +17,16 @@ class Scheduler:
         today: date,
         tasks_per_day: int,
         ignore_tag: str,
+        dry_run: bool = False,
     ) -> None:
         self.api: TodoistAPI = api
         self.today: date = today
         self.tasks_per_day: int = tasks_per_day
         self.ignore_tag: str = ignore_tag
+        self.dry_run: bool = dry_run
+        self.planned_moves: list[
+            tuple[str, str, date]
+        ] = []
 
     def _sort_tasks(self, tasks: List[Task]) -> None:
         """Sorts tasks by priority (desc) and then due date (asc)."""
@@ -43,6 +48,17 @@ class Scheduler:
 
     def _reschedule_to(self, task: Task, day: date) -> None:
         """Reschedules a task to a new date."""
+        self.planned_moves.append(
+            (task.id, task.content, day)
+        )
+        if self.dry_run:
+            logging.info(
+                "[DRY RUN] Would reschedule '%s' "
+                "to %s",
+                task.content,
+                day,
+            )
+            return
         reschedule_task(self.api, task, day)
 
     def _slice_list(self, lst: List[T], num_items: int) -> Tuple[List[T], List[T]]:
