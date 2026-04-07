@@ -11,6 +11,7 @@ from planning_agent.config import (
     EXTRACTION_MODEL,
 )
 from planning_agent.context import (
+    CALENDAR_NEEDS_RECONNECT,
     PlanningContext,
     _compute_day_type,
     _fetch_calendar_snapshot,
@@ -188,6 +189,7 @@ class TestFetchCalendarSnapshot:
         result = _fetch_calendar_snapshot()
         assert result == "(Google Calendar not connected)"
 
+    @patch("planning_agent.context._save_credentials")
     @patch("googleapiclient.discovery.build")
     @patch(
         "google.oauth2.credentials.Credentials"
@@ -195,7 +197,8 @@ class TestFetchCalendarSnapshot:
     )
     @patch("planning_agent.context.GOOGLE_CALENDAR_CREDENTIALS")
     def test_returns_formatted_events(
-        self, mock_path, _mock_creds, mock_build
+        self, mock_path, _mock_creds, mock_build,
+        _mock_save
     ):
         mock_path.exists.return_value = True
         mock_service = MagicMock()
@@ -225,6 +228,7 @@ class TestFetchCalendarSnapshot:
         assert "Team meeting" in result
         assert "All-day event" in result
 
+    @patch("planning_agent.context._save_credentials")
     @patch("googleapiclient.discovery.build")
     @patch(
         "google.oauth2.credentials.Credentials"
@@ -232,7 +236,8 @@ class TestFetchCalendarSnapshot:
     )
     @patch("planning_agent.context.GOOGLE_CALENDAR_CREDENTIALS")
     def test_empty_calendar(
-        self, mock_path, _mock_creds, mock_build
+        self, mock_path, _mock_creds, mock_build,
+        _mock_save
     ):
         mock_path.exists.return_value = True
         mock_service = MagicMock()
@@ -260,6 +265,54 @@ class TestFetchCalendarSnapshot:
         result = _fetch_calendar_snapshot()
         assert "(Google Calendar error:" in result
         assert "auth error" in result
+
+    @patch("googleapiclient.discovery.build")
+    @patch(
+        "google.oauth2.credentials.Credentials"
+        ".from_authorized_user_file"
+    )
+    @patch("planning_agent.context.GOOGLE_CALENDAR_CREDENTIALS")
+    def test_refresh_error_returns_reconnect(
+        self, mock_path, _mock_creds, mock_build
+    ):
+        from google.auth.exceptions import RefreshError
+
+        mock_path.exists.return_value = True
+        mock_service = MagicMock()
+        mock_build.return_value = mock_service
+        (
+            mock_service.events.return_value
+            .list.return_value
+            .execute.side_effect
+        ) = RefreshError("Token has been revoked")
+
+        result = _fetch_calendar_snapshot()
+        assert result == CALENDAR_NEEDS_RECONNECT
+
+    @patch("planning_agent.context._save_credentials")
+    @patch("googleapiclient.discovery.build")
+    @patch(
+        "google.oauth2.credentials.Credentials"
+        ".from_authorized_user_file"
+    )
+    @patch("planning_agent.context.GOOGLE_CALENDAR_CREDENTIALS")
+    def test_saves_credentials_after_success(
+        self, mock_path, mock_creds_cls,
+        mock_build, mock_save
+    ):
+        mock_path.exists.return_value = True
+        creds_obj = MagicMock()
+        mock_creds_cls.return_value = creds_obj
+        mock_service = MagicMock()
+        mock_build.return_value = mock_service
+        (
+            mock_service.events.return_value
+            .list.return_value
+            .execute.return_value
+        ) = {"items": []}
+
+        _fetch_calendar_snapshot()
+        mock_save.assert_called_once_with(creds_obj)
 
 
 class TestFetchInboxProject:
@@ -300,13 +353,19 @@ class TestFetchInboxProject:
 
 
 class TestBuildContext:
+    @patch(
+        "planning_agent.context"
+        ".GOOGLE_CALENDAR_CREDENTIALS"
+    )
     @patch("planning_agent.context.TODOIST_API_KEY", "")
     @patch("planning_agent.context.get_recent")
     @patch("planning_agent.context.get_active")
     @patch("planning_agent.context.read_values")
     def test_builds_without_todoist(
         self, mock_values, mock_active, mock_recent,
+        mock_gcal_path,
     ):
+        mock_gcal_path.exists.return_value = False
         mock_values.return_value = "my values"
         mock_active.return_value = []
         mock_recent.return_value = []

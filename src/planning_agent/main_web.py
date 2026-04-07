@@ -37,7 +37,10 @@ from .auth import (
     verify_state_cookie,
     get_verifier_cookie,
 )
-from .context import build_context
+from .context import (
+    CALENDAR_NEEDS_RECONNECT,
+    build_context,
+)
 from .extraction import run_extraction
 from .version import GIT_COMMIT
 
@@ -173,6 +176,12 @@ async def websocket_endpoint(ws: WebSocket) -> None:
 
     ctx = build_context()
     history: list[Any] = []
+
+    if ctx.calendar_snapshot == CALENDAR_NEEDS_RECONNECT:
+        await ws.send_json({
+            "type": "calendar_reconnect",
+            "url": "/login/google",
+        })
 
     # Mutable so the receive loop can toggle it.
     debug_state: dict[str, bool] = {"enabled": DEBUG_MODE}

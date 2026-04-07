@@ -452,6 +452,28 @@
         );
       } else if (data.type === "debug") {
         addDebug(data.event, data);
+      } else if (data.type === "calendar_reconnect") {
+        const old = document.getElementById(
+          "gcal-reconnect"
+        );
+        if (old) old.remove();
+        const bar = document.createElement("div");
+        bar.id = "gcal-reconnect";
+        bar.style.cssText =
+          "background:#f59e0b;color:#000;padding:8px 16px;"
+          + "text-align:center;font-size:14px;";
+        bar.innerHTML =
+          "Google Calendar disconnected. "
+          + '<a href="' + data.url
+          + '" style="font-weight:600;'
+          + 'text-decoration:underline">'
+          + "Reconnect</a>"
+          + ' <button onclick='
+          + '"this.parentElement.remove()"'
+          + ' style="margin-left:12px;background:none;'
+          + 'border:none;cursor:pointer;font-size:16px"'
+          + ">&times;</button>";
+        document.body.prepend(bar);
       }
     };
   }

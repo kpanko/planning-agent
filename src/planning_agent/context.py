@@ -13,10 +13,15 @@ from planning_context.values import read_values
 from todoist_api_python.api import TodoistAPI
 from todoist_api_python.models import Task
 
+from .auth import save_credentials as _save_credentials
 from .config import (
     GOOGLE_CALENDAR_CREDENTIALS,
     TODOIST_API_KEY,
     USER_TZ,
+)
+
+CALENDAR_NEEDS_RECONNECT = (
+    "(Google Calendar needs reconnect)"
 )
 
 
@@ -133,6 +138,8 @@ def _fetch_calendar_snapshot() -> str:
     if not GOOGLE_CALENDAR_CREDENTIALS.exists():
         return "(Google Calendar not connected)"
 
+    from google.auth.exceptions import RefreshError  # pyright: ignore[reportUnknownVariableType]
+
     try:
         from google.oauth2.credentials import Credentials  # pyright: ignore[reportUnknownVariableType]
         from googleapiclient.discovery import build as gcal_build  # pyright: ignore[reportUnknownVariableType]
@@ -171,6 +178,10 @@ def _fetch_calendar_snapshot() -> str:
             )
             .execute(),
         )
+        # Persist refreshed tokens so the next call
+        # gets a valid access token from disk.
+        _save_credentials(creds)  # pyright: ignore[reportUnknownArgumentType]
+
         events: list[dict[str, Any]] = cast(
             list[dict[str, Any]],
             events_result.get("items", []),
@@ -201,6 +212,8 @@ def _fetch_calendar_snapshot() -> str:
 
         return "Next 14 days:\n" + "\n".join(lines)
 
+    except RefreshError:
+        return CALENDAR_NEEDS_RECONNECT
     except Exception as exc:
         return f"(Google Calendar error: {exc})"
 
