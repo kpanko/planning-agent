@@ -23,6 +23,8 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from .agent import ConfirmFn, DebugFn, create_agent
 from .config import DEBUG_MODE
+from . import config
+from .main_nightly import run_nightly
 from .auth import (
     build_auth_url,
     check_allowed_email,
@@ -67,6 +69,60 @@ async def health() -> JSONResponse:
     return JSONResponse({
         "status": "ok",
         "version": GIT_COMMIT,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Internal: nightly replan trigger (bearer-token auth)
+# ---------------------------------------------------------------------------
+
+@app.post("/internal/nightly-replan")
+async def internal_nightly_replan(
+    request: Request,
+    dry_run: bool = False,
+) -> JSONResponse:
+    """Trigger the nightly replan job.
+
+    Auth: Bearer token in `Authorization` header, compared
+    against the `NIGHTLY_REPLAN_TOKEN` env var via constant-time
+    comparison. Intended to be called by a Fly scheduled Machine.
+    """
+    import secrets
+
+    expected = config.NIGHTLY_REPLAN_TOKEN
+    if not expected:
+        return JSONResponse(
+            {"error": "nightly replan disabled"},
+            status_code=503,
+        )
+
+    header = request.headers.get("authorization", "")
+    scheme, _, token = header.partition(" ")
+    if scheme.lower() != "bearer" or not secrets.compare_digest(
+        token, expected,
+    ):
+        return JSONResponse(
+            {"error": "unauthorized"}, status_code=401,
+        )
+
+    try:
+        moves = await run_nightly(dry_run=dry_run)
+    except Exception as exc:
+        logger.exception("nightly replan failed")
+        return JSONResponse(
+            {"error": f"{type(exc).__name__}: {exc}"},
+            status_code=500,
+        )
+
+    return JSONResponse({
+        "ok": True,
+        "dry_run": dry_run,
+        "moved": len(moves),
+        "moves": [
+            {"task_id": tid, "content": content,
+             "target_day": day.isoformat()}
+            for tid, content, day in moves
+        ],
     })
 
 

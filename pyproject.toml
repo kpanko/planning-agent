@@ -30,6 +30,7 @@ todoist-mcp = "todoist_mcp.server:main"
 planning-context = "planning_context.server:main"
 planning-agent = "planning_agent.main_cli:main_sync"
 planning-agent-web = "planning_agent.main_web:main"
+planning-agent-nightly = "planning_agent.main_nightly:main"
 
 [build-system]
 requires = ["hatchling"]

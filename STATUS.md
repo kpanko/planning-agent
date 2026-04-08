@@ -1,31 +1,35 @@
 # Status
 
-**Last updated:** 2026-04-05
-**Active milestone:** Milestone 4 — Nightly Replan Job
+**Last updated:** 2026-04-07 (session 2)
+**Active milestone:** Milestone 4 — Nightly Replan Job (PR open)
 
 ## Recently Completed
 
-- Milestone 3 complete — all 12 tasks done, PR #52 open
-- #50 — Fix agent missing overdue tasks (summary counts + prompt)
-- #51 — Extend planning horizon to two weeks (14-day window)
-- Version label added to chat UI header (git commit hash)
+- M4 implementation: `planning-agent-nightly` CLI with `--dry-run`,
+  idempotency, recurring task support (PR #53)
+- Extracted `fetch_overdue_tasks` helper into
+  `todoist_scheduler/overdue.py`; `Scheduler` gained backward-compat
+  `dry_run` + `planned_moves` tracking
+- 15 new tests in `tests/test_nightly.py`; 211 total passing
+- Milestone 3 merged (PR #52)
+- GCal token refresh fix; Google OAuth published to production
 
 ## In Progress
 
-- **Milestone 4** — Nightly Replan Job (`planned`, not yet started)
+- **Milestone 4** — PR #53 open, awaiting:
+  1. Live test against real Todoist (`--dry-run` then real run)
+  2. Implementation of #54: authenticated `/internal/nightly-replan`
+     endpoint + Fly scheduled Machine that curls it nightly
 
 ## Next Up
 
-- Milestone 4 tasks: #14, #15, #16, #17, #18, #19
-- Fix Google Calendar token refresh (see Blockers)
+- Test PR #53 live, then merge
+- Implement #54 (endpoint + scheduler Machine + README/DEPLOY updates)
+- Then start Milestone 5: Fuzzy Recurring Tasks (#20-#25)
 
 ## Blockers / Open Questions
 
-- **Google Calendar disconnected.** OAuth refresh token is expired
-  and there is no way to re-authenticate from the deployed app.
-  The original token was generated locally and copied to the
-  volume. Needs a proper re-auth flow or a way to refresh from
-  the app.
+- None — nightly host decision resolved (see DECISIONS.md).
 
 ## Key Context
 
@@ -36,9 +40,10 @@
   fly.io secret. Dashboard at logfire-us.pydantic.dev/pankok/planning-agent.
   LLM spans are nested under WebSocket `/ws` trace.
 - Branching strategy: one branch + PR per milestone.
-- Branch `milestone-3-eval` has open PR #52 for M3.
 - Debug mode is per-session via the UI toggle; `DEBUG_MODE` env var
   sets the default. Documented in DEPLOY.md.
 - Todoist SDK v3 returns paginated `Iterator[list[T]]` for
   `get_tasks`, `get_projects`, `get_sections`, `get_comments`,
   and `filter_tasks` — always flatten with nested comprehension.
+- `Scheduler.dry_run=True` collects `planned_moves` without calling
+  the API; `dry_run=False` does both. Backward-compatible default.

@@ -114,16 +114,18 @@ from today and earlier, and spreads them forward using the existing
 - A cron/Task Scheduler example is documented.
 
 **Tasks:**
-- [ ] Create `src/planning_agent/main_nightly.py`: async entry point that
+- [x] Create `src/planning_agent/main_nightly.py`: async entry point that
   identifies overdue open tasks and uses `todoist_scheduler` spreading
   logic to assign new due dates. (#14)
-- [ ] Add `--dry-run` CLI flag; print planned changes without calling the
+- [x] Add `--dry-run` CLI flag; print planned changes without calling the
   Todoist API. (#15)
-- [ ] Add idempotency guard: skip tasks already rescheduled to today or
+- [x] Add idempotency guard: skip tasks already rescheduled to today or
   later. (#16)
-- [ ] Add `planning-agent-nightly` entry point in `pyproject.toml`. (#17)
-- [ ] Add unit tests with a mocked Todoist API. (#18)
-- [ ] Document cron / Task Scheduler setup in `README.md`. (#19)
+- [x] Add `planning-agent-nightly` entry point in `pyproject.toml`. (#17)
+- [x] Add unit tests with a mocked Todoist API. (#18)
+- [x] Document cron / Task Scheduler setup in `README.md`. (#19)
+- [x] Nightly replan via authenticated endpoint + Fly scheduled Machine
+  (replaces local cron docs). (#54)
 
 
 ## Milestone 5: Fuzzy Recurring Tasks — `planned`

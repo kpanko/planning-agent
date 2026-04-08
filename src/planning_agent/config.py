@@ -22,6 +22,9 @@ ALLOWED_GOOGLE_EMAIL = os.environ.get(
 WEB_SECRET = os.environ.get("WEB_SECRET", "")
 DEBUG_MODE = bool(os.environ.get("DEBUG_MODE", ""))
 LOGFIRE_TOKEN = os.environ.get("LOGFIRE_TOKEN", "")
+NIGHTLY_REPLAN_TOKEN = os.environ.get(
+    "NIGHTLY_REPLAN_TOKEN", ""
+)
 BASE_URL = os.environ.get(
     "BASE_URL", "http://localhost:8080"
 ).rstrip("/")

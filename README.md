@@ -66,6 +66,11 @@ uv run planning-agent
 
 # Planning agent — web (http://localhost:8080)
 uv run planning-agent-web
+
+# Nightly replan — reschedule overdue tasks forward
+uv run planning-agent-nightly
+uv run planning-agent-nightly --dry-run   # preview only
+uv run planning-agent-nightly -v          # verbose
 ```
 
 ## Web Interface
@@ -78,3 +83,28 @@ The server accepts connections at `GET /` (HTML UI) and
 `WebSocket /ws` (chat protocol). Tool confirmations appear
 as inline Yes/No prompts in the UI; no server restart
 needed.
+
+## Nightly Replan Job
+
+`planning-agent-nightly` finds overdue Todoist tasks and
+spreads them across upcoming days, respecting the
+5-tasks-per-day limit. Recurring tasks preserve their
+recurrence rules. The job is idempotent — safe to run
+multiple times.
+
+### Scheduling with cron (Linux/macOS/WSL)
+
+```cron
+# Run at 11:55 PM daily
+55 23 * * * cd /path/to/planning-agent && uv run planning-agent-nightly >> /var/log/planning-agent-nightly.log 2>&1
+```
+
+### Scheduling with Task Scheduler (Windows)
+
+1. Open Task Scheduler
+2. Create Basic Task: "Planning Agent Nightly"
+3. Trigger: Daily at 11:55 PM
+4. Action: Start a program
+   - Program: `uv`
+   - Arguments: `run planning-agent-nightly`
+   - Start in: `C:\path\to\planning-agent`
