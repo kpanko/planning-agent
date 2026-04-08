@@ -100,6 +100,66 @@ DEBUG_MODE=1 uv run planning-agent-web
 flyctl secrets set DEBUG_MODE=1
 ```
 
+## Nightly replan (scheduled Machine)
+
+The nightly replan job runs as a `POST /internal/nightly-replan`
+endpoint on the web Machine, triggered by a separate Fly scheduled
+Machine that curls it with a bearer token. This avoids needing a
+second copy of the `/data` volume (Fly volumes attach to one Machine
+at a time).
+
+### 1. Set the shared bearer token
+
+```bash
+flyctl secrets set \
+  NIGHTLY_REPLAN_TOKEN="$(openssl rand -hex 32)" \
+  -a planning-agent
+```
+
+When `NIGHTLY_REPLAN_TOKEN` is unset the endpoint returns 503, so
+nothing fires by accident.
+
+### 2. Manual ad-hoc trigger
+
+```bash
+TOKEN=$(flyctl secrets list -a planning-agent | grep NIGHTLY)  # confirm set
+# Dry-run from your laptop:
+curl -X POST \
+  -H "Authorization: Bearer $NIGHTLY_REPLAN_TOKEN" \
+  "https://planning-agent.fly.dev/internal/nightly-replan?dry_run=true"
+
+# Real run:
+curl -X POST \
+  -H "Authorization: Bearer $NIGHTLY_REPLAN_TOKEN" \
+  https://planning-agent.fly.dev/internal/nightly-replan
+```
+
+### 3. Scheduled Machine
+
+Run a tiny Alpine Machine on a schedule (no volume, no app code):
+
+```bash
+flyctl machine run \
+  --schedule daily \
+  --region ord \
+  --name nightly-replan-cron \
+  --env "NIGHTLY_URL=https://planning-agent.fly.dev/internal/nightly-replan" \
+  --env "NIGHTLY_REPLAN_TOKEN=<paste the token here>" \
+  alpine/curl:latest \
+  -a planning-agent \
+  -- sh -c 'curl -fsS -X POST -H "Authorization: Bearer $NIGHTLY_REPLAN_TOKEN" "$NIGHTLY_URL"'
+```
+
+`--schedule daily` runs once every 24 hours (Fly picks the time).
+Use `--schedule hourly` to test, then update.
+
+Verify the schedule:
+
+```bash
+flyctl machine list -a planning-agent
+flyctl logs -a planning-agent -i <machine-id>
+```
+
 ## Regions
 
 The `fly.toml` defaults to `ord` (Chicago). Change `primary_region` to

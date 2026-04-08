@@ -54,6 +54,115 @@ def _make_mock_context():
     return MagicMock()
 
 
+# ── Internal nightly replan endpoint ──────────────────────
+
+
+class TestInternalNightlyReplan:
+    _PATH = "/internal/nightly-replan"
+    _TOKEN = "test-nightly-token"
+
+    def test_disabled_when_token_unset(self):
+        with patch(
+            "planning_agent.main_web.config.NIGHTLY_REPLAN_TOKEN",
+            "",
+        ):
+            with TestClient(app) as c:
+                r = c.post(self._PATH)
+        assert r.status_code == 503
+
+    def test_missing_auth_header_rejected(self):
+        with patch(
+            "planning_agent.main_web.config.NIGHTLY_REPLAN_TOKEN",
+            self._TOKEN,
+        ):
+            with TestClient(app) as c:
+                r = c.post(self._PATH)
+        assert r.status_code == 401
+
+    def test_wrong_token_rejected(self):
+        with patch(
+            "planning_agent.main_web.config.NIGHTLY_REPLAN_TOKEN",
+            self._TOKEN,
+        ):
+            with TestClient(app) as c:
+                r = c.post(
+                    self._PATH,
+                    headers={"Authorization": "Bearer nope"},
+                )
+        assert r.status_code == 401
+
+    def test_wrong_scheme_rejected(self):
+        with patch(
+            "planning_agent.main_web.config.NIGHTLY_REPLAN_TOKEN",
+            self._TOKEN,
+        ):
+            with TestClient(app) as c:
+                r = c.post(
+                    self._PATH,
+                    headers={
+                        "Authorization": f"Basic {self._TOKEN}",
+                    },
+                )
+        assert r.status_code == 401
+
+    def test_valid_token_runs_nightly(self):
+        from datetime import date
+
+        async def _fake_run(dry_run: bool = False):
+            return [("tid1", "task one", date(2026, 4, 8))]
+
+        with (
+            patch(
+                "planning_agent.main_web.config.NIGHTLY_REPLAN_TOKEN",
+                self._TOKEN,
+            ),
+            patch(
+                "planning_agent.main_web.run_nightly",
+                side_effect=_fake_run,
+            ) as mock_run,
+        ):
+            with TestClient(app) as c:
+                r = c.post(
+                    self._PATH + "?dry_run=true",
+                    headers={
+                        "Authorization": f"Bearer {self._TOKEN}",
+                    },
+                )
+
+        assert r.status_code == 200
+        body = r.json()
+        assert body["ok"] is True
+        assert body["dry_run"] is True
+        assert body["moved"] == 1
+        assert body["moves"][0]["task_id"] == "tid1"
+        assert body["moves"][0]["target_day"] == "2026-04-08"
+        mock_run.assert_called_once_with(dry_run=True)
+
+    def test_run_failure_returns_500(self):
+        async def _boom(dry_run: bool = False):
+            raise RuntimeError("todoist down")
+
+        with (
+            patch(
+                "planning_agent.main_web.config.NIGHTLY_REPLAN_TOKEN",
+                self._TOKEN,
+            ),
+            patch(
+                "planning_agent.main_web.run_nightly",
+                side_effect=_boom,
+            ),
+        ):
+            with TestClient(app) as c:
+                r = c.post(
+                    self._PATH,
+                    headers={
+                        "Authorization": f"Bearer {self._TOKEN}",
+                    },
+                )
+        assert r.status_code == 500
+        assert "todoist down" in r.json()["error"]
+
+
 # ── HTTP routes ────────────────────────────────────────────
 
 
