@@ -124,6 +124,8 @@ from today and earlier, and spreads them forward using the existing
 - [x] Add `planning-agent-nightly` entry point in `pyproject.toml`. (#17)
 - [x] Add unit tests with a mocked Todoist API. (#18)
 - [x] Document cron / Task Scheduler setup in `README.md`. (#19)
+- [ ] Nightly replan via authenticated endpoint + Fly scheduled Machine
+  (replaces local cron docs). (#54)
 
 
 ## Milestone 5: Fuzzy Recurring Tasks — `planned`

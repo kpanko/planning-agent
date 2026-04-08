@@ -1,6 +1,6 @@
 # Status
 
-**Last updated:** 2026-04-07
+**Last updated:** 2026-04-07 (session 2)
 **Active milestone:** Milestone 4 — Nightly Replan Job (PR open)
 
 ## Recently Completed
@@ -18,20 +18,18 @@
 
 - **Milestone 4** — PR #53 open, awaiting:
   1. Live test against real Todoist (`--dry-run` then real run)
-  2. Infrastructure setup to run the job nightly (host TBD —
-     local cron, Task Scheduler, or fly.io scheduled machine)
+  2. Implementation of #54: authenticated `/internal/nightly-replan`
+     endpoint + Fly scheduled Machine that curls it nightly
 
 ## Next Up
 
 - Test PR #53 live, then merge
-- Decide nightly run host and stand it up
+- Implement #54 (endpoint + scheduler Machine + README/DEPLOY updates)
 - Then start Milestone 5: Fuzzy Recurring Tasks (#20-#25)
 
 ## Blockers / Open Questions
 
-- Where should the nightly job run? Local cron is simplest but
-  requires the laptop to be on. fly.io scheduled machines are
-  more reliable but need separate process group config.
+- None — nightly host decision resolved (see DECISIONS.md).
 
 ## Key Context
 
