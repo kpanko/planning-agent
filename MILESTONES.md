@@ -98,7 +98,7 @@ fix planning quality issues so the agent is useful for daily use.
 - [x] Extend planning horizon to two weeks (#51)
 
 
-## Milestone 4: Nightly Replan Job — `in-progress`
+## Milestone 4: Nightly Replan Job — `done`
 **Goal:** Build a headless job that runs once per night, finds undone tasks
 from today and earlier, and spreads them forward using the existing
 `todoist_scheduler` logic. This completes v1 DoD item 5.
@@ -128,7 +128,7 @@ from today and earlier, and spreads them forward using the existing
   (replaces local cron docs). (#54)
 
 
-## Milestone 5: Fuzzy Recurring Tasks — `planned`
+## Milestone 5: Fuzzy Recurring Tasks — `in-progress`
 **Goal:** Add the fuzzy-recurring-task subsystem: a `fuzzy_recurring.json`
 store, MCP tools to manage it, and agent integration so maintenance tasks
 (e.g. "check spare tire ~every 6 months") surface during weekly planning.
