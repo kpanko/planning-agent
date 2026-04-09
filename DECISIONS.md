@@ -40,3 +40,25 @@ volume. Keeping the logic on the web Machine and using the scheduler as
 a dumb cron-curl avoids that, keeps secrets in one place, and lets the
 endpoint double as a manual ad-hoc trigger. Local cron / Task Scheduler
 was rejected because it requires the laptop to be on at midnight.
+
+## Secrets on scheduled Fly Machines
+
+**Decision:** Any auth token or credential consumed by a scheduled Fly
+Machine must be stored as a Fly secret and injected into the Machine at
+runtime, never baked into the Machine's static env config.
+
+**Rationale:** The nightly cron deployed under #54 put the bearer token
+directly in the Machine env (visible via `flyctl machine status -d`),
+which defeats Fly's secret storage — the value was readable in cleartext
+by anyone with app read access, and was captured in any config dump or
+backup of the Machine. Discovered 2026-04-08 while responding to #55;
+the affected token had to be treated as fully leaked and rotated
+(tracked in #57). Fly secrets are encrypted at rest and not exposed in
+`machine status` output, which is the behavior we assumed when
+acceptance criteria for #54 said "stored as a Fly secret".
+
+**How to apply:** When redeploying the nightly cron (or adding any
+future scheduled Machine that calls an authenticated endpoint), verify
+that `flyctl machine status -d` shows no token values in the Machine
+env block before considering the work done. Reviewers of scheduled-
+Machine PRs should require this check explicitly.
