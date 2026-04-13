@@ -7,6 +7,7 @@ from todoist_api_python.models import Duration
 from todoist_scheduler.reschedule import (
     compute_due_string,
     reschedule_task,
+    validate_recurring_preserved,
 )
 from tests.conftest import create_task
 
@@ -107,6 +108,126 @@ class TestComputeDueString(unittest.TestCase):
         self.assertEqual(result, '2024-01-15 17:00')
 
 
+    # ----- time override -----
+
+    def test_time_override_date_only_task(self):
+        task = create_task(
+            '1', 'Task', due_date_str='2024-01-10',
+        )
+        result = compute_due_string(
+            task, date(2024, 1, 15), time='09:30',
+        )
+        self.assertEqual(result, '2024-01-15 09:30')
+
+    def test_time_override_replaces_existing_time(self):
+        task = create_task(
+            '1', 'Task',
+            due_date_str='2024-01-10',
+            due_datetime_str='2024-01-10T17:00:00Z',
+        )
+        result = compute_due_string(
+            task, date(2024, 1, 15), time='09:30',
+        )
+        self.assertEqual(result, '2024-01-15 09:30')
+
+    def test_time_override_recurring_preserves_pattern(self):
+        task = create_task(
+            '1', 'Task',
+            due_date_str='2024-01-10',
+            is_recurring=True,
+            due_string='every week',
+        )
+        result = compute_due_string(
+            task, date(2024, 1, 15), time='09:30',
+        )
+        self.assertEqual(
+            result,
+            'every week starting on 2024-01-15 09:30',
+        )
+
+    def test_time_override_recurring_with_existing_time(self):
+        task = create_task(
+            '1', 'Task',
+            due_date_str='2024-01-10',
+            is_recurring=True,
+            due_string='every week at 5pm',
+            due_datetime_str='2024-01-10T17:00:00Z',
+        )
+        result = compute_due_string(
+            task, date(2024, 1, 15), time='09:30',
+        )
+        self.assertEqual(
+            result,
+            'every week at 5pm starting on '
+            '2024-01-15 09:30',
+        )
+
+    def test_time_override_same_day_still_reschedules(self):
+        """Time override on same day should not return None."""
+        task = create_task(
+            '1', 'Task', due_date_str='2024-01-15',
+        )
+        result = compute_due_string(
+            task, date(2024, 1, 15), time='09:30',
+        )
+        self.assertEqual(result, '2024-01-15 09:30')
+
+
+class TestValidateRecurringPreserved(unittest.TestCase):
+
+    def test_non_recurring_allows_any_string(self):
+        task = create_task(
+            '1', 'Task', due_date_str='2024-01-10',
+        )
+        # Should not raise
+        validate_recurring_preserved(
+            task, '2024-01-15',
+        )
+
+    def test_recurring_with_pattern_passes(self):
+        task = create_task(
+            '1', 'Task',
+            due_date_str='2024-01-10',
+            is_recurring=True,
+            due_string='every week',
+        )
+        validate_recurring_preserved(
+            task,
+            'every week starting on 2024-01-15',
+        )
+
+    def test_recurring_without_pattern_raises(self):
+        task = create_task(
+            '1', 'Task',
+            due_date_str='2024-01-10',
+            is_recurring=True,
+            due_string='every week',
+        )
+        with self.assertRaises(ValueError):
+            validate_recurring_preserved(
+                task, '2024-01-15',
+            )
+
+    def test_recurring_bare_datetime_raises(self):
+        task = create_task(
+            '1', 'Task',
+            due_date_str='2024-01-10',
+            is_recurring=True,
+            due_string='every week at 5pm',
+            due_datetime_str='2024-01-10T17:00:00Z',
+        )
+        with self.assertRaises(ValueError):
+            validate_recurring_preserved(
+                task, '2024-01-15 09:30',
+            )
+
+    def test_no_due_allows_any_string(self):
+        task = create_task('1', 'Task')
+        validate_recurring_preserved(
+            task, '2024-01-15',
+        )
+
+
 class TestRescheduleTask(unittest.TestCase):
 
     def setUp(self):
@@ -168,6 +289,38 @@ class TestRescheduleTask(unittest.TestCase):
         self.api.update_task.assert_called_once_with(
             task_id='1',
             due_string='2024-01-15',
+        )
+
+    def test_time_override_passed_to_api(self):
+        task = create_task(
+            '1', 'Task', due_date_str='2024-01-10',
+        )
+        reschedule_task(
+            self.api, task, date(2024, 1, 15),
+            time='09:30',
+        )
+        self.api.update_task.assert_called_once_with(
+            task_id='1',
+            due_string='2024-01-15 09:30',
+        )
+
+    def test_recurring_with_time_preserves_pattern(self):
+        task = create_task(
+            '1', 'Task',
+            due_date_str='2024-01-10',
+            is_recurring=True,
+            due_string='every week',
+        )
+        reschedule_task(
+            self.api, task, date(2024, 1, 15),
+            time='09:30',
+        )
+        self.api.update_task.assert_called_once_with(
+            task_id='1',
+            due_string=(
+                'every week starting on '
+                '2024-01-15 09:30'
+            ),
         )
 
     @patch(
