@@ -13,6 +13,8 @@
   repo is public-adjacent. When investigating a real-data incident,
   keep notes in an untracked local file or a gist, and reference
   them from the issue — do not add them as tracked files.
+- Never squash merge. Always delete the branch after merge.
+  Default invocation: `gh pr merge <n> --merge --delete-branch`.
 
 ## Build & Test
 
