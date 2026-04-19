@@ -7,6 +7,12 @@
   not Claude Code itself, unless clearly stated otherwise.
 - State what you intend to modify before writing code.
 - If something goes wrong, stop and re-plan instead of pushing forward.
+- Never commit personal data (real Todoist task content, task IDs,
+  reminder contents, API tokens, calendar events, email snippets,
+  anything pulled from the user's live accounts) to the repo. This
+  repo is public-adjacent. When investigating a real-data incident,
+  keep notes in an untracked local file or a gist, and reference
+  them from the issue — do not add them as tracked files.
 
 ## Build & Test
 
