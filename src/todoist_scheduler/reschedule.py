@@ -82,15 +82,26 @@ def validate_recurring_preserved(
 
     Call this before sending an update to the Todoist API to
     ensure we never silently convert a repeating task into a
-    one-shot task.
+    one-shot task. Checks that the new due_string begins with
+    the task's existing recurrence pattern (the part before any
+    ``starting on ...`` suffix), which is pattern-agnostic —
+    "every week", "daily", "workday", etc. all work.
     """
     if not task.due or not task.due.is_recurring:
         return
-    if "every " not in due_string.lower():
+    original_pattern = re.sub(
+        r'\s*starting on.*', '', task.due.string,
+    ).strip()
+    if not original_pattern:
+        return
+    if not due_string.lower().startswith(
+        original_pattern.lower()
+    ):
         raise ValueError(
             f"Refusing to strip recurrence from "
             f"'{task.content}': due_string "
-            f"'{due_string}' has no recurrence pattern "
+            f"'{due_string}' does not preserve "
+            f"pattern '{original_pattern}' "
             f"(original: '{task.due.string}')"
         )
 

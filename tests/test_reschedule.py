@@ -227,6 +227,41 @@ class TestValidateRecurringPreserved(unittest.TestCase):
             task, '2024-01-15',
         )
 
+    def test_recurring_daily_pattern_passes(self):
+        task = create_task(
+            '1', 'Task',
+            due_date_str='2024-01-10',
+            is_recurring=True,
+            due_string='daily',
+        )
+        validate_recurring_preserved(
+            task, 'daily starting on 2024-01-15',
+        )
+
+    def test_recurring_workday_pattern_passes(self):
+        task = create_task(
+            '1', 'Task',
+            due_date_str='2024-01-10',
+            is_recurring=True,
+            due_string='every workday',
+        )
+        validate_recurring_preserved(
+            task,
+            'every workday starting on 2024-01-15',
+        )
+
+    def test_original_with_starting_on_suffix(self):
+        task = create_task(
+            '1', 'Task',
+            due_date_str='2024-01-10',
+            is_recurring=True,
+            due_string='every week starting on 2024-01-10',
+        )
+        validate_recurring_preserved(
+            task,
+            'every week starting on 2024-01-15',
+        )
+
 
 class TestRescheduleTask(unittest.TestCase):
 
