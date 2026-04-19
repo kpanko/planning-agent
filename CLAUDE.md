@@ -15,6 +15,8 @@
   them from the issue — do not add them as tracked files.
 - Never squash merge. Always delete the branch after merge.
   Default invocation: `gh pr merge <n> --merge --delete-branch`.
+- Concrete bugs with a repro go in GitHub issues on the project
+  board, not in inline notes or separate tracked files.
 
 ## Build & Test
 
@@ -66,3 +68,8 @@ Planning docs live in `project-plans/`.
   `get_tasks`, `get_projects`, `get_sections`, `get_comments`,
   and `filter_tasks`. Always flatten:
   `[x for page in api.get_tasks() for x in page]`
+- Fly.io CLI is `flyctl`, not `fly` (the `fly` alias is not on PATH
+  in this environment).
+- Every `flyctl deploy` must pass
+  `--build-arg GIT_COMMIT=$(git rev-parse --short HEAD)` so the
+  `/health` endpoint reports the right version (see DEPLOY.md).
