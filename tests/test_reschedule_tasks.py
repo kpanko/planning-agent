@@ -39,10 +39,12 @@ def test_date_only_calls_reschedule(mock_api, mock_reschedule):
     task = _make_task("1", "Buy milk")
     mock_api.get_task.return_value = task
 
-    result = reschedule_tasks([RescheduleItem(task_id="1", date="2026-03-10")])
+    result = reschedule_tasks([
+        RescheduleItem(task_id="1", date="2026-03-10"),
+    ])
 
     mock_reschedule.assert_called_once_with(
-        mock_api, task, date(2026, 3, 10)
+        mock_api, task, date(2026, 3, 10), time=None,
     )
     mock_api.update_task.assert_not_called()
     assert result == "✓ 'Buy milk' -> 2026-03-10"
@@ -72,21 +74,24 @@ def test_date_shortcuts_today_tomorrow(mock_api, mock_reschedule):
 # date + time
 # ---------------------------------------------------------------------------
 
-def test_with_time_calls_update_task(mock_api, mock_reschedule):
+def test_with_time_passes_time_to_reschedule(
+    mock_api, mock_reschedule,
+):
     task = _make_task("1", "Dentist")
     mock_api.get_task.return_value = task
 
     result = reschedule_tasks([
-        RescheduleItem(task_id="1", date="2026-03-10", time="09:30")
+        RescheduleItem(
+            task_id="1", date="2026-03-10", time="09:30",
+        )
     ])
 
     mock_reschedule.assert_called_once_with(
-        mock_api, task, date(2026, 3, 10)
+        mock_api, task, date(2026, 3, 10), time="09:30",
     )
-    mock_api.update_task.assert_called_once_with(
-        task_id="1",
-        due_string="2026-03-10 09:30",
-    )
+    # No separate update_task call — time is handled
+    # inside _reschedule_task via compute_due_string
+    mock_api.update_task.assert_not_called()
     assert result == "✓ 'Dentist' -> 2026-03-10 09:30"
 
 
@@ -109,15 +114,22 @@ def test_multiple_tasks_mixed(mock_api, mock_reschedule):
     mock_api.get_task.side_effect = [task_a, task_b]
 
     result = reschedule_tasks([
-        RescheduleItem(task_id="1", date="2026-03-10", time="14:00"),
+        RescheduleItem(
+            task_id="1", date="2026-03-10", time="14:00",
+        ),
         RescheduleItem(task_id="2", date="2026-03-11"),
     ])
 
     assert mock_reschedule.call_count == 2
-    mock_api.update_task.assert_called_once_with(
-        task_id="1",
-        due_string="2026-03-10 14:00",
+    mock_reschedule.assert_any_call(
+        mock_api, task_a, date(2026, 3, 10),
+        time="14:00",
     )
+    mock_reschedule.assert_any_call(
+        mock_api, task_b, date(2026, 3, 11),
+        time=None,
+    )
+    mock_api.update_task.assert_not_called()
     lines = result.splitlines()
     assert lines[0] == "✓ 'Call doctor' -> 2026-03-10 14:00"
     assert lines[1] == "✓ 'Read book' -> 2026-03-11"

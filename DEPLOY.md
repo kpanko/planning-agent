@@ -122,21 +122,25 @@ nothing fires by accident.
 ### 2. Manual ad-hoc trigger
 
 ```bash
-TOKEN=$(flyctl secrets list -a planning-agent | grep NIGHTLY)  # confirm set
-# Dry-run from your laptop:
+flyctl secrets list -a planning-agent  # confirm NIGHTLY_REPLAN_TOKEN set
+
+# Dry-run (requires the token value — copy from a secure store):
 curl -X POST \
-  -H "Authorization: Bearer $NIGHTLY_REPLAN_TOKEN" \
+  -H "Authorization: Bearer <token>" \
   "https://planning-agent.fly.dev/internal/nightly-replan?dry_run=true"
 
 # Real run:
 curl -X POST \
-  -H "Authorization: Bearer $NIGHTLY_REPLAN_TOKEN" \
+  -H "Authorization: Bearer <token>" \
   https://planning-agent.fly.dev/internal/nightly-replan
 ```
 
 ### 3. Scheduled Machine
 
-Run a tiny Alpine Machine on a schedule (no volume, no app code):
+Run a tiny Alpine Machine on a schedule (no volume, no app code).
+The Machine inherits app-level Fly secrets automatically — **never
+pass the token via `--env`**, which stores it in plaintext in the
+Machine config (visible via `flyctl machine status -d`).
 
 ```bash
 flyctl machine run \
@@ -144,7 +148,6 @@ flyctl machine run \
   --region ord \
   --name nightly-replan-cron \
   --env "NIGHTLY_URL=https://planning-agent.fly.dev/internal/nightly-replan" \
-  --env "NIGHTLY_REPLAN_TOKEN=<paste the token here>" \
   alpine/curl:latest \
   -a planning-agent \
   -- sh -c 'curl -fsS -X POST -H "Authorization: Bearer $NIGHTLY_REPLAN_TOKEN" "$NIGHTLY_URL"'
@@ -152,6 +155,14 @@ flyctl machine run \
 
 `--schedule daily` runs once every 24 hours (Fly picks the time).
 Use `--schedule hourly` to test, then update.
+
+After creating the Machine, verify no secrets leaked into its env:
+
+```bash
+flyctl machine status -d <machine-id> -a planning-agent
+# Confirm: no NIGHTLY_REPLAN_TOKEN in the env block.
+# The token is injected at runtime from Fly secrets.
+```
 
 Verify the schedule:
 

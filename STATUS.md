@@ -1,49 +1,43 @@
 # Status
 
-**Last updated:** 2026-04-07 (session 2)
-**Active milestone:** Milestone 4 — Nightly Replan Job (PR open)
+**Last updated:** 2026-04-19 (session 6)
+**Active milestone:** Milestone 5 — Fuzzy Recurring Tasks
 
 ## Recently Completed
 
-- M4 implementation: `planning-agent-nightly` CLI with `--dry-run`,
-  idempotency, recurring task support (PR #53)
-- Extracted `fetch_overdue_tasks` helper into
-  `todoist_scheduler/overdue.py`; `Scheduler` gained backward-compat
-  `dry_run` + `planned_moves` tracking
-- 15 new tests in `tests/test_nightly.py`; 211 total passing
-- Milestone 3 merged (PR #52)
-- GCal token refresh fix; Google OAuth published to production
+- **#55 PR opened** (kpanko/planning-agent#58) on `milestone-5`.
+  Fix routes `time` parameter through `reschedule_task` to preserve
+  recurrence rules. Ready for merge.
+- **#57 docs fix committed** (fd2a039 on `milestone-5`). DEPLOY.md
+  updated: cron Machine now inherits token from Fly secrets instead
+  of `--env`. Includes post-deploy verification step.
 
-## In Progress
+## Action Required (manual, production)
 
-- **Milestone 4** — PR #53 open, awaiting:
-  1. Live test against real Todoist (`--dry-run` then real run)
-  2. Implementation of #54: authenticated `/internal/nightly-replan`
-     endpoint + Fly scheduled Machine that curls it nightly
+- **Merge PR #58** to land the #55 fix on `main`.
+- **Rotate the compromised token.** Run:
+  `flyctl secrets set NIGHTLY_REPLAN_TOKEN="$(openssl rand -hex 32)" -a planning-agent`
+- **Redeploy the cron Machine** using the updated DEPLOY.md
+  instructions (no `--env` for the token). Verify with
+  `flyctl machine status -d` that no token appears in the env block.
+- **Close #57** once the token is rotated and cron Machine is
+  redeployed correctly.
 
 ## Next Up
 
-- Test PR #53 live, then merge
-- Implement #54 (endpoint + scheduler Machine + README/DEPLOY updates)
-- Then start Milestone 5: Fuzzy Recurring Tasks (#20-#25)
+1. Complete manual production steps above.
+2. Begin Milestone 5: Fuzzy Recurring Tasks (#20–#25).
 
 ## Blockers / Open Questions
 
-- None — nightly host decision resolved (see DECISIONS.md).
+- **Nightly job disabled.** Cron Machine was destroyed. Cannot be
+  redeployed until the token is rotated (manual step above).
 
 ## Key Context
 
 - Deployed on fly.io: `planning-agent` app, `ord` region, 512mb
-  shared-cpu-1x, 1GB volume at `/data`.
+  shared-cpu-1x, 1GB volume at `/data`. Current image: 577079a.
 - Deploy command: `flyctl deploy -a planning-agent --build-arg GIT_COMMIT=$(git rev-parse --short HEAD)`
-- Logfire tracing active in prod. Write token set as `LOGFIRE_TOKEN`
-  fly.io secret. Dashboard at logfire-us.pydantic.dev/pankok/planning-agent.
-  LLM spans are nested under WebSocket `/ws` trace.
+- Logfire tracing active in prod. Dashboard at
+  logfire-us.pydantic.dev/pankok/planning-agent.
 - Branching strategy: one branch + PR per milestone.
-- Debug mode is per-session via the UI toggle; `DEBUG_MODE` env var
-  sets the default. Documented in DEPLOY.md.
-- Todoist SDK v3 returns paginated `Iterator[list[T]]` for
-  `get_tasks`, `get_projects`, `get_sections`, `get_comments`,
-  and `filter_tasks` — always flatten with nested comprehension.
-- `Scheduler.dry_run=True` collects `planned_moves` without calling
-  the API; `dry_run=False` does both. Backward-compatible default.

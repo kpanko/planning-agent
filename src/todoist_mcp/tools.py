@@ -283,15 +283,11 @@ def reschedule_tasks(
         try:
             task = api.get_task(task_id=task_id)
             target = parse_date(item["date"])
-            _reschedule_task(api, task, target)
             time_str = item.get("time")
+            _reschedule_task(
+                api, task, target, time=time_str,
+            )
             if time_str:
-                api.update_task(
-                    task_id=task_id,
-                    due_string=(
-                        f"{target} {time_str}"
-                    ),
-                )
                 results.append(
                     f"✓ '{task.content}'"
                     f" -> {target} {time_str}"
