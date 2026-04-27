@@ -21,6 +21,9 @@ env/
 .env
 project-plans/values.md
 
+# Local scratch (one-off repros, untracked notes — never commit)
+scratch/
+
 # IDE
 .vscode/
 .idea/

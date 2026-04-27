@@ -23,6 +23,27 @@ def _parse_task_date(task: Task) -> date | None:
     return date.fromisoformat(date_str)
 
 
+# Strips a trailing `at <time>` clause from a Todoist recurrence
+# pattern. Matches "at 5pm", "at 5:30pm", "at 17:00", "at 9am",
+# case-insensitive. See #62 — we re-attach time before
+# `starting on` so Todoist honors the new weekday.
+_AT_TIME_RE = re.compile(
+    r"\s+at\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?\b",
+    re.IGNORECASE,
+)
+
+
+def _strip_recurrence_pattern(due_string: str) -> str:
+    """Reduce a recurring due_string to just the cadence pattern.
+
+    Removes any trailing `starting on ...` clause and any `at <time>`
+    clause so we can re-emit the pattern with our own time placement.
+    """
+    pattern = re.sub(r'\s*starting on.*', '', due_string)
+    pattern = _AT_TIME_RE.sub('', pattern)
+    return pattern.strip()
+
+
 def compute_due_string(
     task: Task,
     day: date,
@@ -49,30 +70,33 @@ def compute_due_string(
     ):
         return None
 
+    target_day = day.strftime('%Y-%m-%d')
     if time:
-        due_date_string = (
-            f"{day.strftime('%Y-%m-%d')} {time}"
-        )
+        target_time: str | None = time
     elif due_date and len(due_date) > 10:
-        existing_time = datetime.fromisoformat(
+        target_time = datetime.fromisoformat(
             due_date
         ).strftime('%H:%M')
-        due_date_string = (
-            f"{day.strftime('%Y-%m-%d')} {existing_time}"
-        )
     else:
-        due_date_string = day.strftime('%Y-%m-%d')
+        target_time = None
 
     if task.due and task.due.is_recurring:
-        # Preserve original due date string for recurring tasks
-        original_due = re.sub(
-            r'\s*starting on.*', '', task.due.string,
-        )
-        due_date_string = (
-            f"{original_due} starting on {due_date_string}"
-        )
+        # See #62: Todoist silently ignores the date in
+        # `<pattern> starting on YYYY-MM-DD HH:MM` and snaps to the
+        # recurrence anchor's weekday. Putting the time inside the
+        # pattern (`<pattern> at HH:MM starting on YYYY-MM-DD`)
+        # makes Todoist honor the requested date.
+        pattern = _strip_recurrence_pattern(task.due.string)
+        if target_time:
+            return (
+                f"{pattern} at {target_time} "
+                f"starting on {target_day}"
+            )
+        return f"{pattern} starting on {target_day}"
 
-    return due_date_string
+    if target_time:
+        return f"{target_day} {target_time}"
+    return target_day
 
 
 def validate_recurring_preserved(
@@ -89,9 +113,7 @@ def validate_recurring_preserved(
     """
     if not task.due or not task.due.is_recurring:
         return
-    original_pattern = re.sub(
-        r'\s*starting on.*', '', task.due.string,
-    ).strip()
+    original_pattern = _strip_recurrence_pattern(task.due.string)
     if not original_pattern:
         return
     if not due_string.lower().startswith(
@@ -104,6 +126,41 @@ def validate_recurring_preserved(
             f"pattern '{original_pattern}' "
             f"(original: '{task.due.string}')"
         )
+
+
+class DueDateMismatchError(Exception):
+    """Todoist stored a different date than we asked for.
+
+    Raised when read-after-write shows that the task's stored due
+    date doesn't match the date we requested. Catches Todoist API
+    quirks (see #62) and semantic conflicts like trying to move an
+    `every Monday` task to a Tuesday — Todoist silently snaps to a
+    valid recurrence date and our agent would otherwise report
+    success on a wrong date.
+    """
+
+
+def _verify_due_date_matches(
+    api: TodoistAPI,
+    task_id: str,
+    expected_day: date,
+    due_string: str,
+) -> None:
+    """Re-fetch the task and confirm Todoist stored our date."""
+    fresh = api.get_task(task_id=task_id)
+    actual_date = _parse_task_date(fresh)
+    if actual_date == expected_day:
+        return
+    actual_due = (
+        str(fresh.due.date)  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+        if fresh.due else None
+    )
+    raise DueDateMismatchError(
+        f"Todoist stored {actual_due!r} for task "
+        f"{task_id} ('{fresh.content}') after we sent "
+        f"due_string={due_string!r} targeting "
+        f"{expected_day.isoformat()}."
+    )
 
 
 def reschedule_task(
@@ -153,6 +210,10 @@ def reschedule_task(
         raise Exception(
             f"Failed to reschedule task: {task.content}"
         )
+
+    # Read-after-write: catches Todoist quirks that silently shift
+    # the date (#62) and recurrence/weekday semantic conflicts.
+    _verify_due_date_matches(api, task.id, day, due_string)
 
     # Restore reminders after the update
     if reminders:

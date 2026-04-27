@@ -88,6 +88,13 @@ class TestSchedulerDryRun(unittest.TestCase):
         self.api = MagicMock()
         self.api.update_task.return_value = True
         self.today = date(2026, 4, 6)
+        # Skip read-after-write check; these tests exercise the
+        # scheduler push-down, not the wire format.
+        self._verify_patcher = patch(
+            "todoist_scheduler.reschedule._verify_due_date_matches"
+        )
+        self._verify_patcher.start()
+        self.addCleanup(self._verify_patcher.stop)
 
     def test_dry_run_collects_moves(self) -> None:
         scheduler = Scheduler(
