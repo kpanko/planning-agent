@@ -5,6 +5,12 @@
 
 ## Recently Completed
 
+- **#55 regression test merged** (PR #65). End-to-end coverage that
+  drives `reschedule_tasks` through the real `_reschedule_task` body
+  and asserts the recurrence pattern survives in the `due_string`
+  reaching `api.update_task`. Verified by reverting commit 30ba8bb
+  locally — the new tests fail on the old behavior. Final acceptance
+  box on #55 ticked.
 - **#62 fix merged** (PR #63). Recurring tasks no longer lose their
   date when rescheduled with a time. Root cause: emitting
   `<pattern> starting on YYYY-MM-DD HH:MM` made Todoist silently snap
@@ -28,9 +34,9 @@ Nothing actively in progress.
 
 ## Next Up
 
-1. **Add #55 regression test.** Acceptance criterion still unchecked
-   on the closed issue — currently no automated guard against the
-   data-loss path that started this whole reliability arc.
+1. **Deploy reliability fixes to prod.** PRs #63 and #65 are on main
+   but Fly is still on `5efaa47`. Verify against a real recurring
+   task in the live backlog before closing the reliability arc.
 2. **Fix #59, #60, #61** on a fresh branch — context/tool gaps that
    affect planning quality. Do before starting M5.
    - #59: Include recurrence string in pre-loaded task context
@@ -38,9 +44,7 @@ Nothing actively in progress.
    - #61: Make Inbox tasks reliably viewable
 3. **Fix #57 production steps** — redeploy cron Machine using updated
    DEPLOY.md instructions. Token already rotated.
-4. **Deploy #62 fix to prod** and verify against a real recurring
-   task before closing the reliability arc.
-5. **Resume Milestone 5** — Fuzzy Recurring Tasks (#20–#25).
+4. **Resume Milestone 5** — Fuzzy Recurring Tasks (#20–#25).
 
 ## Blockers / Open Questions
 
