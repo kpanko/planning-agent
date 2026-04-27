@@ -62,3 +62,26 @@ future scheduled Machine that calls an authenticated endpoint), verify
 that `flyctl machine status -d` shows no token values in the Machine
 env block before considering the work done. Reviewers of scheduled-
 Machine PRs should require this check explicitly.
+
+## Recurring task time placement (#62)
+
+**Decision:** When rescheduling a recurring task with a target time,
+emit `<pattern> at HH:MM starting on YYYY-MM-DD`, not
+`<pattern> starting on YYYY-MM-DD HH:MM`. `compute_due_string` strips
+any pre-existing `at <time>` from the original pattern before
+re-attaching the new time.
+
+**Rationale:** Discovered 2026-04-26 by direct API repro against a
+Todoist test project. The latter format causes Todoist to silently
+ignore the date in `starting on` and snap to the recurrence anchor's
+existing weekday — across `daily`, `every week`, `every! week`,
+`every N weeks`, and `every month`. Putting the time inside the
+pattern makes Todoist honor the requested date. This is independent
+of the `every`/`every!` distinction.
+
+**Defensive partner:** `reschedule_task` now also re-fetches the task
+after `update_task` and raises `DueDateMismatchError` if Todoist
+stored a different date than we asked for. This catches future
+quirks of the same shape and semantic conflicts (e.g. asking to move
+an `every Monday` task to a Tuesday — Todoist snaps back to Monday,
+and we'd otherwise report success on a wrong date).

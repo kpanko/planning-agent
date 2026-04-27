@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock, call, patch
 from datetime import date, timedelta
 
 from todoist_scheduler.scheduler import Scheduler
@@ -72,6 +72,13 @@ class TestScheduling(unittest.TestCase):
         self.scheduler = Scheduler(
             self.api, self.today, self.tasks_per_day, self.ignore_tag
         )
+        # Skip read-after-write verification in scheduler tests —
+        # they exercise push-down logic, not the wire format.
+        self._verify_patcher = patch(
+            'todoist_scheduler.reschedule._verify_due_date_matches'
+        )
+        self._verify_patcher.start()
+        self.addCleanup(self._verify_patcher.stop)
 
     def test_schedule_no_tasks(self):
         self.scheduler.schedule_and_push_down([])
@@ -153,7 +160,10 @@ class TestScheduling(unittest.TestCase):
         self.api.filter_tasks.return_value = iter([])
         self.scheduler.schedule_and_push_down(tasks_to_add)
 
-        expected_due_string = f"every week at 5pm starting on {self.today.strftime('%Y-%m-%d')} 17:00"
+        expected_due_string = (
+            f"every week at 17:00 starting on "
+            f"{self.today.strftime('%Y-%m-%d')}"
+        )
         self.api.update_task.assert_called_once_with(
             task_id='1',
             due_string=expected_due_string

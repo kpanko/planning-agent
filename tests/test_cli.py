@@ -78,18 +78,23 @@ class TestMain(unittest.TestCase):
         mock_config.USER_TZ = "UTC"
         mock_api = MagicMock()
         mock_api_cls.return_value = mock_api
-        task = create_task(
+        task_before = create_task(
             "1", "My Task",
             due_date_str="2026-03-01",
         )
-        mock_api.get_task.return_value = task
+        task_after = create_task(
+            "1", "My Task",
+            due_date_str="2026-03-15",
+        )
+        # Two get_task calls: CLI fetch, then read-after-write
+        # verification inside reschedule_task.
+        mock_api.get_task.side_effect = [
+            task_before, task_after,
+        ]
         mock_api.update_task.return_value = True
 
         main(["1", "2026-03-15"])
 
-        mock_api.get_task.assert_called_once_with(
-            task_id="1",
-        )
         mock_api.update_task.assert_called_once_with(
             task_id="1",
             due_string="2026-03-15",
