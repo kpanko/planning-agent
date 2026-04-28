@@ -356,6 +356,11 @@ class TestRescheduleTask(unittest.TestCase):
         )
 
     def test_time_override_passed_to_api(self):
+        self.api.get_task.return_value = create_task(
+            '1', 'Task',
+            due_date_str='2024-01-15',
+            due_datetime_str='2024-01-15T09:30:00',
+        )
         task = create_task(
             '1', 'Task', due_date_str='2024-01-10',
         )
@@ -369,6 +374,11 @@ class TestRescheduleTask(unittest.TestCase):
         )
 
     def test_recurring_with_time_preserves_pattern(self):
+        self.api.get_task.return_value = create_task(
+            '1', 'Task',
+            due_date_str='2024-01-15',
+            due_datetime_str='2024-01-15T09:30:00',
+        )
         task = create_task(
             '1', 'Task',
             due_date_str='2024-01-10',
@@ -626,6 +636,49 @@ class TestVerifyDueDateMatches(unittest.TestCase):
         with self.assertRaises(DueDateMismatchError):
             _verify_due_date_matches(
                 api, '1', date(2024, 1, 15), 'sent',
+            )
+
+    def test_time_match_passes(self):
+        api = MagicMock()
+        api.get_task.return_value = create_task(
+            '1', 'Task',
+            due_date_str='2024-01-15',
+            due_datetime_str='2024-01-15T17:00:00',
+        )
+        _verify_due_date_matches(
+            api, '1', date(2024, 1, 15), 'sent',
+            expected_time='17:00',
+        )
+
+    def test_time_mismatch_raises(self):
+        api = MagicMock()
+        api.get_task.return_value = create_task(
+            '1', 'Task',
+            due_date_str='2024-01-15',
+            due_datetime_str='2024-01-15T20:00:00',
+        )
+        with self.assertRaises(DueDateMismatchError) as ctx:
+            _verify_due_date_matches(
+                api, '1', date(2024, 1, 15), 'sent string',
+                expected_time='17:00',
+            )
+        msg = str(ctx.exception)
+        self.assertIn('20:00', msg)
+        self.assertIn('17:00', msg)
+        self.assertIn('sent string', msg)
+
+    def test_time_requested_but_stored_date_only_raises(self):
+        # Silent time-corruption case: we asked for 17:00 but
+        # Todoist stored a date-only result. The date check passes;
+        # the time check should fail.
+        api = MagicMock()
+        api.get_task.return_value = create_task(
+            '1', 'Task', due_date_str='2024-01-15',
+        )
+        with self.assertRaises(DueDateMismatchError):
+            _verify_due_date_matches(
+                api, '1', date(2024, 1, 15), 'sent',
+                expected_time='17:00',
             )
 
 
