@@ -1,10 +1,16 @@
 # Status
 
-**Last updated:** 2026-04-26 (session 7)
+**Last updated:** 2026-04-27 (session 8)
 **Active milestone:** Milestone 5 — Fuzzy Recurring Tasks
 
 ## Recently Completed
 
+- **#59 fix merged** (PR #67). `_fmt_task()` now surfaces the
+  recurrence rule from `task.due.string` (e.g. `every week`,
+  `every 3rd Monday`) in pre-loaded context, replacing the bare
+  `(recurring)` flag. The agent can now reason about cadence and
+  reconstruct a broken recurrence — a visibility gap that
+  contributed to #55.
 - **#55 regression test merged** (PR #65). End-to-end coverage that
   drives `reschedule_tasks` through the real `_reschedule_task` body
   and asserts the recurrence pattern survives in the `due_string`
@@ -30,16 +36,15 @@
 
 ## In Progress
 
-Nothing actively in progress.
+- **#60** — agent cannot move tasks between projects (`update_task`
+  needs `project_id`).
 
 ## Next Up
 
 1. **Deploy reliability fixes to prod.** PRs #63 and #65 are on main
    but Fly is still on `5efaa47`. Verify against a real recurring
    task in the live backlog before closing the reliability arc.
-2. **Fix #59, #60, #61** on a fresh branch — context/tool gaps that
-   affect planning quality. Do before starting M5.
-   - #59: Include recurrence string in pre-loaded task context
+2. **Fix #60, #61** — remaining context/tool gaps before M5.
    - #60: Add `project_id` to `update_task` (move between projects)
    - #61: Make Inbox tasks reliably viewable
 3. **Fix #57 production steps** — redeploy cron Machine using updated
