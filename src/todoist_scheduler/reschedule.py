@@ -145,22 +145,42 @@ def _verify_due_date_matches(
     task_id: str,
     expected_day: date,
     due_string: str,
+    expected_time: str | None = None,
 ) -> None:
-    """Re-fetch the task and confirm Todoist stored our date."""
+    """Re-fetch the task and confirm Todoist stored our date.
+
+    When ``expected_time`` is given (HH:MM), also verifies the
+    stored time matches. Catches silent time corruption from
+    recurrence strings that embed a time-of-day in formats our
+    normalization doesn't strip — see #66.
+    """
     fresh = api.get_task(task_id=task_id)
     actual_date = _parse_task_date(fresh)
-    if actual_date == expected_day:
-        return
     actual_due = (
         str(fresh.due.date)  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
         if fresh.due else None
     )
-    raise DueDateMismatchError(
-        f"Todoist stored {actual_due!r} for task "
-        f"{task_id} ('{fresh.content}') after we sent "
-        f"due_string={due_string!r} targeting "
-        f"{expected_day.isoformat()}."
-    )
+    if actual_date != expected_day:
+        raise DueDateMismatchError(
+            f"Todoist stored {actual_due!r} for task "
+            f"{task_id} ('{fresh.content}') after we sent "
+            f"due_string={due_string!r} targeting "
+            f"{expected_day.isoformat()}."
+        )
+    if expected_time is None:
+        return
+    actual_time: str | None = None
+    if actual_due and len(actual_due) > 10:
+        actual_time = datetime.fromisoformat(
+            actual_due
+        ).strftime("%H:%M")
+    if actual_time != expected_time:
+        raise DueDateMismatchError(
+            f"Todoist stored time {actual_time!r} for task "
+            f"{task_id} ('{fresh.content}') after we sent "
+            f"due_string={due_string!r} targeting time "
+            f"{expected_time!r}."
+        )
 
 
 def reschedule_task(
@@ -213,7 +233,10 @@ def reschedule_task(
 
     # Read-after-write: catches Todoist quirks that silently shift
     # the date (#62) and recurrence/weekday semantic conflicts.
-    _verify_due_date_matches(api, task.id, day, due_string)
+    # Also verifies the time when one was requested (#66).
+    _verify_due_date_matches(
+        api, task.id, day, due_string, expected_time=time,
+    )
 
     # Restore reminders after the update
     if reminders:
