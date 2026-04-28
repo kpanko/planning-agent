@@ -98,14 +98,24 @@ class TestFmtTask:
         result = _fmt_task(task)
         assert "no due date" in result
 
-    def test_recurring_shown(self):
+    def test_recurring_shows_pattern(self):
         task = create_task(
             "789", "Daily standup",
             due_date_str="2026-03-14",
             is_recurring=True,
+            due_string="every weekday",
         )
         result = _fmt_task(task)
-        assert "(recurring)" in result
+        assert "(every weekday)" in result
+        assert "(recurring)" not in result
+
+    def test_non_recurring_has_no_pattern(self):
+        task = create_task(
+            "790", "One-off errand",
+            due_date_str="2026-03-14",
+        )
+        result = _fmt_task(task)
+        assert "(" not in result
 
     def test_priority_mapping(self):
         task = create_task(

@@ -56,7 +56,7 @@ def _fmt_task(task: Task) -> str:
         if task.due else "no due date"
     )
     recurring = (
-        " (recurring)"
+        f" ({task.due.string})"
         if task.due and task.due.is_recurring
         else ""
     )
