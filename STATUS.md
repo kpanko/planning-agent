@@ -5,51 +5,59 @@
 
 ## Recently Completed
 
+- **Prod deploy to `e28f1b2`** (2026-04-27). All session-8 fixes
+  (#59/#60/#61/#66) plus the prior reliability arc (#55/#62/#63/#65)
+  are now live. `/health` returns `{"version":"e28f1b2"}`. Reliability
+  arc goal "verify against a real recurring task" still pending —
+  needs a hands-on probe in the live backlog.
+- **#66 fix merged** (PR #70). Read-after-write now also checks the
+  HH:MM time component when a time was requested. Catches silent
+  time corruption from recurrence strings that embed time-of-day in
+  formats `_strip_recurrence_pattern` doesn't strip
+  (e.g. `every 3rd friday 8pm`). Date-only reschedules unchanged.
+- **#61 fix merged** (PR #69). Prompt-only change: the agent is now
+  directed to use the pre-loaded Inbox project ID for Inbox queries
+  instead of being told to call `get_projects()` first. Live verify
+  pending — only meaningful test is asking the agent about Inbox
+  tasks on the deployed instance.
+- **#60 fix merged** (PR #68). `update_task` MCP tool now accepts
+  `project_id`. The Todoist SDK splits this between `update_task`
+  (fields) and `move_task` (project moves); the tool keeps a single
+  surface and dispatches internally — move first, then field updates.
 - **#59 fix merged** (PR #67). `_fmt_task()` now surfaces the
-  recurrence rule from `task.due.string` (e.g. `every week`,
-  `every 3rd Monday`) in pre-loaded context, replacing the bare
-  `(recurring)` flag. The agent can now reason about cadence and
-  reconstruct a broken recurrence — a visibility gap that
-  contributed to #55.
+  recurrence rule from `task.due.string` in pre-loaded context,
+  replacing the bare `(recurring)` flag. Closes a visibility gap
+  that contributed to #55.
 - **#55 regression test merged** (PR #65). End-to-end coverage that
   drives `reschedule_tasks` through the real `_reschedule_task` body
   and asserts the recurrence pattern survives in the `due_string`
   reaching `api.update_task`. Verified by reverting commit 30ba8bb
-  locally — the new tests fail on the old behavior. Final acceptance
-  box on #55 ticked.
+  locally — tests fail on the old behavior.
 - **#62 fix merged** (PR #63). Recurring tasks no longer lose their
   date when rescheduled with a time. Root cause: emitting
   `<pattern> starting on YYYY-MM-DD HH:MM` made Todoist silently snap
   to the recurrence anchor's weekday. Fix moves time inside the
-  pattern (`<pattern> at HH:MM starting on YYYY-MM-DD`). Affected
-  every recurrence type (daily, weekly, every-N-weeks, monthly),
-  not just `every!`.
-- **Defensive read-after-write** added to `reschedule_task`. Re-fetches
-  the task and raises `DueDateMismatchError` if Todoist stored a
-  different date than requested. Catches future quirks of the same
-  shape and semantic conflicts (e.g. `every Monday` → Tuesday).
-- **pyright bumped** 1.1.408 → 1.1.409 (PR #64).
-- **#55 fix merged** (PR #58). Recurring-task data loss via `time`
-  parameter — routes through `reschedule_task` to preserve recurrence.
-- **#57 docs fix committed** (fd2a039). DEPLOY.md updated so cron
-  Machine inherits token from Fly secrets instead of `--env`.
+  pattern (`<pattern> at HH:MM starting on YYYY-MM-DD`).
+- **Defensive read-after-write** added to `reschedule_task` (PR #63,
+  extended in #70). Re-fetches the task and raises
+  `DueDateMismatchError` if Todoist stored a different date or time
+  than requested.
 
 ## In Progress
 
-- **#60** — agent cannot move tasks between projects (`update_task`
-  needs `project_id`).
+Nothing actively in progress.
 
 ## Next Up
 
-1. **Deploy reliability fixes to prod.** PRs #63 and #65 are on main
-   but Fly is still on `5efaa47`. Verify against a real recurring
-   task in the live backlog before closing the reliability arc.
-2. **Fix #60, #61** — remaining context/tool gaps before M5.
-   - #60: Add `project_id` to `update_task` (move between projects)
-   - #61: Make Inbox tasks reliably viewable
-3. **Fix #57 production steps** — redeploy cron Machine using updated
+1. **Live verification on `e28f1b2`.** Two unverified items rolled
+   into this deploy:
+   - **#61** — ask the agent "what's in my Inbox?" and confirm it
+     answers without first calling `get_projects()`.
+   - **Reliability arc closeout** — round-trip a real recurring task
+     in the live backlog and confirm date+time survive.
+2. **#57 production steps** — redeploy cron Machine using updated
    DEPLOY.md instructions. Token already rotated.
-4. **Resume Milestone 5** — Fuzzy Recurring Tasks (#20–#25).
+3. **Resume Milestone 5** — Fuzzy Recurring Tasks (#20–#25).
 
 ## Blockers / Open Questions
 
@@ -64,7 +72,7 @@
 ## Key Context
 
 - Deployed on fly.io: `planning-agent` app, `ord` region, 512mb
-  shared-cpu-1x, 1GB volume at `/data`. Current image: 5efaa47.
+  shared-cpu-1x, 1GB volume at `/data`. Current image: e28f1b2.
 - Deploy command: `flyctl deploy -a planning-agent --build-arg GIT_COMMIT=$(git rev-parse --short HEAD)`
 - Logfire tracing active in prod. Dashboard at
   logfire-us.pydantic.dev/pankok/planning-agent.
