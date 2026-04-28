@@ -205,17 +205,21 @@ def update_task(
     description: Optional[str] = None,
     priority: Optional[int] = None,
     labels: Optional[list[str]] = None,
+    project_id: Optional[str] = None,
 ) -> str:
-    """Update a task's content, description, priority, or labels.
+    """Update a task's fields or move it to a different project.
 
     NOTE: To change a task's due date use reschedule_tasks instead —
     it safely preserves recurring patterns and reminders.
 
     priority: 1=lowest (p4), 2=p3, 3=p2, 4=highest (p1).
+    project_id: if set, moves the task to that project before
+        applying any other field updates.
     """
     return _tools.update_task(
         _require_api(),
         task_id, content, description, priority, labels,
+        project_id=project_id,
     )
 
 

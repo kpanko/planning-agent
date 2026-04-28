@@ -224,6 +224,7 @@ def update_task(
     description: Optional[str] = None,
     priority: Optional[int] = None,
     labels: Optional[list[str]] = None,
+    project_id: Optional[str] = None,
 ) -> str:
     try:
         kwargs: dict[str, Any] = {}
@@ -235,9 +236,12 @@ def update_task(
             kwargs["priority"] = priority
         if labels is not None:
             kwargs["labels"] = labels
-        if not kwargs:
+        if project_id is None and not kwargs:
             return "No changes specified."
-        api.update_task(task_id=task_id, **kwargs)
+        if project_id is not None:
+            api.move_task(task_id=task_id, project_id=project_id)
+        if kwargs:
+            api.update_task(task_id=task_id, **kwargs)
         task = api.get_task(task_id=task_id)
         return f"Updated: {fmt_task(task)}"
     except Exception as e:

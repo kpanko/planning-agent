@@ -319,6 +319,33 @@ class TestUpdateTask:
         mock_api.update_task.side_effect = Exception("fail")
         assert update_task("1", content="x").startswith("Error:")
 
+    def test_project_id_alone_moves_task(self, mock_api):
+        mock_api.get_task.return_value = _task()
+        result = update_task("1", project_id="proj-2")
+        mock_api.move_task.assert_called_once_with(
+            task_id="1", project_id="proj-2"
+        )
+        mock_api.update_task.assert_not_called()
+        assert "Updated" in result
+
+    def test_project_id_with_other_fields(self, mock_api):
+        mock_api.get_task.return_value = _task(content="Renamed")
+        update_task("1", content="Renamed", project_id="proj-2")
+        mock_api.move_task.assert_called_once_with(
+            task_id="1", project_id="proj-2"
+        )
+        mock_api.update_task.assert_called_once_with(
+            task_id="1", content="Renamed"
+        )
+
+    def test_no_kwargs_does_not_call_move(self, mock_api):
+        update_task("1")
+        mock_api.move_task.assert_not_called()
+
+    def test_move_error_returned(self, mock_api):
+        mock_api.move_task.side_effect = Exception("fail")
+        assert update_task("1", project_id="p2").startswith("Error:")
+
 
 # ---------------------------------------------------------------------------
 # complete_task
