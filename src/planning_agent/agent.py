@@ -164,7 +164,10 @@ relevant.
   search against task titles. Use this when looking \
   up a task by name.
 - `find_tasks(project_id)` — all tasks in a project. \
-  Use `get_projects()` first to look up the ID.
+  The Inbox project ID is already in the pre-loaded \
+  "Todoist projects" section below — use it directly. \
+  For other projects, call `get_projects()` to look up \
+  the ID.
 - `find_tasks_by_date(start_date, end_date)` — date \
   range.
 - `get_task(task_id)` — details on one task.
@@ -306,6 +309,9 @@ def create_agent(
 
 ### Todoist projects
 {deps.inbox_project}
+When the user asks about Inbox tasks, pass this ID as
+`project_id` to `find_tasks` or `get_overview` — do not
+call `get_projects()` to look it up again.
 
 ### Tasks (overdue + next 14 days)
 {deps.todoist_snapshot}
