@@ -1,15 +1,32 @@
 # Status
 
-**Last updated:** 2026-04-27 (session 8)
+**Last updated:** 2026-04-28 (session 8)
 **Active milestone:** Milestone 5 — Fuzzy Recurring Tasks
 
 ## Recently Completed
 
+- **Live verification on `e28f1b2`** (2026-04-28).
+  - **#61 Inbox visibility** — confirmed working. Agent answers
+    Inbox queries directly without calling `get_projects()`.
+  - **Reliability arc closeout** — happy-path round-trip of a
+    recurring task with a new time succeeded. The semantic-conflict
+    path (target weekday ≠ recurrence anchor) correctly raised
+    `DueDateMismatchError` instead of silently storing the snapped
+    date. Read-after-write guard validated end-to-end.
+- **Two new bugs filed during verification.**
+  - **#71** — `update_task` is registered on the MCP server but
+    not named in `STATIC_PROMPT`, so the agent denies it can move
+    tasks between projects. Same shape as #61. Scope expanded to
+    include a CI-level drift-prevention test that asserts every
+    `@mcp.tool()` is either advertised in the prompt or on an
+    explicit `INTENTIONALLY_UNADVERTISED` list. Audit found six
+    other unadvertised Todoist tools handled by the same mechanism.
+  - **#72** — UI bug: agent text before and after a tool call
+    render on the same line. Should be `[before] [tool_call]
+    [tool_result] [after]`, top to bottom.
 - **Prod deploy to `e28f1b2`** (2026-04-27). All session-8 fixes
   (#59/#60/#61/#66) plus the prior reliability arc (#55/#62/#63/#65)
-  are now live. `/health` returns `{"version":"e28f1b2"}`. Reliability
-  arc goal "verify against a real recurring task" still pending —
-  needs a hands-on probe in the live backlog.
+  are live. `/health` returns `{"version":"e28f1b2"}`.
 - **#66 fix merged** (PR #70). Read-after-write now also checks the
   HH:MM time component when a time was requested. Catches silent
   time corruption from recurrence strings that embed time-of-day in
@@ -49,15 +66,13 @@ Nothing actively in progress.
 
 ## Next Up
 
-1. **Live verification on `e28f1b2`.** Two unverified items rolled
-   into this deploy:
-   - **#61** — ask the agent "what's in my Inbox?" and confirm it
-     answers without first calling `get_projects()`.
-   - **Reliability arc closeout** — round-trip a real recurring task
-     in the live backlog and confirm date+time survive.
-2. **#57 production steps** — redeploy cron Machine using updated
+1. **#71** — advertise `update_task` in `STATIC_PROMPT` and add
+   the `@mcp.tool()` registry-coverage test. Issue body has the
+   expanded scope.
+2. **#72** — UI tool-call interleaving fix. Lower priority.
+3. **#57 production steps** — redeploy cron Machine using updated
    DEPLOY.md instructions. Token already rotated.
-3. **Resume Milestone 5** — Fuzzy Recurring Tasks (#20–#25).
+4. **Resume Milestone 5** — Fuzzy Recurring Tasks (#20–#25).
 
 ## Blockers / Open Questions
 
