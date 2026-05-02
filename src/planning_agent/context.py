@@ -151,7 +151,7 @@ def _fetch_todoist_snapshot(
     return "\n".join(lines), n_overdue, n_upcoming
 
 
-def _fetch_calendar_snapshot(days: int = 14) -> str:
+def fetch_calendar_snapshot(days: int = 14) -> str:
     """Fetch next ``days`` days of Google Calendar events.
 
     Returns a formatted string of events, or a short
@@ -289,7 +289,7 @@ def build_context(lazy: bool = False) -> PlanningContext:
     if lazy:
         calendar_snapshot = LAZY_CALENDAR_PLACEHOLDER
     else:
-        calendar_snapshot = _fetch_calendar_snapshot()
+        calendar_snapshot = fetch_calendar_snapshot()
 
     now = datetime.now(ZoneInfo(USER_TZ))
     current_datetime = now.strftime("%A, %B %d, %Y %I:%M %p")

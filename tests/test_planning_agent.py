@@ -16,7 +16,7 @@ from planning_agent.context import (
     LAZY_TODOIST_PLACEHOLDER,
     PlanningContext,
     _compute_day_type,
-    _fetch_calendar_snapshot,
+    fetch_calendar_snapshot,
     _fetch_inbox_project,
     _fetch_todoist_snapshot,
     _fmt_task,
@@ -216,7 +216,7 @@ class TestFetchCalendarSnapshot:
     @patch("planning_agent.context.GOOGLE_CALENDAR_CREDENTIALS")
     def test_no_credentials_returns_fallback(self, mock_path):
         mock_path.exists.return_value = False
-        result = _fetch_calendar_snapshot()
+        result = fetch_calendar_snapshot()
         assert result == "(Google Calendar not connected)"
 
     @patch("planning_agent.context._save_credentials")
@@ -252,7 +252,7 @@ class TestFetchCalendarSnapshot:
             ]
         }
 
-        result = _fetch_calendar_snapshot()
+        result = fetch_calendar_snapshot()
 
         assert "Next 14 days:" in result
         assert "Team meeting" in result
@@ -278,7 +278,7 @@ class TestFetchCalendarSnapshot:
             .execute.return_value
         ) = {"items": []}
 
-        result = _fetch_calendar_snapshot()
+        result = fetch_calendar_snapshot()
 
         assert result == "No calendar events in next 14 days."
 
@@ -292,7 +292,7 @@ class TestFetchCalendarSnapshot:
         self, mock_path, _mock_creds
     ):
         mock_path.exists.return_value = True
-        result = _fetch_calendar_snapshot()
+        result = fetch_calendar_snapshot()
         assert "(Google Calendar error:" in result
         assert "auth error" in result
 
@@ -316,7 +316,7 @@ class TestFetchCalendarSnapshot:
             .execute.side_effect
         ) = RefreshError("Token has been revoked")
 
-        result = _fetch_calendar_snapshot()
+        result = fetch_calendar_snapshot()
         assert result == CALENDAR_NEEDS_RECONNECT
 
     @patch("planning_agent.context._save_credentials")
@@ -341,7 +341,7 @@ class TestFetchCalendarSnapshot:
             .execute.return_value
         ) = {"items": []}
 
-        _fetch_calendar_snapshot()
+        fetch_calendar_snapshot()
         mock_save.assert_called_once_with(creds_obj)
 
 
@@ -434,7 +434,7 @@ class TestBuildContext:
         assert len(ctx.memories) == 1
         assert ctx.memories[0]["id"] == "m_001"
 
-    @patch("planning_agent.context._fetch_calendar_snapshot")
+    @patch("planning_agent.context.fetch_calendar_snapshot")
     @patch("planning_agent.context._fetch_inbox_project")
     @patch("planning_agent.context._fetch_todoist_snapshot")
     @patch(
@@ -529,7 +529,7 @@ class TestBuildContext:
             .execute.return_value
         ) = {"items": []}
 
-        result = _fetch_calendar_snapshot(days=7)
+        result = fetch_calendar_snapshot(days=7)
         assert result == "No calendar events in next 7 days."
 
 
@@ -850,3 +850,22 @@ class TestRenderSystemPrompt:
         assert "get_calendar(days)" in STATIC_PROMPT
         assert "get_memories" in STATIC_PROMPT
         assert "get_recent_conversations" in STATIC_PROMPT
+
+
+class TestLazyFetchTools:
+    @patch("planning_agent.agent.TODOIST_API_KEY", "fake-key")
+    def test_lazy_fetch_tools_registered(self):
+        # The lazy prompt names these three tools (#74); without
+        # them registered the agent would hit a wall when lazy
+        # mode kicks in. Probes the pydantic-ai internal toolset
+        # rather than firing the LLM.
+        from planning_agent.agent import create_agent
+
+        agent = create_agent()
+        tool_names = {
+            t.name
+            for t in agent._function_toolset.tools.values()  # pyright: ignore[reportPrivateUsage]
+        }
+        assert "get_calendar" in tool_names
+        assert "get_memories" in tool_names
+        assert "get_recent_conversations" in tool_names
