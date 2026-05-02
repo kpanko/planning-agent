@@ -85,3 +85,27 @@ stored a different date than we asked for. This catches future
 quirks of the same shape and semantic conflicts (e.g. asking to move
 an `every Monday` task to a Tuesday — Todoist snaps back to Monday,
 and we'd otherwise report success on a wrong date).
+
+## Lazy preload optimizes prompt tokens, not API calls (#73)
+
+**Decision:** In lazy mode, `build_context()` still calls
+`api.filter_tasks(query="overdue")` and the upcoming-tasks filter at
+startup. The Todoist snapshot string is dropped from the system
+prompt; the counts feed the shape summary in #74. Only the Google
+Calendar fetch is fully skipped.
+
+**Rationale:** The cost we are reducing is Anthropic input tokens,
+not Todoist quota. The Todoist API is free to the user and the
+filter calls are fast. The shape summary needs exact counts
+("27 overdue, 18 in next 14 days") to be useful for the agent's
+fetch-decision; bucketing into "you have some" would force the
+agent to call `find_tasks` even when the user's question doesn't
+need them. Calendar is different: GCal latency is high enough
+that we accept the loss of "X events today" for the latency win.
+
+**How to apply:** When adding new lazy-aware data sources,
+default to fetching at startup and dropping from the prompt
+unless (a) the upstream fetch is genuinely slow, or (b) the
+data source is rate-limited. Only skip the fetch outright when
+the cost of fetching outweighs the prompt-design value of having
+exact shape numbers.

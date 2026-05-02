@@ -14,11 +14,20 @@
   multi-turn already amortizes; lazy mode targets the short
   single-turn sessions that don't need the full preload.
   Renumbered old M6/M7 to M7/M8.
-- **#73 PR open** (#78). `build_context(lazy=True)` skips GCal
-  fetch and replaces the Todoist snapshot with a placeholder;
-  counts (`n_overdue`, `n_upcoming`, `n_memories`,
-  `n_conversations`) flow through for the shape-summary prompt
-  in #74. Awaiting merge.
+- **#73 merged** (PR #78). `build_context(lazy=True)` skips
+  the GCal fetch and replaces the Todoist snapshot with a
+  module-level placeholder constant; counts (`n_overdue`,
+  `n_upcoming`, `n_memories`, `n_conversations`) flow
+  through for the shape-summary prompt in #74. Lazy mode
+  intentionally still calls Todoist filters — the API is
+  free; the cost we save is prompt tokens, not API calls.
+- **Code review now uses `superpowers:code-reviewer`
+  subagent.** Plugin installed mid-session. Each review
+  runs in a fresh context, eliminating
+  implementer-reviewer bias. Workflow: get base/head SHAs,
+  dispatch via Agent tool, act on the verdict. Used on PR
+  #78 and produced three actionable items, all addressed
+  before merge.
 - **Live verification on `e28f1b2`** (2026-04-28).
   - **#61 Inbox visibility** — confirmed working. Agent answers
     Inbox queries directly without calling `get_projects()`.
@@ -76,18 +85,22 @@
 
 ## In Progress
 
-- **#73** — lazy `build_context()`. PR #78 open, awaiting merge.
+Nothing actively in progress.
 
 ## Next Up
 
 1. **#74** — branch `build_system_prompt` on `is_lazy`; add
-   "Lazy Context" section to `STATIC_PROMPT`. Depends on #73.
+   "Lazy Context" section to `STATIC_PROMPT`. The lazy data
+   layer (#73) and the placeholder constants are already in
+   place; this issue wires them into the prompt.
 2. **#75** — add `get_calendar`, `get_memories`,
-   `get_recent_conversations` tools.
+   `get_recent_conversations` tools so the lazy prompt has
+   something to call.
 3. **#76** — wire `main_cli` and `main_web` to `lazy=True`.
 4. **#77** — broader tests for lazy mode + new tools.
 5. **#71 / #72 / #57** — orphan cleanup work folded into M6.
-6. **Resume Milestone 5** — Fuzzy Recurring Tasks once M6 lands.
+6. **Resume Milestone 5** — Fuzzy Recurring Tasks once M6
+   lands.
 
 ## Blockers / Open Questions
 
@@ -106,4 +119,13 @@
 - Deploy command: `flyctl deploy -a planning-agent --build-arg GIT_COMMIT=$(git rev-parse --short HEAD)`
 - Logfire tracing active in prod. Dashboard at
   logfire-us.pydantic.dev/pankok/planning-agent.
-- Branching strategy: one branch + PR per milestone.
+- Branching strategy: per-issue branches in current practice
+  (e.g. `feat-73-lazy-build-context`), even though
+  DECISIONS.md still says per-milestone. PRs use
+  `--merge --delete-branch`, never squash.
+- Anthropic prompt caching is on (`agent.py:285-286`,
+  `anthropic_cache_instructions=True`,
+  `anthropic_cache_messages=True`). Multi-turn sessions
+  amortize the system prompt at ~10% cache-hit cost; the
+  M6 lazy-mode work targets short single-turn sessions
+  that don't benefit from caching.
