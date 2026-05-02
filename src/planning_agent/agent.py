@@ -45,10 +45,14 @@ async def _default_confirm(
         return False
     return answer in ("y", "yes")
 
-from planning_context.conversations import Conversation
+from planning_context.conversations import (
+    Conversation,
+    get_recent as _get_recent_conversations,
+)
 from planning_context.memories import (
     Memory,
     add_memory as _add_memory,
+    get_active as _get_active_memories,
     resolve_memory as _resolve_memory,
 )
 from planning_context.values import write_values
@@ -57,7 +61,7 @@ from todoist_mcp import tools as _tools
 from todoist_mcp.tools import RescheduleItem
 
 from .config import TODOIST_API_KEY, LLM_MODEL
-from .context import PlanningContext
+from .context import PlanningContext, fetch_calendar_snapshot
 
 # -- Static system prompt (adapted from system-prompt.md) --
 # The "Start of Conversation" section is removed because
@@ -684,6 +688,57 @@ def create_agent(
             f"({len(content)} chars)",
             write_values,
             content,
+        )
+
+    # ---------------------------------------------------------------
+    # Lazy-mode fetch tools
+    # ---------------------------------------------------------------
+    # Used when the system prompt is rendered in lazy mode and the
+    # agent needs to pull data that isn't pre-loaded. See the "Lazy
+    # Context Mode" section of STATIC_PROMPT for invocation rules.
+
+    @planning_agent.tool
+    async def get_calendar(  # pyright: ignore[reportUnusedFunction]
+        ctx: RunContext[PlanningContext],
+        days: int = 14,
+    ) -> str:
+        """Fetch upcoming Google Calendar events.
+
+        days: How far ahead to look (default 14).
+        """
+        return await _run_tool(
+            "get_calendar",
+            f"days={days}",
+            fetch_calendar_snapshot,
+            days,
+        )
+
+    @planning_agent.tool
+    async def get_memories(  # pyright: ignore[reportUnusedFunction]
+        ctx: RunContext[PlanningContext],
+    ) -> str:
+        """Fetch the full active-memory list."""
+        return await _run_tool(
+            "get_memories",
+            "",
+            lambda: _format_memories(_get_active_memories()),
+        )
+
+    @planning_agent.tool
+    async def get_recent_conversations(  # pyright: ignore[reportUnusedFunction]
+        ctx: RunContext[PlanningContext],
+        count: int = 3,
+    ) -> str:
+        """Fetch summaries of recent past conversations.
+
+        count: Number of recent days to include (default 3).
+        """
+        return await _run_tool(
+            "get_recent_conversations",
+            f"count={count}",
+            lambda: _format_conversations(
+                _get_recent_conversations(count)
+            ),
         )
 
     return planning_agent
