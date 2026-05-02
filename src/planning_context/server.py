@@ -94,9 +94,10 @@ async def get_active_memories() -> str:
     logger.debug("get_active_memories returning %d memories", len(active))
     lines: list[str] = []
     for m in active:
+        expiry = m.get("expiry_date")
         lines.append(
             f"[{m['id']}] ({m['category']}) {m['content']}"
-            + (f" [expires {m['expiry_date']}]" if m.get("expiry_date") else "")
+            + (f" [expires {expiry}]" if expiry else "")
         )
     return "\n".join(lines)
 

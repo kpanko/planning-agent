@@ -24,9 +24,11 @@ from planning_agent.context import (
 )
 from planning_agent.extraction import (
     ExtractionResult,
-    Memory,
+    Memory as ExtractionMemory,
     _apply,
 )
+from planning_context.conversations import Conversation
+from planning_context.memories import Memory
 from tests.conftest import create_task
 
 
@@ -548,7 +550,7 @@ class TestExtractionResult:
     def test_full_result(self):
         result = ExtractionResult(
             new_memories=[
-                Memory(
+                ExtractionMemory(
                     content="Prefers mornings",
                     category="preference",
                 ),
@@ -575,11 +577,11 @@ class TestApplyExtraction:
     ):
         result = ExtractionResult(
             new_memories=[
-                Memory(
+                ExtractionMemory(
                     content="Likes hiking",
                     category="preference",
                 ),
-                Memory(
+                ExtractionMemory(
                     content="Dentist on March 20",
                     category="fact",
                     expiry_date="2026-03-20",
@@ -686,3 +688,165 @@ class TestAgentSystemPrompt:
         result = _format_conversations(convos)
         assert "2026-03-12" in result
         assert "Planned the week." in result
+
+
+def _make_ctx(
+    is_lazy: bool,
+    *,
+    todoist_snapshot: str = "FULL_TASKS_BODY",
+    calendar_snapshot: str = "FULL_CAL_BODY",
+    memories: list[Memory] | None = None,
+    conversations: list[Conversation] | None = None,
+    n_overdue: int = 0,
+    n_upcoming: int = 0,
+    n_memories: int = 0,
+    n_conversations: int = 0,
+) -> PlanningContext:
+    return PlanningContext(
+        is_lazy=is_lazy,
+        values_doc="MY_VALUES_DOC",
+        memories=memories or [],
+        recent_conversations=conversations or [],
+        todoist_snapshot=todoist_snapshot,
+        calendar_snapshot=calendar_snapshot,
+        current_datetime="Saturday, May 02, 2026 09:00 AM",
+        day_type="weekend",
+        inbox_project="Inbox project: Inbox (ID: 999)",
+        n_overdue=n_overdue,
+        n_upcoming=n_upcoming,
+        n_memories=n_memories,
+        n_conversations=n_conversations,
+    )
+
+
+class TestRenderSystemPrompt:
+    def test_full_mode_includes_snapshot_bodies(self):
+        from planning_agent.agent import (
+            STATIC_PROMPT,
+            _render_system_prompt,
+        )
+        ctx = _make_ctx(
+            is_lazy=False,
+            memories=[
+                {
+                    "id": "m_001",
+                    "content": "Likes mornings",
+                    "category": "preference",
+                },
+            ],
+            conversations=[
+                {
+                    "date": "2026-05-01",
+                    "entries": [
+                        {"summary": "Last session."},
+                    ],
+                },
+            ],
+        )
+        prompt = _render_system_prompt(ctx)
+
+        assert STATIC_PROMPT in prompt
+        assert "MY_VALUES_DOC" in prompt
+        assert "FULL_TASKS_BODY" in prompt
+        assert "FULL_CAL_BODY" in prompt
+        assert "Likes mornings" in prompt
+        assert "Last session." in prompt
+        assert "Tasks (overdue + next 14 days)" in prompt
+        assert "Calendar (next 14 days)" in prompt
+        # The lazy-block markdown header ("### Available context")
+        # only appears in lazy renders. The bare string "Available
+        # context (call tools to load)" is also referenced in the
+        # static prompt's Lazy Context Mode section, so we have to
+        # match the heading prefix specifically to distinguish.
+        assert "### Available context (call tools to load)" not in prompt
+
+    def test_lazy_mode_renders_shape_summary(self):
+        from planning_agent.agent import (
+            _render_system_prompt,
+        )
+        ctx = _make_ctx(
+            is_lazy=True,
+            n_overdue=27,
+            n_upcoming=18,
+            n_memories=6,
+            n_conversations=3,
+        )
+        prompt = _render_system_prompt(ctx)
+
+        assert "### Available context (call tools to load)" in prompt
+        assert "27 overdue, 18 in next 14 days" in prompt
+        assert "find_tasks / find_tasks_by_date" in prompt
+        assert "Calendar: not loaded — call get_calendar(days)" in prompt
+        assert "Memories: 6 active — call get_memories" in prompt
+        assert (
+            "Recent conversations: 3 available "
+            "— call get_recent_conversations"
+        ) in prompt
+
+    def test_lazy_mode_omits_full_snapshot_bodies(self):
+        from planning_agent.agent import (
+            _render_system_prompt,
+        )
+        ctx = _make_ctx(
+            is_lazy=True,
+            todoist_snapshot="SHOULD_NOT_APPEAR_TASKS",
+            calendar_snapshot="SHOULD_NOT_APPEAR_CAL",
+            memories=[
+                {
+                    "id": "m_999",
+                    "content": "SECRET_MEMORY_CONTENT",
+                    "category": "fact",
+                },
+            ],
+            conversations=[
+                {
+                    "date": "2026-05-01",
+                    "entries": [
+                        {"summary": "SECRET_CONV_SUMMARY"},
+                    ],
+                },
+            ],
+            n_memories=1,
+            n_conversations=1,
+        )
+        prompt = _render_system_prompt(ctx)
+
+        # Full bodies are not rendered — that's the whole point
+        # of lazy mode.
+        assert "SHOULD_NOT_APPEAR_TASKS" not in prompt
+        assert "SHOULD_NOT_APPEAR_CAL" not in prompt
+        assert "SECRET_MEMORY_CONTENT" not in prompt
+        assert "SECRET_CONV_SUMMARY" not in prompt
+        assert "Tasks (overdue + next 14 days)" not in prompt
+        assert "Calendar (next 14 days)" not in prompt
+        assert "Active memories" not in prompt
+
+    def test_always_shown_sections_present_in_both_modes(self):
+        from planning_agent.agent import (
+            _render_system_prompt,
+        )
+        for is_lazy in (False, True):
+            prompt = _render_system_prompt(_make_ctx(is_lazy))
+            # Values, inbox ID, current datetime, day type
+            # are cheap and live in the prompt regardless.
+            assert "MY_VALUES_DOC" in prompt, (
+                f"values missing in lazy={is_lazy}"
+            )
+            assert "Inbox project: Inbox (ID: 999)" in prompt, (
+                f"inbox missing in lazy={is_lazy}"
+            )
+            assert (
+                "Saturday, May 02, 2026 09:00 AM" in prompt
+            ), f"datetime missing in lazy={is_lazy}"
+            assert "weekend day" in prompt, (
+                f"day_type missing in lazy={is_lazy}"
+            )
+
+    def test_static_prompt_contains_lazy_context_section(self):
+        from planning_agent.agent import STATIC_PROMPT
+
+        assert "## Lazy Context Mode" in STATIC_PROMPT
+        # Names the fetch tools so the agent knows what to call.
+        assert "get_calendar(days)" in STATIC_PROMPT
+        assert "get_memories" in STATIC_PROMPT
+        assert "get_recent_conversations" in STATIC_PROMPT

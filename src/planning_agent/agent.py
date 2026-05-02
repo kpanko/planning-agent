@@ -45,7 +45,9 @@ async def _default_confirm(
         return False
     return answer in ("y", "yes")
 
+from planning_context.conversations import Conversation
 from planning_context.memories import (
+    Memory,
     add_memory as _add_memory,
     resolve_memory as _resolve_memory,
 )
@@ -198,6 +200,28 @@ longer active.
 - `update_values_doc(content)` — rewrite the values doc \
 if priorities have clearly shifted.
 
+## Lazy Context Mode
+
+When the pre-loaded context shows "Available context \
+(call tools to load)" instead of full task lists, \
+calendar events, and memories, you are in lazy mode — \
+only counts have been pre-loaded. Fetch what the \
+question needs before answering:
+
+- Tasks: `find_tasks` (Todoist filter syntax) or \
+`find_tasks_by_date` (date range).
+- Calendar: `get_calendar(days)` — pass the number of \
+days you need.
+- Memories: `get_memories` — full active memory list.
+- Recent conversations: `get_recent_conversations(count)`.
+
+Don't fetch what the question doesn't need. A quick \
+"what's on today?" needs today's tasks and today's \
+calendar — not 14 days of tasks or every memory. A \
+"plan my week" request needs all four. In full mode \
+(no "Available context" header), the data is already \
+in this prompt — don't re-fetch.
+
 ## Conversation Style
 
 - **Short responses.** A sentence or two unless asked.
@@ -223,38 +247,100 @@ time to do what matters.\
 
 
 def _format_memories(
-    memories: list[dict[str, Any]],
+    memories: list[Memory],
 ) -> str:
     if not memories:
         return "(no active memories)"
     lines: list[str] = []
     for m in memories:
         line = (
-            f"[{m['id']}] ({m.get('category', '?')}) "
+            f"[{m['id']}] ({m['category']}) "
             f"{m['content']}"
         )
-        if m.get("expiry_date"):
-            line += f" (expires {m['expiry_date']})"
+        expiry = m.get("expiry_date")
+        if expiry:
+            line += f" (expires {expiry})"
         lines.append(line)
     return "\n".join(lines)
 
 
 def _format_conversations(
-    conversations: list[dict[str, Any]],
+    conversations: list[Conversation],
 ) -> str:
     if not conversations:
         return "(no recent conversations)"
     lines: list[str] = []
     for conv in conversations:
-        d: str = conv.get("date", "?")
-        entries: list[dict[str, Any]] = conv.get(
-            "entries", []
-        )
-        for entry in entries:
+        for entry in conv["entries"]:
             lines.append(
-                f"[{d}] {entry.get('summary', '(no summary)')}"
+                f"[{conv['date']}] {entry['summary']}"
             )
     return "\n".join(lines)
+
+
+def _render_system_prompt(deps: PlanningContext) -> str:
+    """Render the full system prompt for a context.
+
+    Branches on ``deps.is_lazy``:
+    - **Full**: pre-loads task snapshot, calendar, memories,
+      and recent conversations into the prompt.
+    - **Lazy**: replaces those bodies with a shape-summary
+      block telling the agent which tools to call.
+
+    Always-shown sections (values, inbox project ID, current
+    datetime/day type) appear in both modes — they're cheap
+    and the agent needs them up front.
+    """
+    header = f"""{STATIC_PROMPT}
+
+---
+
+## Pre-loaded Context
+
+### Values and priorities
+{deps.values_doc or "(no values document yet)"}"""
+
+    if deps.is_lazy:
+        middle = f"""
+
+### Todoist projects
+{deps.inbox_project}
+When the user asks about Inbox tasks, pass this ID as
+`project_id` to `find_tasks` or `get_overview` — do not
+call `get_projects()` to look it up again.
+
+### Available context (call tools to load)
+- Tasks: {deps.n_overdue} overdue, {deps.n_upcoming} in next 14 days — call find_tasks / find_tasks_by_date
+- Calendar: not loaded — call get_calendar(days)
+- Memories: {deps.n_memories} active — call get_memories
+- Recent conversations: {deps.n_conversations} available — call get_recent_conversations"""
+    else:
+        middle = f"""
+
+### Active memories
+{_format_memories(deps.memories)}
+
+### Recent conversations
+{_format_conversations(deps.recent_conversations)}
+
+### Todoist projects
+{deps.inbox_project}
+When the user asks about Inbox tasks, pass this ID as
+`project_id` to `find_tasks` or `get_overview` — do not
+call `get_projects()` to look it up again.
+
+### Tasks (overdue + next 14 days)
+{deps.todoist_snapshot}
+
+### Calendar (next 14 days)
+{deps.calendar_snapshot}"""
+
+    footer = f"""
+
+### Right now
+{deps.current_datetime} — {deps.day_type} day"""
+
+    return header + middle + footer
 
 
 # -- Agent creation --
@@ -291,36 +377,7 @@ def create_agent(
     async def build_system_prompt(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
     ) -> str:
-        deps = ctx.deps
-        prompt = f"""{STATIC_PROMPT}
-
----
-
-## Pre-loaded Context
-
-### Values and priorities
-{deps.values_doc or "(no values document yet)"}
-
-### Active memories
-{_format_memories(deps.memories)}
-
-### Recent conversations
-{_format_conversations(deps.recent_conversations)}
-
-### Todoist projects
-{deps.inbox_project}
-When the user asks about Inbox tasks, pass this ID as
-`project_id` to `find_tasks` or `get_overview` — do not
-call `get_projects()` to look it up again.
-
-### Tasks (overdue + next 14 days)
-{deps.todoist_snapshot}
-
-### Calendar (next 14 days)
-{deps.calendar_snapshot}
-
-### Right now
-{deps.current_datetime} — {deps.day_type} day"""
+        prompt = _render_system_prompt(ctx.deps)
         if debug_fn:
             await debug_fn(
                 "system_prompt", {"content": prompt}
