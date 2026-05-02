@@ -1,10 +1,24 @@
 # Status
 
-**Last updated:** 2026-04-28 (session 8)
-**Active milestone:** Milestone 5 — Fuzzy Recurring Tasks
+**Last updated:** 2026-05-02 (session 9)
+**Active milestone:** Milestone 6 — Interactive Cost Reduction & Cleanup
 
 ## Recently Completed
 
+- **Milestone 6 opened** (2026-05-02). Goal: switch interactive
+  (CLI/web) sessions to lazy-context mode where tasks, calendar,
+  memories, and recent conversations are fetched on demand
+  instead of pre-loaded. Nightly job stays full-context. Also
+  rolls in orphan bug/cleanup work (#57, #71, #72). Confirmed
+  Anthropic prompt caching is on (`agent.py:285-286`), so
+  multi-turn already amortizes; lazy mode targets the short
+  single-turn sessions that don't need the full preload.
+  Renumbered old M6/M7 to M7/M8.
+- **#73 PR open** (#78). `build_context(lazy=True)` skips GCal
+  fetch and replaces the Todoist snapshot with a placeholder;
+  counts (`n_overdue`, `n_upcoming`, `n_memories`,
+  `n_conversations`) flow through for the shape-summary prompt
+  in #74. Awaiting merge.
 - **Live verification on `e28f1b2`** (2026-04-28).
   - **#61 Inbox visibility** — confirmed working. Agent answers
     Inbox queries directly without calling `get_projects()`.
@@ -62,17 +76,18 @@
 
 ## In Progress
 
-Nothing actively in progress.
+- **#73** — lazy `build_context()`. PR #78 open, awaiting merge.
 
 ## Next Up
 
-1. **#71** — advertise `update_task` in `STATIC_PROMPT` and add
-   the `@mcp.tool()` registry-coverage test. Issue body has the
-   expanded scope.
-2. **#72** — UI tool-call interleaving fix. Lower priority.
-3. **#57 production steps** — redeploy cron Machine using updated
-   DEPLOY.md instructions. Token already rotated.
-4. **Resume Milestone 5** — Fuzzy Recurring Tasks (#20–#25).
+1. **#74** — branch `build_system_prompt` on `is_lazy`; add
+   "Lazy Context" section to `STATIC_PROMPT`. Depends on #73.
+2. **#75** — add `get_calendar`, `get_memories`,
+   `get_recent_conversations` tools.
+3. **#76** — wire `main_cli` and `main_web` to `lazy=True`.
+4. **#77** — broader tests for lazy mode + new tools.
+5. **#71 / #72 / #57** — orphan cleanup work folded into M6.
+6. **Resume Milestone 5** — Fuzzy Recurring Tasks once M6 lands.
 
 ## Blockers / Open Questions
 

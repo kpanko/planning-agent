@@ -186,7 +186,7 @@ job stays full-context. Also clear the orphaned bug/cleanup backlog.
   verified via `flyctl machine status -d` showing no token in env block.
 
 **Tasks:**
-- [ ] Add `lazy: bool` param + count fields to `build_context()` /
+- [x] Add `lazy: bool` param + count fields to `build_context()` /
   `PlanningContext`; refactor `_fetch_calendar_snapshot()` to take
   `days: int`. (#73)
 - [ ] Branch `build_system_prompt` on `deps.is_lazy` to render full
