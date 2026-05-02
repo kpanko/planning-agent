@@ -1,10 +1,36 @@
 # Status
 
-**Last updated:** 2026-05-02 (session 9)
+**Last updated:** 2026-05-02 (session 10)
 **Active milestone:** Milestone 6 — Interactive Cost Reduction & Cleanup
 
 ## Recently Completed
 
+- **#74 merged** (PR #79). `_render_system_prompt(deps)`
+  extracted to module level and branches on `deps.is_lazy`.
+  Full mode is byte-identical to before (cache-safe).
+  Lazy mode swaps the task snapshot, calendar body, memory
+  list, and conversation list for an `### Available context
+  (call tools to load)` block with counts and tool names.
+  `STATIC_PROMPT` gained a `## Lazy Context Mode` section
+  naming the four fetch tools. Once #75 lands the agent has
+  something to actually call.
+- **TypedDict refactor folded into PR #79** (scope expansion
+  during the same session). `Memory` and
+  `Conversation`/`ConversationEntry` defined in
+  `planning_context`; required-vs-`NotRequired` split on the
+  axis of "consumer reads it directly." Propagated through
+  `PlanningContext`, `_format_memories`,
+  `_format_conversations`, MCP server's
+  `get_active_memories`, and `write_json` (widened to
+  `Mapping[str, Any] | list[Any]`). Code review caught a
+  defensive-fallback regression — fixed by moving shape
+  validation into `get_active` and `get_recent` so malformed
+  on-disk records get skipped + logged at the read boundary
+  instead of crashing the prompt build.
+- **#80 filed** as follow-up to #79: tighten
+  `Memory.category` to a `Literal` so the runtime
+  `VALID_CATEGORIES` check becomes a static guarantee at
+  every read site.
 - **Milestone 6 opened** (2026-05-02). Goal: switch interactive
   (CLI/web) sessions to lazy-context mode where tasks, calendar,
   memories, and recent conversations are fetched on demand
@@ -89,16 +115,16 @@ Nothing actively in progress.
 
 ## Next Up
 
-1. **#74** — branch `build_system_prompt` on `is_lazy`; add
-   "Lazy Context" section to `STATIC_PROMPT`. The lazy data
-   layer (#73) and the placeholder constants are already in
-   place; this issue wires them into the prompt.
-2. **#75** — add `get_calendar`, `get_memories`,
+1. **#75** — add `get_calendar`, `get_memories`,
    `get_recent_conversations` tools so the lazy prompt has
-   something to call.
-3. **#76** — wire `main_cli` and `main_web` to `lazy=True`.
-4. **#77** — broader tests for lazy mode + new tools.
-5. **#71 / #72 / #57** — orphan cleanup work folded into M6.
+   something to call. The lazy prompt already references
+   them by name (#74); without these tools the agent in
+   lazy mode would hit a wall.
+2. **#76** — wire `main_cli` and `main_web` to `lazy=True`.
+3. **#77** — broader tests for lazy mode + new tools.
+4. **#71 / #72 / #57** — orphan cleanup work folded into M6.
+5. **#80** — tighten `Memory.category` to a Literal type.
+   Cheap follow-up from #79 review.
 6. **Resume Milestone 5** — Fuzzy Recurring Tasks once M6
    lands.
 

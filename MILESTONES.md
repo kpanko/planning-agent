@@ -189,7 +189,7 @@ job stays full-context. Also clear the orphaned bug/cleanup backlog.
 - [x] Add `lazy: bool` param + count fields to `build_context()` /
   `PlanningContext`; refactor `_fetch_calendar_snapshot()` to take
   `days: int`. (#73)
-- [ ] Branch `build_system_prompt` on `deps.is_lazy` to render full
+- [x] Branch `build_system_prompt` on `deps.is_lazy` to render full
   preload vs shape-summary; add "Lazy Context" section to
   `STATIC_PROMPT`. (#74)
 - [ ] Add `get_calendar`, `get_memories`, `get_recent_conversations`
