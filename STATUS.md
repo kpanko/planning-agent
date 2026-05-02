@@ -5,6 +5,15 @@
 
 ## Recently Completed
 
+- **#75 merged** (PR #81). Three new agent tools wired
+  in for lazy mode: `get_calendar(days)`,
+  `get_memories()`, `get_recent_conversations(count)`.
+  All read-only, route through `_run_tool` for debug
+  tracing. Drive-by: promoted `_fetch_calendar_snapshot`
+  to public so `agent.py` can import it without tripping
+  pyright. Lazy mode now has the four fetch tools the #74
+  prompt names — wiring (`main_cli`, `main_web`) is #76.
+  No live-LLM smoke test from here; verify on deploy.
 - **#74 merged** (PR #79). `_render_system_prompt(deps)`
   extracted to module level and branches on `deps.is_lazy`.
   Full mode is byte-identical to before (cache-safe).
@@ -115,17 +124,15 @@ Nothing actively in progress.
 
 ## Next Up
 
-1. **#75** — add `get_calendar`, `get_memories`,
-   `get_recent_conversations` tools so the lazy prompt has
-   something to call. The lazy prompt already references
-   them by name (#74); without these tools the agent in
-   lazy mode would hit a wall.
-2. **#76** — wire `main_cli` and `main_web` to `lazy=True`.
-3. **#77** — broader tests for lazy mode + new tools.
-4. **#71 / #72 / #57** — orphan cleanup work folded into M6.
-5. **#80** — tighten `Memory.category` to a Literal type.
+1. **#76** — wire `main_cli` and `main_web` to `lazy=True`.
+   This is the flip-the-switch step that turns on lazy mode
+   in production interactive sessions. After this lands,
+   verify on deploy with a real LLM session.
+2. **#77** — broader tests for lazy mode + new tools.
+3. **#71 / #72 / #57** — orphan cleanup work folded into M6.
+4. **#80** — tighten `Memory.category` to a Literal type.
    Cheap follow-up from #79 review.
-6. **Resume Milestone 5** — Fuzzy Recurring Tasks once M6
+5. **Resume Milestone 5** — Fuzzy Recurring Tasks once M6
    lands.
 
 ## Blockers / Open Questions

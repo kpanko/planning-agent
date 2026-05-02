@@ -192,7 +192,7 @@ job stays full-context. Also clear the orphaned bug/cleanup backlog.
 - [x] Branch `build_system_prompt` on `deps.is_lazy` to render full
   preload vs shape-summary; add "Lazy Context" section to
   `STATIC_PROMPT`. (#74)
-- [ ] Add `get_calendar`, `get_memories`, `get_recent_conversations`
+- [x] Add `get_calendar`, `get_memories`, `get_recent_conversations`
   agent tools. (#75)
 - [ ] Wire `main_cli.py` and `main_web.py` to pass `lazy=True`; leave
   `main_nightly.py` as `lazy=False`. (#76)
