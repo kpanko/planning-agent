@@ -75,3 +75,35 @@ def test_get_recent_respects_count(data_dir):
     assert len(get_recent(1)) == 1
     assert len(get_recent(3)) == 3
     assert len(get_recent(10)) == 4  # only 4 exist
+
+
+def test_get_recent_skips_malformed_files(data_dir, caplog):
+    from planning_context.conversations import get_recent
+    from planning_context.storage import get_data_dir, write_json
+
+    conv_dir = get_data_dir() / "conversations"
+    write_json(
+        conv_dir / "2026-02-20.json",
+        {"date": "2026-02-20", "entries": [{"summary": "Good"}]},
+    )
+    # Missing "entries"
+    write_json(
+        conv_dir / "2026-02-21.json",
+        {"date": "2026-02-21"},
+    )
+    # Entry missing "summary"
+    write_json(
+        conv_dir / "2026-02-22.json",
+        {
+            "date": "2026-02-22",
+            "entries": [{"started_at": "2026-02-22T10:00:00"}],
+        },
+    )
+
+    with caplog.at_level("WARNING", logger="planning-context"):
+        recent = get_recent(10)
+
+    assert len(recent) == 1
+    assert recent[0]["date"] == "2026-02-20"
+    assert "2026-02-21.json" in caplog.text
+    assert "2026-02-22.json" in caplog.text

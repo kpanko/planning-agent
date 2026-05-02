@@ -7,8 +7,8 @@ from datetime import datetime, timedelta
 from typing import Any, cast
 from zoneinfo import ZoneInfo
 
-from planning_context.conversations import get_recent
-from planning_context.memories import get_active
+from planning_context.conversations import Conversation, get_recent
+from planning_context.memories import Memory, get_active
 from planning_context.values import read_values
 from todoist_api_python.api import TodoistAPI
 from todoist_api_python.models import Task
@@ -43,8 +43,8 @@ class PlanningContext:
 
     is_lazy: bool
     values_doc: str
-    memories: list[dict[str, Any]]
-    recent_conversations: list[dict[str, Any]]
+    memories: list[Memory]
+    recent_conversations: list[Conversation]
     todoist_snapshot: str
     calendar_snapshot: str
     current_datetime: str

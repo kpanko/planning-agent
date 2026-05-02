@@ -3,7 +3,7 @@
 import logging
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import NotRequired, TypedDict, cast
 
 from .storage import commit_data, get_data_dir, read_json, write_json
 
@@ -12,21 +12,43 @@ logger = logging.getLogger("planning-context")
 VALID_CATEGORIES = ("fact", "observation", "open_thread", "preference")
 
 
+class Memory(TypedDict):
+    """A persisted memory record.
+
+    ``id``, ``content``, and ``category`` are written by every code
+    path that produces a Memory and read directly by every consumer.
+    The remaining fields are bookkeeping the writer always emits but
+    most consumers don't touch — marked NotRequired so test fixtures
+    and partial-data code paths typecheck without filler values.
+    """
+
+    id: str
+    content: str
+    category: str
+    expiry_date: NotRequired[str | None]
+    confidence: NotRequired[str]
+    confirming_count: NotRequired[int]
+    source_date: NotRequired[str]
+    resolved: NotRequired[bool]
+    resolved_at: NotRequired[str | None]
+    created_at: NotRequired[str]
+
+
 def _memories_path() -> Path:
     return get_data_dir() / "memories.json"
 
 
-def _load_memories() -> list[dict[str, Any]]:
+def _load_memories() -> list[Memory]:
     data = read_json(_memories_path())
     assert isinstance(data, list)
-    return data  # type: ignore[return-value]
+    return cast(list[Memory], data)
 
 
-def _save_memories(memories: list[dict[str, Any]]) -> None:
+def _save_memories(memories: list[Memory]) -> None:
     write_json(_memories_path(), memories)
 
 
-def _next_id(memories: list[dict[str, Any]]) -> str:
+def _next_id(memories: list[Memory]) -> str:
     """Generate the next m_NNN id."""
     max_n = 0
     for m in memories:
@@ -41,12 +63,34 @@ def _next_id(memories: list[dict[str, Any]]) -> str:
     return f"m_{max_n + 1:03d}"
 
 
-def get_active() -> list[dict[str, Any]]:
-    """Return all non-resolved, non-expired memories."""
+_REQUIRED_MEMORY_FIELDS = ("id", "content", "category")
+
+
+def get_active() -> list[Memory]:
+    """Return all non-resolved, non-expired memories.
+
+    Skips and logs records missing any of the fields the prompt
+    renderer reads directly. Consumers can rely on the returned
+    ``Memory`` typing without per-field defensive access.
+    """
     today = date.today().isoformat()
     memories = _load_memories()
-    active: list[dict[str, Any]] = []
+    active: list[Memory] = []
     for m in memories:
+        # _load_memories blanket-casts JSON to list[Memory]; the
+        # cast doesn't validate at runtime, so we still defend
+        # against corrupted/legacy on-disk records here.
+        if not isinstance(m, dict):  # pyright: ignore[reportUnnecessaryIsInstance]
+            logger.warning("Skipping malformed memory (not a dict): %r", m)
+            continue
+        missing = [f for f in _REQUIRED_MEMORY_FIELDS if f not in m]
+        if missing:
+            logger.warning(
+                "Skipping malformed memory missing %s: %r",
+                missing,
+                {k: m.get(k) for k in _REQUIRED_MEMORY_FIELDS},
+            )
+            continue
         if m.get("resolved"):
             continue
         expiry = m.get("expiry_date")
@@ -60,7 +104,7 @@ def add_memory(
     content: str,
     category: str,
     expiry_date: str | None = None,
-) -> dict[str, Any]:
+) -> Memory:
     """Add a new memory. Returns the created memory dict."""
     if category not in VALID_CATEGORIES:
         raise ValueError(
@@ -74,7 +118,7 @@ def add_memory(
     now = datetime.now(timezone.utc)
     confidence = "high" if category in ("fact", "preference") else "low"
 
-    memory = {
+    memory: Memory = {
         "id": _next_id(memories),
         "content": content,
         "category": category,
@@ -101,7 +145,7 @@ def add_memory(
     return memory
 
 
-def resolve_memory(memory_id: str) -> dict[str, Any] | None:
+def resolve_memory(memory_id: str) -> Memory | None:
     """Mark a memory as resolved. Returns the updated memory, or None if not found."""
     memories = _load_memories()
     for m in memories:

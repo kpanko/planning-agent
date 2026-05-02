@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import subprocess
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -122,7 +123,9 @@ def read_json(path: Path) -> list[Any] | dict[str, Any]:
         return []
 
 
-def write_json(path: Path, data: list[Any] | dict[str, Any]) -> None:
+def write_json(
+    path: Path, data: Mapping[str, Any] | list[Any]
+) -> None:
     """Write data to a JSON file with pretty formatting."""
     try:
         path.write_text(

@@ -3,11 +3,31 @@
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, NotRequired, TypedDict, cast
 
 from .storage import commit_data, get_data_dir, read_json, write_json
 
 logger = logging.getLogger("planning-context")
+
+
+class ConversationEntry(TypedDict):
+    """A single agent-conversation summary within a day's record.
+
+    ``summary`` is the only field consumers in this codebase read.
+    ``started_at`` is bookkeeping the writer always emits but no
+    consumer touches — NotRequired so test fixtures and MCP-side
+    callers can construct entries without filler timestamps.
+    """
+
+    summary: str
+    started_at: NotRequired[str]
+
+
+class Conversation(TypedDict):
+    """A day's conversation file: date plus one or more summaries."""
+
+    date: str
+    entries: list[ConversationEntry]
 
 
 def _conversations_dir() -> Path:
@@ -23,14 +43,16 @@ def save_summary(summary: str) -> str:
     today_str = now.strftime("%Y-%m-%d")
     path = _conversations_dir() / f"{today_str}.json"
 
-    entry = {
+    entry: ConversationEntry = {
         "started_at": now.strftime("%Y-%m-%dT%H:%M:%S"),
         "summary": summary,
     }
 
+    data: Conversation
     if path.exists():
-        data = read_json(path)
-        if isinstance(data, dict) and "entries" in data:
+        existing = read_json(path)
+        if isinstance(existing, dict) and "entries" in existing:
+            data = cast(Conversation, existing)
             data["entries"].append(entry)
         else:
             logger.warning(
@@ -50,16 +72,45 @@ def save_summary(summary: str) -> str:
     return f"Conversation summary saved for {today_str}"
 
 
-def get_recent(count: int = 3) -> list[dict[str, Any]]:
-    """Return the most recent `count` conversation files, newest first."""
+def _is_valid_conversation(data: object) -> bool:
+    """Shape-check a parsed conversation file.
+
+    The prompt renderer subscripts ``date``, ``entries``, and each
+    entry's ``summary`` directly. Any file missing those will crash
+    a downstream prompt build, so we filter at the read boundary
+    rather than defending in every consumer.
+    """
+    if not isinstance(data, dict):
+        return False
+    d = cast(dict[str, Any], data)
+    if "date" not in d or "entries" not in d:
+        return False
+    entries = d["entries"]
+    if not isinstance(entries, list):
+        return False
+    for entry in cast(list[Any], entries):
+        if not isinstance(entry, dict) or "summary" not in entry:
+            return False
+    return True
+
+
+def get_recent(count: int = 3) -> list[Conversation]:
+    """Return the most recent `count` conversation files, newest first.
+
+    Files that fail shape validation are skipped and logged.
+    """
     conv_dir = _conversations_dir()
     if not conv_dir.exists():
         return []
 
     files = sorted(conv_dir.glob("*.json"), reverse=True)
-    results: list[dict[str, Any]] = []
+    results: list[Conversation] = []
     for f in files[:count]:
         data = read_json(f)
-        if isinstance(data, dict):
-            results.append(data)
+        if _is_valid_conversation(data):
+            results.append(cast(Conversation, data))
+        else:
+            logger.warning(
+                "Skipping malformed conversation file %s", f.name
+            )
     return results

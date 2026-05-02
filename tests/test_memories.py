@@ -107,3 +107,35 @@ def test_invalid_expiry_raises(data_dir):
 
     with pytest.raises(ValueError):
         add_memory("Bad date", "fact", expiry_date="not-a-date")
+
+
+def test_get_active_skips_malformed_records(data_dir, caplog):
+    from planning_context.memories import get_active
+    from planning_context.storage import get_data_dir, write_json
+
+    write_json(
+        get_data_dir() / "memories.json",
+        [
+            # Good record
+            {
+                "id": "m_001",
+                "content": "Likes mornings",
+                "category": "preference",
+                "resolved": False,
+            },
+            # Missing "content"
+            {"id": "m_002", "category": "fact"},
+            # Missing "id"
+            {"content": "Orphan", "category": "observation"},
+            # Not even a dict
+            "totally bogus entry",
+        ],
+    )
+
+    with caplog.at_level("WARNING", logger="planning-context"):
+        active = get_active()
+
+    assert len(active) == 1
+    assert active[0]["id"] == "m_001"
+    # Each malformed entry produced a warning.
+    assert caplog.text.count("Skipping malformed memory") == 3
