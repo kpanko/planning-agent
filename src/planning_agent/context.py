@@ -24,6 +24,18 @@ CALENDAR_NEEDS_RECONNECT = (
     "(Google Calendar needs reconnect)"
 )
 
+# Placeholders rendered into PlanningContext fields in lazy mode
+# so the system prompt template (#74) and any incidental renderer
+# can show them verbatim. Kept as constants so #74's prompt
+# template can import the same strings — renaming a fetch tool
+# only updates one place.
+LAZY_TODOIST_PLACEHOLDER = (
+    "(not loaded — call find_tasks / find_tasks_by_date)"
+)
+LAZY_CALENDAR_PLACEHOLDER = (
+    "(not loaded — call get_calendar)"
+)
+
 
 @dataclass
 class PlanningContext:
@@ -259,14 +271,14 @@ def build_context(lazy: bool = False) -> PlanningContext:
 
     if TODOIST_API_KEY:
         api = TodoistAPI(TODOIST_API_KEY)
+        # Lazy mode still fetches from Todoist: the API is free
+        # and we want exact counts in the shape summary (#74).
+        # The cost we save is prompt tokens, not API calls.
         snapshot, n_overdue, n_upcoming = (
             _fetch_todoist_snapshot(api)
         )
         if lazy:
-            todoist_snapshot = (
-                "(not loaded — call find_tasks /"
-                " find_tasks_by_date)"
-            )
+            todoist_snapshot = LAZY_TODOIST_PLACEHOLDER
         else:
             todoist_snapshot = snapshot
         inbox_project = _fetch_inbox_project(api)
@@ -275,9 +287,7 @@ def build_context(lazy: bool = False) -> PlanningContext:
         inbox_project = "(Todoist not connected)"
 
     if lazy:
-        calendar_snapshot = (
-            "(not loaded — call get_calendar)"
-        )
+        calendar_snapshot = LAZY_CALENDAR_PLACEHOLDER
     else:
         calendar_snapshot = _fetch_calendar_snapshot()
 
