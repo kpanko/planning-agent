@@ -128,7 +128,7 @@ from today and earlier, and spreads them forward using the existing
   (replaces local cron docs). (#54)
 
 
-## Milestone 5: Fuzzy Recurring Tasks — `in-progress`
+## Milestone 5: Fuzzy Recurring Tasks — `planned`
 **Goal:** Add the fuzzy-recurring-task subsystem: a `fuzzy_recurring.json`
 store, MCP tools to manage it, and agent integration so maintenance tasks
 (e.g. "check spare tire ~every 6 months") surface during weekly planning.
@@ -159,7 +159,53 @@ Post-v1 but self-contained.
   seasonal suppression, and `update_last_done` persistence. (#25)
 
 
-## Milestone 6: Scheduling Pattern Learning — `planned`
+## Milestone 6: Interactive Cost Reduction & Cleanup — `in-progress`
+**Goal:** Slim down per-turn cost of interactive (CLI/web) sessions by
+switching to lazy-context mode where tasks, calendar, memories, and
+recent conversations are fetched on demand instead of pre-loaded. Nightly
+job stays full-context. Also clear the orphaned bug/cleanup backlog.
+
+**Acceptance Criteria:**
+- Interactive entry points (`main_cli`, `main_web`) start without
+  fetching the 14-day Todoist/GCal snapshots; pre-load only
+  `values_doc`, `inbox_project`, `current_datetime`, `day_type`, and
+  cheap counts (overdue, upcoming, memories, conversations).
+- Three new agent tools work: `get_calendar(days)`, `get_memories()`,
+  `get_recent_conversations(count)`.
+- `STATIC_PROMPT` has a "Lazy Context" section naming the fetch tools
+  and instructing the agent when to call them.
+- Nightly job (`main_nightly`) continues full-context preload.
+- Logfire shows a measurable drop in input tokens for short
+  interactive sessions vs. baseline.
+- `update_task` advertised in `STATIC_PROMPT`; CI test asserts every
+  `@mcp.tool()` is either advertised or on an explicit
+  `INTENTIONALLY_UNADVERTISED` allowlist.
+- Agent text before/after a tool call renders on separate lines in
+  the web UI.
+- Fly cron Machine redeployed with bearer token as a Fly secret,
+  verified via `flyctl machine status -d` showing no token in env block.
+
+**Tasks:**
+- [ ] Add `lazy: bool` param + count fields to `build_context()` /
+  `PlanningContext`; refactor `_fetch_calendar_snapshot()` to take
+  `days: int`. (#73)
+- [ ] Branch `build_system_prompt` on `deps.is_lazy` to render full
+  preload vs shape-summary; add "Lazy Context" section to
+  `STATIC_PROMPT`. (#74)
+- [ ] Add `get_calendar`, `get_memories`, `get_recent_conversations`
+  agent tools. (#75)
+- [ ] Wire `main_cli.py` and `main_web.py` to pass `lazy=True`; leave
+  `main_nightly.py` as `lazy=False`. (#76)
+- [ ] Tests: lazy-mode context (no upstream fetch, counts only),
+  shape-summary rendering, three new tools. (#77)
+- [ ] Advertise `update_task` in `STATIC_PROMPT`; add registry-coverage
+  test for `@mcp.tool()` drift. (#71)
+- [ ] Fix agent text rendering before/after tool calls in web UI. (#72)
+- [ ] Redeploy Fly cron Machine with bearer token as a Fly secret per
+  DECISIONS.md. (#57)
+
+
+## Milestone 7: Scheduling Pattern Learning — `planned`
 **Goal:** Extend the post-conversation extraction pipeline to capture
 scheduling patterns (completion rates, duration accuracy, deferral
 tendencies) in `scheduling_patterns.json`. Load these patterns into
@@ -201,7 +247,7 @@ observed behavior.
 - [ ] Add tests for pattern loading, updating, and consolidation. (#34)
 
 
-## Milestone 7: Evaluation Suite — `planned`
+## Milestone 8: Evaluation Suite — `planned`
 **Goal:** Build automated evaluation tooling so system prompt and context
 changes can be measured rather than eyeballed. Uses real session data
 already captured by Logfire.
