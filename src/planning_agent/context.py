@@ -24,11 +24,24 @@ CALENDAR_NEEDS_RECONNECT = (
     "(Google Calendar needs reconnect)"
 )
 
+# Placeholders rendered into PlanningContext fields in lazy mode
+# so the system prompt template (#74) and any incidental renderer
+# can show them verbatim. Kept as constants so #74's prompt
+# template can import the same strings — renaming a fetch tool
+# only updates one place.
+LAZY_TODOIST_PLACEHOLDER = (
+    "(not loaded — call find_tasks / find_tasks_by_date)"
+)
+LAZY_CALENDAR_PLACEHOLDER = (
+    "(not loaded — call get_calendar)"
+)
+
 
 @dataclass
 class PlanningContext:
     """Pre-loaded context injected into every conversation."""
 
+    is_lazy: bool
     values_doc: str
     memories: list[dict[str, Any]]
     recent_conversations: list[dict[str, Any]]
@@ -37,6 +50,10 @@ class PlanningContext:
     current_datetime: str
     day_type: str
     inbox_project: str
+    n_overdue: int
+    n_upcoming: int
+    n_memories: int
+    n_conversations: int
 
 
 def _compute_day_type() -> str:
@@ -74,8 +91,14 @@ def _fmt_task(task: Task) -> str:
     )
 
 
-def _fetch_todoist_snapshot(api: TodoistAPI) -> str:
-    """Fetch overdue + next 14 days of tasks."""
+def _fetch_todoist_snapshot(
+    api: TodoistAPI,
+) -> tuple[str, int, int]:
+    """Fetch overdue + next 14 days of tasks.
+
+    Returns ``(snapshot, n_overdue, n_upcoming)``. Lazy mode uses
+    only the counts; full mode renders the snapshot string.
+    """
     lines: list[str] = []
     n_overdue = 0
     n_upcoming = 0
@@ -125,11 +148,11 @@ def _fetch_todoist_snapshot(api: TodoistAPI) -> str:
     except Exception as exc:
         lines.append(f"Error loading Todoist tasks: {exc}")
 
-    return "\n".join(lines)
+    return "\n".join(lines), n_overdue, n_upcoming
 
 
-def _fetch_calendar_snapshot() -> str:
-    """Fetch next 14 days of Google Calendar events.
+def _fetch_calendar_snapshot(days: int = 14) -> str:
+    """Fetch next ``days`` days of Google Calendar events.
 
     Returns a formatted string of events, or a short
     fallback message if credentials are absent or the
@@ -153,7 +176,7 @@ def _fetch_calendar_snapshot() -> str:
         )
 
         today = datetime.now(ZoneInfo(USER_TZ)).date()
-        end_date = today + timedelta(days=13)
+        end_date = today + timedelta(days=days - 1)
         time_min = (
             datetime.combine(today, datetime.min.time())
             .isoformat() + "Z"
@@ -188,7 +211,7 @@ def _fetch_calendar_snapshot() -> str:
         )
 
         if not events:
-            return "No calendar events in next 14 days."
+            return f"No calendar events in next {days} days."
 
         lines: list[str] = []
         for ev in events:
@@ -210,7 +233,7 @@ def _fetch_calendar_snapshot() -> str:
                 start = dt.strftime("%a %b %d %I:%M %p")
             lines.append(f"  {start}: {summary}")
 
-        return "Next 14 days:\n" + "\n".join(lines)
+        return f"Next {days} days:\n" + "\n".join(lines)
 
     except RefreshError:
         return CALENDAR_NEEDS_RECONNECT
@@ -230,27 +253,50 @@ def _fetch_inbox_project(api: TodoistAPI) -> str:
     return "(Inbox project not found)"
 
 
-def build_context() -> PlanningContext:
-    """Assemble full planning context for a conversation."""
+def build_context(lazy: bool = False) -> PlanningContext:
+    """Assemble planning context for a conversation.
+
+    ``lazy=True`` skips the GCal fetch and the rendered task
+    snapshot but still reads task counts from Todoist so the
+    shape summary in the prompt has numbers. Memories and
+    recent conversations are local file reads and are always
+    loaded; the prompt template decides whether to render them.
+    """
     values_doc = read_values()
     memories = get_active()
     conversations = get_recent(count=3)
 
+    n_overdue = 0
+    n_upcoming = 0
+
     if TODOIST_API_KEY:
         api = TodoistAPI(TODOIST_API_KEY)
-        todoist_snapshot = _fetch_todoist_snapshot(api)
+        # Lazy mode still fetches from Todoist: the API is free
+        # and we want exact counts in the shape summary (#74).
+        # The cost we save is prompt tokens, not API calls.
+        snapshot, n_overdue, n_upcoming = (
+            _fetch_todoist_snapshot(api)
+        )
+        if lazy:
+            todoist_snapshot = LAZY_TODOIST_PLACEHOLDER
+        else:
+            todoist_snapshot = snapshot
         inbox_project = _fetch_inbox_project(api)
     else:
         todoist_snapshot = "(Todoist not connected)"
         inbox_project = "(Todoist not connected)"
 
-    calendar_snapshot = _fetch_calendar_snapshot()
+    if lazy:
+        calendar_snapshot = LAZY_CALENDAR_PLACEHOLDER
+    else:
+        calendar_snapshot = _fetch_calendar_snapshot()
 
     now = datetime.now(ZoneInfo(USER_TZ))
     current_datetime = now.strftime("%A, %B %d, %Y %I:%M %p")
     day_type = _compute_day_type()
 
     return PlanningContext(
+        is_lazy=lazy,
         values_doc=values_doc,
         memories=memories,
         recent_conversations=conversations,
@@ -259,4 +305,8 @@ def build_context() -> PlanningContext:
         current_datetime=current_datetime,
         day_type=day_type,
         inbox_project=inbox_project,
+        n_overdue=n_overdue,
+        n_upcoming=n_upcoming,
+        n_memories=len(memories),
+        n_conversations=len(conversations),
     )

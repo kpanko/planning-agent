@@ -12,6 +12,8 @@ from planning_agent.config import (
 )
 from planning_agent.context import (
     CALENDAR_NEEDS_RECONNECT,
+    LAZY_CALENDAR_PLACEHOLDER,
+    LAZY_TODOIST_PLACEHOLDER,
     PlanningContext,
     _compute_day_type,
     _fetch_calendar_snapshot,
@@ -142,12 +144,16 @@ class TestFetchTodoistSnapshot:
             [[upcoming_task]],      # date range query
         ]
 
-        result = _fetch_todoist_snapshot(mock_api)
+        result, n_overdue, n_upcoming = (
+            _fetch_todoist_snapshot(mock_api)
+        )
 
         assert "Overdue (1):" in result
         assert "Overdue errand" in result
         assert "Next 14 days (1):" in result
         assert "Upcoming errand" in result
+        assert n_overdue == 1
+        assert n_upcoming == 1
 
     def test_summary_line_with_counts(self):
         mock_api = MagicMock()
@@ -165,9 +171,13 @@ class TestFetchTodoistSnapshot:
             [[t2, t3]],      # upcoming
         ]
 
-        result = _fetch_todoist_snapshot(mock_api)
+        result, n_overdue, n_upcoming = (
+            _fetch_todoist_snapshot(mock_api)
+        )
 
         assert "Total: 1 overdue, 2 upcoming" in result
+        assert n_overdue == 1
+        assert n_upcoming == 2
 
     def test_no_tasks(self):
         mock_api = MagicMock()
@@ -176,9 +186,13 @@ class TestFetchTodoistSnapshot:
             [[]],   # upcoming — empty page
         ]
 
-        result = _fetch_todoist_snapshot(mock_api)
+        result, n_overdue, n_upcoming = (
+            _fetch_todoist_snapshot(mock_api)
+        )
 
         assert "Total: 0 overdue, 0 upcoming" in result
+        assert n_overdue == 0
+        assert n_upcoming == 0
 
     def test_api_error(self):
         mock_api = MagicMock()
@@ -186,10 +200,14 @@ class TestFetchTodoistSnapshot:
             "API down"
         )
 
-        result = _fetch_todoist_snapshot(mock_api)
+        result, n_overdue, n_upcoming = (
+            _fetch_todoist_snapshot(mock_api)
+        )
 
         assert "Error loading Todoist tasks" in result
         assert "API down" in result
+        assert n_overdue == 0
+        assert n_upcoming == 0
 
 
 class TestFetchCalendarSnapshot:
@@ -413,6 +431,104 @@ class TestBuildContext:
         ctx = build_context()
         assert len(ctx.memories) == 1
         assert ctx.memories[0]["id"] == "m_001"
+
+    @patch("planning_agent.context._fetch_calendar_snapshot")
+    @patch("planning_agent.context._fetch_inbox_project")
+    @patch("planning_agent.context._fetch_todoist_snapshot")
+    @patch(
+        "planning_agent.context.TodoistAPI",
+        autospec=True,
+    )
+    @patch(
+        "planning_agent.context.TODOIST_API_KEY",
+        "fake-key",
+    )
+    @patch("planning_agent.context.get_recent")
+    @patch("planning_agent.context.get_active")
+    @patch("planning_agent.context.read_values")
+    def test_lazy_mode_skips_calendar_and_renders_placeholder(
+        self,
+        mock_values, mock_active, mock_recent,
+        _mock_api_cls,
+        mock_todoist_snap, mock_inbox, mock_gcal,
+    ):
+        mock_values.return_value = "vals"
+        mock_active.return_value = [{"id": "m_001"}]
+        mock_recent.return_value = [
+            {"date": "2026-05-01"},
+            {"date": "2026-04-30"},
+        ]
+        mock_todoist_snap.return_value = (
+            "rendered snapshot", 3, 7,
+        )
+        mock_inbox.return_value = "Inbox: ..."
+
+        ctx = build_context(lazy=True)
+
+        # No GCal fetch attempted
+        mock_gcal.assert_not_called()
+        # Lazy flag and counts populated
+        assert ctx.is_lazy is True
+        assert ctx.n_overdue == 3
+        assert ctx.n_upcoming == 7
+        assert ctx.n_memories == 1
+        assert ctx.n_conversations == 2
+        # Snapshot strings are placeholders, not full content
+        assert ctx.todoist_snapshot == LAZY_TODOIST_PLACEHOLDER
+        assert ctx.calendar_snapshot == LAZY_CALENDAR_PLACEHOLDER
+        assert "rendered snapshot" not in ctx.todoist_snapshot
+
+    @patch(
+        "planning_agent.context"
+        ".GOOGLE_CALENDAR_CREDENTIALS"
+    )
+    @patch("planning_agent.context.TODOIST_API_KEY", "")
+    @patch("planning_agent.context.get_recent")
+    @patch("planning_agent.context.get_active")
+    @patch("planning_agent.context.read_values")
+    def test_lazy_mode_without_todoist_key(
+        self, mock_values, mock_active, mock_recent,
+        mock_gcal_path,
+    ):
+        # Lazy + no Todoist key: the "not connected" branch
+        # runs, the lazy branch still rewrites calendar to its
+        # placeholder, and counts stay zero.
+        mock_gcal_path.exists.return_value = False
+        mock_values.return_value = ""
+        mock_active.return_value = []
+        mock_recent.return_value = []
+
+        ctx = build_context(lazy=True)
+
+        assert ctx.is_lazy is True
+        assert ctx.n_overdue == 0
+        assert ctx.n_upcoming == 0
+        assert ctx.n_memories == 0
+        assert ctx.n_conversations == 0
+        assert "(Todoist not connected)" in ctx.todoist_snapshot
+        assert ctx.calendar_snapshot == LAZY_CALENDAR_PLACEHOLDER
+
+    @patch("planning_agent.context._save_credentials")
+    @patch("googleapiclient.discovery.build")
+    @patch(
+        "google.oauth2.credentials.Credentials"
+        ".from_authorized_user_file"
+    )
+    @patch("planning_agent.context.GOOGLE_CALENDAR_CREDENTIALS")
+    def test_calendar_snapshot_honors_days_arg(
+        self, mock_path, _mock_creds, mock_build, _mock_save,
+    ):
+        mock_path.exists.return_value = True
+        mock_service = MagicMock()
+        mock_build.return_value = mock_service
+        (
+            mock_service.events.return_value
+            .list.return_value
+            .execute.return_value
+        ) = {"items": []}
+
+        result = _fetch_calendar_snapshot(days=7)
+        assert result == "No calendar events in next 7 days."
 
 
 # -------------------------------------------------------------------
