@@ -3,7 +3,7 @@
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import NotRequired, TypedDict, cast
+from typing import Any, NotRequired, TypedDict, cast
 
 from .storage import commit_data, get_data_dir, read_json, write_json
 
@@ -72,8 +72,33 @@ def save_summary(summary: str) -> str:
     return f"Conversation summary saved for {today_str}"
 
 
+def _is_valid_conversation(data: object) -> bool:
+    """Shape-check a parsed conversation file.
+
+    The prompt renderer subscripts ``date``, ``entries``, and each
+    entry's ``summary`` directly. Any file missing those will crash
+    a downstream prompt build, so we filter at the read boundary
+    rather than defending in every consumer.
+    """
+    if not isinstance(data, dict):
+        return False
+    d = cast(dict[str, Any], data)
+    if "date" not in d or "entries" not in d:
+        return False
+    entries = d["entries"]
+    if not isinstance(entries, list):
+        return False
+    for entry in cast(list[Any], entries):
+        if not isinstance(entry, dict) or "summary" not in entry:
+            return False
+    return True
+
+
 def get_recent(count: int = 3) -> list[Conversation]:
-    """Return the most recent `count` conversation files, newest first."""
+    """Return the most recent `count` conversation files, newest first.
+
+    Files that fail shape validation are skipped and logged.
+    """
     conv_dir = _conversations_dir()
     if not conv_dir.exists():
         return []
@@ -82,6 +107,10 @@ def get_recent(count: int = 3) -> list[Conversation]:
     results: list[Conversation] = []
     for f in files[:count]:
         data = read_json(f)
-        if isinstance(data, dict):
+        if _is_valid_conversation(data):
             results.append(cast(Conversation, data))
+        else:
+            logger.warning(
+                "Skipping malformed conversation file %s", f.name
+            )
     return results

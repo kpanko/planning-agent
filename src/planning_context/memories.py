@@ -63,12 +63,34 @@ def _next_id(memories: list[Memory]) -> str:
     return f"m_{max_n + 1:03d}"
 
 
+_REQUIRED_MEMORY_FIELDS = ("id", "content", "category")
+
+
 def get_active() -> list[Memory]:
-    """Return all non-resolved, non-expired memories."""
+    """Return all non-resolved, non-expired memories.
+
+    Skips and logs records missing any of the fields the prompt
+    renderer reads directly. Consumers can rely on the returned
+    ``Memory`` typing without per-field defensive access.
+    """
     today = date.today().isoformat()
     memories = _load_memories()
     active: list[Memory] = []
     for m in memories:
+        # _load_memories blanket-casts JSON to list[Memory]; the
+        # cast doesn't validate at runtime, so we still defend
+        # against corrupted/legacy on-disk records here.
+        if not isinstance(m, dict):  # pyright: ignore[reportUnnecessaryIsInstance]
+            logger.warning("Skipping malformed memory (not a dict): %r", m)
+            continue
+        missing = [f for f in _REQUIRED_MEMORY_FIELDS if f not in m]
+        if missing:
+            logger.warning(
+                "Skipping malformed memory missing %s: %r",
+                missing,
+                {k: m.get(k) for k in _REQUIRED_MEMORY_FIELDS},
+            )
+            continue
         if m.get("resolved"):
             continue
         expiry = m.get("expiry_date")
