@@ -872,3 +872,121 @@ class TestLazyFetchTools:
         assert "get_calendar" in tool_names
         assert "get_memories" in tool_names
         assert "get_recent_conversations" in tool_names
+
+    # ---------------------------------------------------------------
+    # Behavior tests: each tool routes to the right backing function
+    # with the right args. Mocks the backing fn(s); never fires the
+    # LLM. Tools ignore `ctx`, so MagicMock() is sufficient.
+    # ---------------------------------------------------------------
+
+    @staticmethod
+    def _build_tool(name: str):
+        from planning_agent.agent import create_agent
+
+        agent = create_agent()
+        return agent._function_toolset.tools[name]  # pyright: ignore[reportPrivateUsage]
+
+    @pytest.mark.anyio
+    @patch.dict(
+        "os.environ", {"ANTHROPIC_API_KEY": "fake-key"}
+    )
+    @patch("planning_agent.agent.TODOIST_API_KEY", "fake-key")
+    @patch("planning_agent.agent.fetch_calendar_snapshot")
+    async def test_get_calendar_calls_fetch_with_days(
+        self, mock_fetch: MagicMock,
+    ):
+        mock_fetch.return_value = "calendar body"
+        tool = self._build_tool("get_calendar")
+
+        result = await tool.function(MagicMock(), days=7)
+
+        mock_fetch.assert_called_once_with(7)
+        assert result == "calendar body"
+
+    @pytest.mark.anyio
+    @patch.dict(
+        "os.environ", {"ANTHROPIC_API_KEY": "fake-key"}
+    )
+    @patch("planning_agent.agent.TODOIST_API_KEY", "fake-key")
+    @patch("planning_agent.agent.fetch_calendar_snapshot")
+    async def test_get_calendar_default_days_is_14(
+        self, mock_fetch: MagicMock,
+    ):
+        mock_fetch.return_value = ""
+        tool = self._build_tool("get_calendar")
+
+        await tool.function(MagicMock())
+
+        mock_fetch.assert_called_once_with(14)
+
+    @pytest.mark.anyio
+    @patch.dict(
+        "os.environ", {"ANTHROPIC_API_KEY": "fake-key"}
+    )
+    @patch("planning_agent.agent.TODOIST_API_KEY", "fake-key")
+    @patch("planning_agent.agent._format_memories")
+    @patch("planning_agent.agent._get_active_memories")
+    async def test_get_memories_formats_active_list(
+        self,
+        mock_get_active: MagicMock,
+        mock_format: MagicMock,
+    ):
+        mock_get_active.return_value = [
+            {"id": "m_1", "content": "x", "category": "fact"},
+        ]
+        mock_format.return_value = "rendered memories"
+        tool = self._build_tool("get_memories")
+
+        result = await tool.function(MagicMock())
+
+        mock_get_active.assert_called_once_with()
+        mock_format.assert_called_once_with(
+            mock_get_active.return_value
+        )
+        assert result == "rendered memories"
+
+    @pytest.mark.anyio
+    @patch.dict(
+        "os.environ", {"ANTHROPIC_API_KEY": "fake-key"}
+    )
+    @patch("planning_agent.agent.TODOIST_API_KEY", "fake-key")
+    @patch("planning_agent.agent._format_conversations")
+    @patch("planning_agent.agent._get_recent_conversations")
+    async def test_get_recent_conversations_passes_count(
+        self,
+        mock_get_recent: MagicMock,
+        mock_format: MagicMock,
+    ):
+        mock_get_recent.return_value = [
+            {"date": "2026-05-01", "entries": []},
+        ]
+        mock_format.return_value = "rendered conversations"
+        tool = self._build_tool("get_recent_conversations")
+
+        result = await tool.function(MagicMock(), count=5)
+
+        mock_get_recent.assert_called_once_with(5)
+        mock_format.assert_called_once_with(
+            mock_get_recent.return_value
+        )
+        assert result == "rendered conversations"
+
+    @pytest.mark.anyio
+    @patch.dict(
+        "os.environ", {"ANTHROPIC_API_KEY": "fake-key"}
+    )
+    @patch("planning_agent.agent.TODOIST_API_KEY", "fake-key")
+    @patch("planning_agent.agent._format_conversations")
+    @patch("planning_agent.agent._get_recent_conversations")
+    async def test_get_recent_conversations_default_count_is_3(
+        self,
+        mock_get_recent: MagicMock,
+        mock_format: MagicMock,
+    ):
+        mock_get_recent.return_value = []
+        mock_format.return_value = ""
+        tool = self._build_tool("get_recent_conversations")
+
+        await tool.function(MagicMock())
+
+        mock_get_recent.assert_called_once_with(3)
