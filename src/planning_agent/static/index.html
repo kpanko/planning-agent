@@ -439,6 +439,8 @@
         addBubble("agent", data.content);
         setInputEnabled(true);
       } else if (data.type === "confirm") {
+        streamBubble = null;
+        streamRaw = "";
         showConfirm(data.id, data.tool, data.detail || "");
       } else if (data.type === "error") {
         streamBubble = null;
