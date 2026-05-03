@@ -1,9 +1,12 @@
 """Every @mcp.tool / @server.tool must be named in STATIC_PROMPT
 or listed in INTENTIONALLY_UNADVERTISED with a written reason.
+Every tool named in STATIC_PROMPT must be registered on the agent.
 """
 from __future__ import annotations
 
 import asyncio
+import re
+from unittest.mock import patch
 
 import planning_context.server as planning_server
 import todoist_mcp.server as todoist_server
@@ -69,4 +72,54 @@ def test_unadvertised_set_has_no_stale_entries() -> None:
     assert not stale, (
         "INTENTIONALLY_UNADVERTISED contains names that are no longer"
         f" registered: {stale}. Remove them from the set."
+    )
+
+
+# -------------------------------------------------------------------
+# Reverse direction: every tool named in STATIC_PROMPT must be
+# registered on the agent. Prevents the class of bug where a tool
+# is added to the prompt but the @planning_agent.tool decorator is
+# never wired up (as happened with update_task / issue #71).
+# -------------------------------------------------------------------
+
+
+def _agent_tool_names() -> set[str]:
+    """Return the set of tool names registered on the agent."""
+    from planning_agent.agent import create_agent
+
+    with (
+        patch.dict(
+            "os.environ", {"ANTHROPIC_API_KEY": "fake-key"}
+        ),
+        patch(
+            "planning_agent.agent.TODOIST_API_KEY", "fake-key"
+        ),
+    ):
+        agent = create_agent()
+    return {
+        t.name
+        for t in agent._function_toolset.tools.values()  # pyright: ignore[reportPrivateUsage]
+    }
+
+
+def _prompt_tool_names() -> set[str]:
+    """Extract tool names from STATIC_PROMPT.
+
+    Matches backtick-prefixed identifiers followed by ``(``
+    (call-signature form). This is specific enough to avoid
+    false positives from parameter names also wrapped in
+    backticks (e.g. ``project_id``).
+    """
+    return set(
+        re.findall(r"`([a-z][a-z0-9_]*)\s*\(", STATIC_PROMPT)
+    )
+
+
+def test_prompt_tools_all_registered() -> None:
+    in_prompt = _prompt_tool_names()
+    registered = _agent_tool_names()
+    missing = sorted(in_prompt - registered)
+    assert not missing, (
+        "These tools are named in STATIC_PROMPT but not"
+        f" registered on the agent: {missing}"
     )

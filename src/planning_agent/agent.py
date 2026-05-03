@@ -222,7 +222,7 @@ question needs before answering:
 `find_tasks_by_date` (date range).
 - Calendar: `get_calendar(days)` — pass the number of \
 days you need.
-- Memories: `get_memories` — full active memory list.
+- Memories: `get_memories()` — full active memory list.
 - Recent conversations: `get_recent_conversations(count)`.
 
 Don't fetch what the question doesn't need. A quick \
