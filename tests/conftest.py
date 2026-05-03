@@ -1,3 +1,13 @@
+import os
+
+# Prevent test traces from being sent to the production Logfire
+# project. main_web.py calls logfire.configure(send_to_logfire=
+# "if-token-present") at import time; if LOGFIRE_TOKEN is set in
+# .env, every test run ships spans to prod. Setting it to "" here
+# first works because load_dotenv() (called later in config.py)
+# uses override=False and won't clobber an already-set var.
+os.environ["LOGFIRE_TOKEN"] = ""
+
 from todoist_api_python.models import Duration, Task, Due
 
 
