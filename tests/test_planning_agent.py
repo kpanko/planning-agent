@@ -701,6 +701,7 @@ def _make_ctx(
     n_upcoming: int = 0,
     n_memories: int = 0,
     n_conversations: int = 0,
+    fuzzy_due_soon: str = "(none due in the next 14 days)",
 ) -> PlanningContext:
     return PlanningContext(
         is_lazy=is_lazy,
@@ -716,6 +717,7 @@ def _make_ctx(
         n_upcoming=n_upcoming,
         n_memories=n_memories,
         n_conversations=n_conversations,
+        fuzzy_due_soon=fuzzy_due_soon,
     )
 
 
