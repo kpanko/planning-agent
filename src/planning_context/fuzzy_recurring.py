@@ -95,19 +95,28 @@ def update_last_done(
     date_str: str,
 ) -> FuzzyRecurring | None:
     """Set last_done on a task. Returns updated task or None."""
+    try:
+        normalized = date.fromisoformat(date_str).isoformat()
+    except ValueError:
+        logger.warning(
+            "update_last_done: invalid date %r for %s",
+            date_str,
+            task_id,
+        )
+        return None
     tasks = _load()
     for t in tasks:
         if t["id"] == task_id:
-            t["last_done"] = date_str
+            t["last_done"] = normalized
             _save(tasks)
             commit_data(
                 _path().parent,
-                f"fuzzy: mark done {task_id} on {date_str}",
+                f"fuzzy: mark done {task_id} on {normalized}",
             )
             logger.info(
                 "Fuzzy recurring updated: %s last_done=%s",
                 task_id,
-                date_str,
+                normalized,
             )
             return t
     logger.warning("update_last_done: id %s not found", task_id)
@@ -120,7 +129,15 @@ def _is_suppressed(
 ) -> bool:
     for constraint in task.get("seasonal_constraints", []):
         suppressed_months = SEASONAL_SUPPRESSORS.get(constraint)
-        if suppressed_months and month in suppressed_months:
+        if suppressed_months is None:
+            logger.warning(
+                "Unknown seasonal constraint %r on fuzzy task %s;"
+                " suppressing",
+                constraint,
+                task.get("id", "?"),
+            )
+            return True
+        if month in suppressed_months:
             return True
     return False
 
@@ -146,7 +163,16 @@ def get_due_soon(
         if last_done is None:
             due.append(t)
             continue
-        last_date = date.fromisoformat(last_done)
+        try:
+            last_date = date.fromisoformat(last_done)
+        except ValueError:
+            logger.warning(
+                "get_due_soon: skipping task %s with invalid"
+                " last_done=%r",
+                t.get("id", "?"),
+                last_done,
+            )
+            continue
         next_target = last_date + timedelta(days=t["interval_days"])
         window_end = ref + timedelta(days=days_ahead)
         if next_target <= window_end:

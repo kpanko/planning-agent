@@ -258,8 +258,11 @@ tasks with approximate intervals (e.g. "check spare tire \
 These are stored in a local file, not in Todoist.
 
 During weekly planning, check that section and work any \
-due items into the schedule. After the user confirms they \
-did one, call `update_fuzzy_last_done` to record the date.
+due items into the schedule. Only propose scheduling a task \
+when its seasonal_constraints allow it for the current month \
+— do not schedule out-of-season tasks. After the user \
+confirms they did one, call `update_fuzzy_last_done` to \
+record the date.
 
 Tools for managing fuzzy tasks:
 - `add_fuzzy_recurring_task(name, interval_days, \

@@ -1,11 +1,8 @@
 """Tests for fuzzy recurring task data layer."""
 
-import os
 from datetime import date
 
 import pytest
-
-os.environ["PLANNING_AGENT_DATA_DIR"] = ""
 
 
 @pytest.fixture(autouse=True)
@@ -151,3 +148,34 @@ def test_update_last_done_nonexistent_returns_none(data_dir):
 
     result = update_last_done("fr_999", "2026-01-01")
     assert result is None
+
+
+def test_update_last_done_invalid_date_returns_none(data_dir):
+    from planning_context.fuzzy_recurring import (
+        add_fuzzy_recurring,
+        get_fuzzy_recurring,
+        update_last_done,
+    )
+
+    add_fuzzy_recurring("Validated task", 30)
+    result = update_last_done("fr_001", "not-a-date")
+    assert result is None
+    # last_done must not be changed
+    reloaded = get_fuzzy_recurring("fr_001")
+    assert reloaded is not None
+    assert reloaded["last_done"] is None
+
+
+def test_unknown_seasonal_constraint_suppresses(data_dir):
+    from planning_context.fuzzy_recurring import (
+        add_fuzzy_recurring,
+        get_due_soon,
+    )
+
+    add_fuzzy_recurring(
+        "Unknown constraint task",
+        30,
+        seasonal_constraints=["not_recognized"],
+    )
+    ref = date(2026, 5, 1)
+    assert get_due_soon(14, reference_date=ref) == []
