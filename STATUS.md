@@ -1,171 +1,56 @@
 # Status
 
-**Last updated:** 2026-05-03 (session 12)
+**Last updated:** 2026-05-03 (session 13)
 **Active milestone:** Milestone 6 — Interactive Cost Reduction & Cleanup
 
 ## Recently Completed
 
+- **Full M6 live verification** (session 13). Lazy mode confirmed working
+  in production: correct Todoist + GCal data, no full task snapshot in
+  system prompt. Reschedule write (core path) verified end-to-end.
+  Bubble fix verified — pre/post tool text in separate bubbles.
+  `update_task` / move-between-projects verified working.
+- **#72 real fix** (commit 3f300ed). Prior fix only sealed the bubble on
+  `confirm` events (mutating tools). Read-only tools (`get_calendar`,
+  `get_tasks`, etc.) complete silently — no confirm fires. Fix: detect
+  `ToolCallPart` in `_stream_handler` and send `tool_start` to the
+  frontend; client seals the bubble on receipt.
+- **update_task agent tool implemented** (commit c3e53d0). `update_task`
+  was advertised in `STATIC_PROMPT` since PR #71 but never registered as
+  a `@planning_agent.tool`. Agent told users it couldn't move tasks
+  between projects. Fixed by implementing the tool in `agent.py`.
+- **add_memory debug detail** (commit 85ab3e6). Confirm banner and debug
+  `[tool_call] add_memory` now show first 100 chars of content, not just
+  the category.
+- **CD pipeline fix** (PR #89). Deploy job was missing `environment:
+  production`, so `FLY_API_TOKEN` resolved to empty on every push after
+  `FLY_API_TOKEN` was moved from repo secrets to environment secrets.
+  Added `environment: production` to the deploy job.
+- **#80 merged** (PR #89). `MemoryCategory = Literal[...]` defined in
+  `memories.py`; used as type of `Memory.category`, `add_memory` param,
+  extraction Pydantic model, and agent tool. MCP server retains
+  `category: str` at the protocol boundary and casts before calling
+  `add_memory`.
+- **#90 filed** — Reverse prompt-coverage test: assert every tool named
+  in `STATIC_PROMPT` is a registered agent tool (gap that allowed the
+  `update_task` miss to slip through CI).
 - **Actions versions updated + production environment** (PR #88).
   `actions/checkout` v4→v6, `astral-sh/setup-uv` v6→v8.1.0,
-  `superfly/flyctl-actions/setup-flyctl` master→1.5 (Node.js 20
-  warning from flyctl-actions is known and ignored — no newer
-  version available). Added `production` GitHub environment with
-  kpanko as required reviewer; deploy job now pauses for manual
-  approval before running flyctl. `FLY_API_TOKEN` moved from repo
-  secrets to the `production` environment secret.
+  `superfly/flyctl-actions/setup-flyctl` master→1.5. Added `production`
+  GitHub environment with kpanko as required reviewer.
 - **#84 merged** (PR #87). CI now auto-deploys to Fly.io on every
   merge to main: test job passes → approval gate → deploy job runs
   flyctl with --remote-only and the short SHA as GIT_COMMIT.
-  DEPLOY.md updated with CD setup instructions.
 - **#72 merged** (PR #86). Two-line frontend fix: sealing the active
-  stream bubble when a tool `confirm` arrives so post-tool text opens
-  a fresh bubble below, not the same one as pre-tool text. Live
-  verification needed on next deploy.
-- **#71 merged** (PR #85). `update_task` added to the `### Modifying
-  Tasks` section of `STATIC_PROMPT` — agent now knows it can move tasks
-  between projects via `project_id` and knows not to use it for due-date
-  changes. New `tests/test_prompt_coverage.py` adds two drift-prevention
-  tests: asserts every `@mcp.tool` / `@server.tool` is either named in
-  `STATIC_PROMPT` or listed in `INTENTIONALLY_UNADVERTISED` with a
-  reason. 276 tests pass.
-- **#77 merged** (PR #83). Five behavior tests for the three
-  lazy-mode fetch tools: each confirms routing to the right
-  backing function with the right args, including default
-  values. Runs via anyio (same pattern as test_web.py). First
-  PR through the new branch-protection gate — CI green
-  required to merge. 274 tests now pass.
-- **CI workflow added** (commit a6dae0e). Runs pyright + pytest
-  on every push and PR. First run caught two pre-existing bugs
-  (timezone flake in 8 tests, missing env patch in 1 test) —
-  fixed same session (commit 419c955, freezegun added to dev
-  deps).
-- **Branch protection enabled** on main: `test` job required
-  before merge. Admin override available; no PR review
-  requirement (solo repo). Force-push and deletion blocked.
-- **#76 merged** (PR #82). Two-line flip-the-switch:
-  `main_cli.py` and `main_web.py` now call
-  `build_context(lazy=True)`. Lazy mode is now on for
-  production interactive sessions — short single-turn
-  chats skip the GCal fetch and drop the Todoist task
-  snapshot from the system prompt; the agent can pull
-  what it needs via the four fetch tools added in #75.
-  `main_nightly.py` doesn't call `build_context`, so it
-  keeps full-data behavior with no change. Pyright clean,
-  269 tests pass. Live verification on deploy still
-  pending — confirm a real session works end-to-end and
-  watch Logfire for the input-token drop.
-- **#75 merged** (PR #81). Three new agent tools wired
-  in for lazy mode: `get_calendar(days)`,
-  `get_memories()`, `get_recent_conversations(count)`.
-  All read-only, route through `_run_tool` for debug
-  tracing. Drive-by: promoted `_fetch_calendar_snapshot`
-  to public so `agent.py` can import it without tripping
-  pyright. Lazy mode now has the four fetch tools the #74
-  prompt names — wiring (`main_cli`, `main_web`) is #76.
-  No live-LLM smoke test from here; verify on deploy.
-- **#74 merged** (PR #79). `_render_system_prompt(deps)`
-  extracted to module level and branches on `deps.is_lazy`.
-  Full mode is byte-identical to before (cache-safe).
-  Lazy mode swaps the task snapshot, calendar body, memory
-  list, and conversation list for an `### Available context
-  (call tools to load)` block with counts and tool names.
-  `STATIC_PROMPT` gained a `## Lazy Context Mode` section
-  naming the four fetch tools. Once #75 lands the agent has
-  something to actually call.
-- **TypedDict refactor folded into PR #79** (scope expansion
-  during the same session). `Memory` and
-  `Conversation`/`ConversationEntry` defined in
-  `planning_context`; required-vs-`NotRequired` split on the
-  axis of "consumer reads it directly." Propagated through
-  `PlanningContext`, `_format_memories`,
-  `_format_conversations`, MCP server's
-  `get_active_memories`, and `write_json` (widened to
-  `Mapping[str, Any] | list[Any]`). Code review caught a
-  defensive-fallback regression — fixed by moving shape
-  validation into `get_active` and `get_recent` so malformed
-  on-disk records get skipped + logged at the read boundary
-  instead of crashing the prompt build.
-- **#80 filed** as follow-up to #79: tighten
-  `Memory.category` to a `Literal` so the runtime
-  `VALID_CATEGORIES` check becomes a static guarantee at
-  every read site.
-- **Milestone 6 opened** (2026-05-02). Goal: switch interactive
-  (CLI/web) sessions to lazy-context mode where tasks, calendar,
-  memories, and recent conversations are fetched on demand
-  instead of pre-loaded. Nightly job stays full-context. Also
-  rolls in orphan bug/cleanup work (#57, #71, #72). Confirmed
-  Anthropic prompt caching is on (`agent.py:285-286`), so
-  multi-turn already amortizes; lazy mode targets the short
-  single-turn sessions that don't need the full preload.
-  Renumbered old M6/M7 to M7/M8.
-- **#73 merged** (PR #78). `build_context(lazy=True)` skips
-  the GCal fetch and replaces the Todoist snapshot with a
-  module-level placeholder constant; counts (`n_overdue`,
-  `n_upcoming`, `n_memories`, `n_conversations`) flow
-  through for the shape-summary prompt in #74. Lazy mode
-  intentionally still calls Todoist filters — the API is
-  free; the cost we save is prompt tokens, not API calls.
-- **Code review now uses `superpowers:code-reviewer`
-  subagent.** Plugin installed mid-session. Each review
-  runs in a fresh context, eliminating
-  implementer-reviewer bias. Workflow: get base/head SHAs,
-  dispatch via Agent tool, act on the verdict. Used on PR
-  #78 and produced three actionable items, all addressed
-  before merge.
-- **Live verification on `e28f1b2`** (2026-04-28).
-  - **#61 Inbox visibility** — confirmed working. Agent answers
-    Inbox queries directly without calling `get_projects()`.
-  - **Reliability arc closeout** — happy-path round-trip of a
-    recurring task with a new time succeeded. The semantic-conflict
-    path (target weekday ≠ recurrence anchor) correctly raised
-    `DueDateMismatchError` instead of silently storing the snapped
-    date. Read-after-write guard validated end-to-end.
-- **Two new bugs filed during verification.**
-  - **#71** — `update_task` is registered on the MCP server but
-    not named in `STATIC_PROMPT`, so the agent denies it can move
-    tasks between projects. Same shape as #61. Scope expanded to
-    include a CI-level drift-prevention test that asserts every
-    `@mcp.tool()` is either advertised in the prompt or on an
-    explicit `INTENTIONALLY_UNADVERTISED` list. Audit found six
-    other unadvertised Todoist tools handled by the same mechanism.
-  - **#72** — UI bug: agent text before and after a tool call
-    render on the same line. Should be `[before] [tool_call]
-    [tool_result] [after]`, top to bottom.
-- **Prod deploy to `e28f1b2`** (2026-04-27). All session-8 fixes
-  (#59/#60/#61/#66) plus the prior reliability arc (#55/#62/#63/#65)
-  are live. `/health` returns `{"version":"e28f1b2"}`.
-- **#66 fix merged** (PR #70). Read-after-write now also checks the
-  HH:MM time component when a time was requested. Catches silent
-  time corruption from recurrence strings that embed time-of-day in
-  formats `_strip_recurrence_pattern` doesn't strip
-  (e.g. `every 3rd friday 8pm`). Date-only reschedules unchanged.
-- **#61 fix merged** (PR #69). Prompt-only change: the agent is now
-  directed to use the pre-loaded Inbox project ID for Inbox queries
-  instead of being told to call `get_projects()` first. Live verify
-  pending — only meaningful test is asking the agent about Inbox
-  tasks on the deployed instance.
-- **#60 fix merged** (PR #68). `update_task` MCP tool now accepts
-  `project_id`. The Todoist SDK splits this between `update_task`
-  (fields) and `move_task` (project moves); the tool keeps a single
-  surface and dispatches internally — move first, then field updates.
-- **#59 fix merged** (PR #67). `_fmt_task()` now surfaces the
-  recurrence rule from `task.due.string` in pre-loaded context,
-  replacing the bare `(recurring)` flag. Closes a visibility gap
-  that contributed to #55.
-- **#55 regression test merged** (PR #65). End-to-end coverage that
-  drives `reschedule_tasks` through the real `_reschedule_task` body
-  and asserts the recurrence pattern survives in the `due_string`
-  reaching `api.update_task`. Verified by reverting commit 30ba8bb
-  locally — tests fail on the old behavior.
-- **#62 fix merged** (PR #63). Recurring tasks no longer lose their
-  date when rescheduled with a time. Root cause: emitting
-  `<pattern> starting on YYYY-MM-DD HH:MM` made Todoist silently snap
-  to the recurrence anchor's weekday. Fix moves time inside the
-  pattern (`<pattern> at HH:MM starting on YYYY-MM-DD`).
-- **Defensive read-after-write** added to `reschedule_task` (PR #63,
-  extended in #70). Re-fetches the task and raises
-  `DueDateMismatchError` if Todoist stored a different date or time
-  than requested.
+  stream bubble when a tool `confirm` arrives. (Superseded by real fix
+  in session 13 — confirm-only sealing was insufficient for read-only
+  tools.)
+- **#71 merged** (PR #85). `update_task` added to `STATIC_PROMPT`.
+  Forward prompt-coverage test added. (Agent tool implementation was
+  missing — fixed session 13.)
+- **#80 filed** as follow-up to #79: tighten `Memory.category` to a
+  `Literal`.
+- **Milestone 6 opened** (2026-05-02).
 
 ## In Progress
 
@@ -173,49 +58,41 @@ Nothing actively in progress.
 
 ## Next Up
 
-1. **Live verify.** Next deploy will be the first through
-   the full CD + approval gate flow. Confirm /health returns
-   the new SHA, run a short interactive session with a tool
-   call to verify the #72 text rendering fix, watch Logfire
-   for the input-token drop from lazy mode.
-2. **#57** — redeploy Fly cron Machine with bearer token
-   as a Fly secret (DECISIONS.md). Token was rotated when
-   the leak was discovered; Machine not yet redeployed.
-3. **#80** — tighten `Memory.category` to a `Literal` type.
-4. **#57** — redeploy Fly cron Machine with bearer token as
-   a Fly secret.
-5. **#80** — tighten `Memory.category` to a Literal type.
-6. **Resume Milestone 5** — Fuzzy Recurring Tasks once M6
-   lands.
+1. **#57** — Redeploy Fly cron Machine with bearer token as a Fly
+   secret (DECISIONS.md). Nightly job is still disabled.
+2. **#90** — Add reverse prompt-coverage test (every tool named in
+   `STATIC_PROMPT` must be a registered agent tool).
+3. **Resume Milestone 5** — Fuzzy Recurring Tasks once M6 lands.
 
 ## Blockers / Open Questions
 
 - **Nightly job disabled.** Cron Machine destroyed; token rotated but
-  Machine not yet redeployed.
+  Machine not yet redeployed. (#57)
 - **Todoist API is a persistent source of bugs.** Recurrence handling
   and date interpretation have caused multiple incidents (#55, #62).
   Defensive read-after-write is now in place for date changes, but
   treat any new Todoist write operation as unreliable until proven
   otherwise — log inputs and outputs, validate results.
+- **"Not listening on expected address" Fly warning** appears on every
+  deploy. The app IS on `0.0.0.0:8080` and health checks pass — this
+  is the proxy connectivity check firing before the process binds the
+  port. Cosmetic; not worth fighting.
 
 ## Key Context
 
 - Deployed on fly.io: `planning-agent` app, `ord` region, 512mb
-  shared-cpu-1x, 1GB volume at `/data`. Current image: pending
-  first CD-triggered deploy.
-- Deploy is now automated: merge to main → CI passes → manual
-  approval in GitHub Actions → flyctl deploys. No manual deploy
-  command needed. `FLY_API_TOKEN` lives in the `production`
-  environment secret (not repo secrets).
+  shared-cpu-1x, 1GB volume at `/data`. Current image: `85ab3e6`
+  (pending deploy of latest commits after approval).
+- Deploy is automated: merge to main → CI passes → manual approval in
+  GitHub Actions → flyctl deploys. `FLY_API_TOKEN` lives in the
+  `production` environment secret. The `environment: production`
+  declaration on the deploy job is required for the secret to be
+  injected — without it the token is empty.
 - Logfire tracing active in prod. Dashboard at
   logfire-us.pydantic.dev/pankok/planning-agent.
-- Branching strategy: per-issue branches in current practice
-  (e.g. `feat-73-lazy-build-context`), even though
-  DECISIONS.md still says per-milestone. PRs use
-  `--merge --delete-branch`, never squash.
-- Anthropic prompt caching is on (`agent.py:285-286`,
-  `anthropic_cache_instructions=True`,
-  `anthropic_cache_messages=True`). Multi-turn sessions
-  amortize the system prompt at ~10% cache-hit cost; the
-  M6 lazy-mode work targets short single-turn sessions
-  that don't benefit from caching.
+- Branching strategy: per-issue branches for substantive work; direct
+  main pushes for small hotfixes (used several times this session).
+  PRs use `--merge --delete-branch`, never squash.
+- Anthropic prompt caching is on (`agent.py`, `anthropic_cache_instructions
+  =True`, `anthropic_cache_messages=True`). Lazy mode (active in prod)
+  targets short single-turn sessions that don't benefit from caching.
