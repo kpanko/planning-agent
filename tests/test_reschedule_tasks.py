@@ -3,6 +3,7 @@ from datetime import date
 from unittest.mock import MagicMock, call, patch
 
 import pytest
+from freezegun import freeze_time
 
 import todoist_mcp.server as server
 import todoist_mcp.tools as tools
@@ -50,6 +51,7 @@ def test_date_only_calls_reschedule(mock_api, mock_reschedule):
     assert result == "✓ 'Buy milk' -> 2026-03-10"
 
 
+@freeze_time("2026-05-15 12:00:00")
 def test_date_shortcuts_today_tomorrow(mock_api, mock_reschedule):
     task_today = _make_task("1", "Task A")
     task_tomorrow = _make_task("2", "Task B")

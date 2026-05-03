@@ -853,6 +853,9 @@ class TestRenderSystemPrompt:
 
 
 class TestLazyFetchTools:
+    @patch.dict(
+        "os.environ", {"ANTHROPIC_API_KEY": "fake-key"}
+    )
     @patch("planning_agent.agent.TODOIST_API_KEY", "fake-key")
     def test_lazy_fetch_tools_registered(self):
         # The lazy prompt names these three tools (#74); without

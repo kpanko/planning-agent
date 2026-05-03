@@ -3,6 +3,7 @@ from datetime import date, timedelta
 from unittest.mock import MagicMock, call, patch
 
 import pytest
+from freezegun import freeze_time
 
 import todoist_mcp.server as server
 from todoist_mcp.tools import fmt_task as _fmt_task, parse_date as _parse_date
@@ -62,6 +63,7 @@ def _task(
 # _parse_date
 # ---------------------------------------------------------------------------
 
+@freeze_time("2026-05-15 12:00:00")
 class TestParseDate:
     def test_today(self):
         assert _parse_date("today") == date.today()
@@ -212,6 +214,7 @@ class TestFindTasksByDate:
             query="due on: 2026-03-10"
         )
 
+    @freeze_time("2026-05-15 12:00:00")
     def test_today_shorthand(self, mock_api):
         mock_api.filter_tasks.return_value = [[]]
         today_str = date.today().strftime("%Y-%m-%d")

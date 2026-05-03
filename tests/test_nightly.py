@@ -5,6 +5,8 @@ import unittest
 from datetime import date, timedelta
 from unittest.mock import MagicMock, patch
 
+from freezegun import freeze_time
+
 from tests.conftest import create_task
 from todoist_scheduler.overdue import fetch_overdue_tasks
 from todoist_scheduler.scheduler import Scheduler
@@ -147,6 +149,7 @@ class TestSchedulerDryRun(unittest.TestCase):
         self.api.update_task.assert_called_once()
 
 
+@freeze_time("2026-05-15 12:00:00")
 class TestRunNightly(unittest.TestCase):
     """Tests for the run_nightly async function."""
 

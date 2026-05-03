@@ -53,4 +53,5 @@ dev = [
     "pytest>=8.0",
     "httpx>=0.27",
     "pyright>=1.1",
+    "freezegun>=1.5",
 ]
