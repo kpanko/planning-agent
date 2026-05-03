@@ -196,7 +196,7 @@ job stays full-context. Also clear the orphaned bug/cleanup backlog.
   agent tools. (#75)
 - [x] Wire `main_cli.py` and `main_web.py` to pass `lazy=True`; leave
   `main_nightly.py` as `lazy=False`. (#76)
-- [ ] Tests: lazy-mode context (no upstream fetch, counts only),
+- [x] Tests: lazy-mode context (no upstream fetch, counts only),
   shape-summary rendering, three new tools. (#77)
 - [ ] Advertise `update_task` in `STATIC_PROMPT`; add registry-coverage
   test for `@mcp.tool()` drift. (#71)

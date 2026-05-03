@@ -1,10 +1,24 @@
 # Status
 
-**Last updated:** 2026-05-02 (session 11)
+**Last updated:** 2026-05-03 (session 11)
 **Active milestone:** Milestone 6 — Interactive Cost Reduction & Cleanup
 
 ## Recently Completed
 
+- **#77 merged** (PR #83). Five behavior tests for the three
+  lazy-mode fetch tools: each confirms routing to the right
+  backing function with the right args, including default
+  values. Runs via anyio (same pattern as test_web.py). First
+  PR through the new branch-protection gate — CI green
+  required to merge. 274 tests now pass.
+- **CI workflow added** (commit a6dae0e). Runs pyright + pytest
+  on every push and PR. First run caught two pre-existing bugs
+  (timezone flake in 8 tests, missing env patch in 1 test) —
+  fixed same session (commit 419c955, freezegun added to dev
+  deps).
+- **Branch protection enabled** on main: `test` job required
+  before merge. Admin override available; no PR review
+  requirement (solo repo). Force-push and deletion blocked.
 - **#76 merged** (PR #82). Two-line flip-the-switch:
   `main_cli.py` and `main_web.py` now call
   `build_context(lazy=True)`. Lazy mode is now on for
@@ -141,11 +155,14 @@ Nothing actively in progress.
    interactive session, confirm the agent calls the fetch
    tools when it needs data, watch Logfire for the input-
    token drop vs. baseline.
-2. **#77** — broader tests for lazy mode + new tools.
-3. **#71 / #72 / #57** — orphan cleanup work folded into M6.
-4. **#80** — tighten `Memory.category` to a Literal type.
-   Cheap follow-up from #79 review.
-5. **Resume Milestone 5** — Fuzzy Recurring Tasks once M6
+2. **#71** — advertise `update_task` in STATIC_PROMPT + CI
+   drift-prevention test for @mcp.tool() coverage.
+3. **#72** — web UI: agent text before/after a tool call
+   renders on same line.
+4. **#57** — redeploy Fly cron Machine with bearer token as
+   a Fly secret.
+5. **#80** — tighten `Memory.category` to a Literal type.
+6. **Resume Milestone 5** — Fuzzy Recurring Tasks once M6
    lands.
 
 ## Blockers / Open Questions
