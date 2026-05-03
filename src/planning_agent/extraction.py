@@ -10,6 +10,7 @@ from pydantic_ai import Agent
 
 from planning_context.conversations import save_summary
 from planning_context.memories import (
+    MemoryCategory,
     add_memory,
     resolve_memory,
 )
@@ -24,7 +25,7 @@ class Memory(BaseModel):
     """A single memory to save."""
 
     content: str
-    category: str = Field(
+    category: MemoryCategory = Field(
         description=(
             "One of: fact, observation,"
             " open_thread, preference"

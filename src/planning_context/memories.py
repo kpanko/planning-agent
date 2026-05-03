@@ -3,13 +3,19 @@
 import logging
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import NotRequired, TypedDict, cast
+from typing import Literal, NotRequired, TypedDict, cast
 
 from .storage import commit_data, get_data_dir, read_json, write_json
 
 logger = logging.getLogger("planning-context")
 
-VALID_CATEGORIES = ("fact", "observation", "open_thread", "preference")
+MemoryCategory = Literal[
+    "fact", "observation", "open_thread", "preference"
+]
+
+VALID_CATEGORIES: tuple[MemoryCategory, ...] = (
+    "fact", "observation", "open_thread", "preference"
+)
 
 
 class Memory(TypedDict):
@@ -24,7 +30,7 @@ class Memory(TypedDict):
 
     id: str
     content: str
-    category: str
+    category: MemoryCategory
     expiry_date: NotRequired[str | None]
     confidence: NotRequired[str]
     confirming_count: NotRequired[int]
@@ -102,7 +108,7 @@ def get_active() -> list[Memory]:
 
 def add_memory(
     content: str,
-    category: str,
+    category: MemoryCategory,
     expiry_date: str | None = None,
 ) -> Memory:
     """Add a new memory. Returns the created memory dict."""

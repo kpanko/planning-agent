@@ -51,6 +51,7 @@ from planning_context.conversations import (
 )
 from planning_context.memories import (
     Memory,
+    MemoryCategory,
     add_memory as _add_memory,
     get_active as _get_active_memories,
     resolve_memory as _resolve_memory,
@@ -615,7 +616,7 @@ def create_agent(
     async def add_memory(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
         content: str,
-        category: str,
+        category: MemoryCategory,
         expiry_date: Optional[str] = None,
     ) -> str:
         """Save a new memory.
