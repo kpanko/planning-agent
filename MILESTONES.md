@@ -205,7 +205,7 @@ job stays full-context. Also clear the orphaned bug/cleanup backlog.
 - [ ] Redeploy Fly cron Machine with bearer token as a Fly secret per
   DECISIONS.md. (#57)
 - [x] Tighten `Memory.category` to a `Literal` type. (#80)
-- [ ] Add reverse prompt-coverage test: assert every tool named in
+- [x] Add reverse prompt-coverage test: assert every tool named in
   `STATIC_PROMPT` is a registered agent tool. (#90)
 
 

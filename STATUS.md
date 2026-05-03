@@ -1,9 +1,15 @@
 # Status
 
-**Last updated:** 2026-05-03 (session 13)
+**Last updated:** 2026-05-03 (session 14)
 **Active milestone:** Milestone 6 — Interactive Cost Reduction & Cleanup
 
 ## Recently Completed
+
+- **#90 merged** (PR #91). Reverse prompt-coverage test added to
+  `test_prompt_coverage.py`: asserts every tool named in `STATIC_PROMPT`
+  (via backtick+open-paren pattern) is registered on the agent. Also
+  added `()` to the `get_memories` reference in `STATIC_PROMPT` to keep
+  the regex clean. All 53 tests pass.
 
 - **Full M6 live verification** (session 13). Lazy mode confirmed working
   in production: correct Todoist + GCal data, no full task snapshot in
@@ -59,10 +65,9 @@ Nothing actively in progress.
 ## Next Up
 
 1. **#57** — Redeploy Fly cron Machine with bearer token as a Fly
-   secret (DECISIONS.md). Nightly job is still disabled.
-2. **#90** — Add reverse prompt-coverage test (every tool named in
-   `STATIC_PROMPT` must be a registered agent tool).
-3. **Resume Milestone 5** — Fuzzy Recurring Tasks once M6 lands.
+   secret (DECISIONS.md). Nightly job is still disabled. Last
+   remaining open M6 task.
+2. **Resume Milestone 5** — Fuzzy Recurring Tasks once M6 lands.
 
 ## Blockers / Open Questions
 
