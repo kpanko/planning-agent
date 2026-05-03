@@ -38,6 +38,23 @@ flyctl secrets set \
 
 ## Deploy
 
+### Continuous deployment (automatic)
+
+Merging to `main` triggers CI, which runs tests and then deploys
+automatically via the `deploy` job in `.github/workflows/ci.yml`.
+
+Requires a `FLY_API_TOKEN` GitHub Actions secret. One-time setup:
+
+```bash
+# Create a deploy token scoped to the app
+flyctl tokens create deploy -a planning-agent
+```
+
+Add the output token as a repository secret named `FLY_API_TOKEN`
+under Settings → Secrets and variables → Actions.
+
+### Manual deploy
+
 ```bash
 flyctl deploy --build-arg GIT_COMMIT=$(git rev-parse --short HEAD)
 ```

@@ -24,3 +24,19 @@ jobs:
       - run: uv run pyright
 
       - run: uv run pytest
+
+  deploy:
+    needs: test
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - run: |
+          flyctl deploy -a planning-agent \
+            --remote-only \
+            --build-arg GIT_COMMIT=${GITHUB_SHA:0:7}
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
