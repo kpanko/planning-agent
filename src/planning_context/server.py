@@ -7,10 +7,12 @@ used by the AI planning agent.
 import json
 import logging
 import sys
+from typing import cast
 
 from fastmcp import FastMCP
 
 from . import conversations, memories, values
+from .memories import MemoryCategory
 from .storage import get_data_dir
 
 logger = logging.getLogger("planning-context")
@@ -115,7 +117,9 @@ async def add_memory(
     """
     logger.debug("Tool called: add_memory category=%s", category)
     try:
-        m = memories.add_memory(content, category, expiry_date)
+        m = memories.add_memory(
+            content, cast(MemoryCategory, category), expiry_date
+        )
         return f"Memory saved: {m['id']} — {m['content']}"
     except ValueError as e:
         logger.warning("add_memory validation error: %s", e)
