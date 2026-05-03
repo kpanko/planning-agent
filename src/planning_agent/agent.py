@@ -482,6 +482,40 @@ def create_agent(
         )
 
     @planning_agent.tool
+    async def update_task(  # pyright: ignore[reportUnusedFunction]
+        ctx: RunContext[PlanningContext],
+        task_id: str,
+        content: Optional[str] = None,
+        description: Optional[str] = None,
+        priority: Optional[int] = None,
+        labels: Optional[list[str]] = None,
+        project_id: Optional[str] = None,
+    ) -> str:
+        """Edit a task's fields or move it to a different project.
+
+        Set project_id to move the task to a different project.
+        Never use for due date changes — use reschedule_tasks instead.
+        priority: 1=lowest (p4), 2=p3, 3=p2, 4=highest (p1).
+        """
+        detail = f"{task_id}"
+        if project_id:
+            detail += f" -> project {project_id}"
+        if not await confirm("update_task", detail):
+            return "Cancelled by user."
+        return await _run_tool(
+            "update_task",
+            detail,
+            _tools.update_task,
+            _get_api(),
+            task_id,
+            content,
+            description,
+            priority,
+            labels,
+            project_id=project_id,
+        )
+
+    @planning_agent.tool
     async def add_task(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
         content: str,
