@@ -1,7 +1,7 @@
 """Fuzzy recurring maintenance task CRUD operations."""
 
 import logging
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from typing import NotRequired, TypedDict, cast
 
@@ -147,7 +147,6 @@ def get_due_soon(
             due.append(t)
             continue
         last_date = date.fromisoformat(last_done)
-        from datetime import timedelta
         next_target = last_date + timedelta(days=t["interval_days"])
         window_end = ref + timedelta(days=days_ahead)
         if next_target <= window_end:
