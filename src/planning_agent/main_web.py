@@ -230,7 +230,7 @@ async def websocket_endpoint(ws: WebSocket) -> None:
 
     await ws.accept()
 
-    ctx = build_context()
+    ctx = build_context(lazy=True)
     history: list[Any] = []
 
     if ctx.calendar_snapshot == CALENDAR_NEEDS_RECONNECT:
