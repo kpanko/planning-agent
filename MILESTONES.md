@@ -194,7 +194,7 @@ job stays full-context. Also clear the orphaned bug/cleanup backlog.
   `STATIC_PROMPT`. (#74)
 - [x] Add `get_calendar`, `get_memories`, `get_recent_conversations`
   agent tools. (#75)
-- [ ] Wire `main_cli.py` and `main_web.py` to pass `lazy=True`; leave
+- [x] Wire `main_cli.py` and `main_web.py` to pass `lazy=True`; leave
   `main_nightly.py` as `lazy=False`. (#76)
 - [ ] Tests: lazy-mode context (no upstream fetch, counts only),
   shape-summary rendering, three new tools. (#77)

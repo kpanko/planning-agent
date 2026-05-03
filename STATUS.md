@@ -1,10 +1,22 @@
 # Status
 
-**Last updated:** 2026-05-02 (session 10)
+**Last updated:** 2026-05-02 (session 11)
 **Active milestone:** Milestone 6 — Interactive Cost Reduction & Cleanup
 
 ## Recently Completed
 
+- **#76 merged** (PR #82). Two-line flip-the-switch:
+  `main_cli.py` and `main_web.py` now call
+  `build_context(lazy=True)`. Lazy mode is now on for
+  production interactive sessions — short single-turn
+  chats skip the GCal fetch and drop the Todoist task
+  snapshot from the system prompt; the agent can pull
+  what it needs via the four fetch tools added in #75.
+  `main_nightly.py` doesn't call `build_context`, so it
+  keeps full-data behavior with no change. Pyright clean,
+  269 tests pass. Live verification on deploy still
+  pending — confirm a real session works end-to-end and
+  watch Logfire for the input-token drop.
 - **#75 merged** (PR #81). Three new agent tools wired
   in for lazy mode: `get_calendar(days)`,
   `get_memories()`, `get_recent_conversations(count)`.
@@ -124,10 +136,11 @@ Nothing actively in progress.
 
 ## Next Up
 
-1. **#76** — wire `main_cli` and `main_web` to `lazy=True`.
-   This is the flip-the-switch step that turns on lazy mode
-   in production interactive sessions. After this lands,
-   verify on deploy with a real LLM session.
+1. **Deploy + live verify lazy mode.** First real-session
+   smoke test of M6 end-to-end: deploy, run a short
+   interactive session, confirm the agent calls the fetch
+   tools when it needs data, watch Logfire for the input-
+   token drop vs. baseline.
 2. **#77** — broader tests for lazy mode + new tools.
 3. **#71 / #72 / #57** — orphan cleanup work folded into M6.
 4. **#80** — tighten `Memory.category` to a Literal type.
