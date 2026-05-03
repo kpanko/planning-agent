@@ -660,7 +660,7 @@ def create_agent(
         expiry_date: Optional YYYY-MM-DD after which
                      this memory expires.
         """
-        detail = f"({category})"
+        detail = f"({category}) {content[:100]}"
         if not await confirm("add_memory", detail):
             return "Cancelled by user."
         if debug_fn:
