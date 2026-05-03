@@ -26,4 +26,4 @@ ENV GIT_COMMIT=$GIT_COMMIT
 
 EXPOSE 8080
 
-CMD ["uv", "run", "planning-agent-web"]
+CMD ["/app/.venv/bin/planning-agent-web"]
