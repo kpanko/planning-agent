@@ -198,11 +198,13 @@ job stays full-context. Also clear the orphaned bug/cleanup backlog.
   `main_nightly.py` as `lazy=False`. (#76)
 - [x] Tests: lazy-mode context (no upstream fetch, counts only),
   shape-summary rendering, three new tools. (#77)
-- [ ] Advertise `update_task` in `STATIC_PROMPT`; add registry-coverage
+- [x] Advertise `update_task` in `STATIC_PROMPT`; add registry-coverage
   test for `@mcp.tool()` drift. (#71)
-- [ ] Fix agent text rendering before/after tool calls in web UI. (#72)
+- [x] Fix agent text rendering before/after tool calls in web UI. (#72)
+- [x] Add continuous deployment to CI pipeline. (#84)
 - [ ] Redeploy Fly cron Machine with bearer token as a Fly secret per
   DECISIONS.md. (#57)
+- [ ] Tighten `Memory.category` to a `Literal` type. (#80)
 
 
 ## Milestone 7: Scheduling Pattern Learning — `planned`

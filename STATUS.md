@@ -1,10 +1,33 @@
 # Status
 
-**Last updated:** 2026-05-03 (session 11)
+**Last updated:** 2026-05-03 (session 12)
 **Active milestone:** Milestone 6 — Interactive Cost Reduction & Cleanup
 
 ## Recently Completed
 
+- **Actions versions updated + production environment** (PR #88).
+  `actions/checkout` v4→v6, `astral-sh/setup-uv` v6→v8.1.0,
+  `superfly/flyctl-actions/setup-flyctl` master→1.5 (Node.js 20
+  warning from flyctl-actions is known and ignored — no newer
+  version available). Added `production` GitHub environment with
+  kpanko as required reviewer; deploy job now pauses for manual
+  approval before running flyctl. `FLY_API_TOKEN` moved from repo
+  secrets to the `production` environment secret.
+- **#84 merged** (PR #87). CI now auto-deploys to Fly.io on every
+  merge to main: test job passes → approval gate → deploy job runs
+  flyctl with --remote-only and the short SHA as GIT_COMMIT.
+  DEPLOY.md updated with CD setup instructions.
+- **#72 merged** (PR #86). Two-line frontend fix: sealing the active
+  stream bubble when a tool `confirm` arrives so post-tool text opens
+  a fresh bubble below, not the same one as pre-tool text. Live
+  verification needed on next deploy.
+- **#71 merged** (PR #85). `update_task` added to the `### Modifying
+  Tasks` section of `STATIC_PROMPT` — agent now knows it can move tasks
+  between projects via `project_id` and knows not to use it for due-date
+  changes. New `tests/test_prompt_coverage.py` adds two drift-prevention
+  tests: asserts every `@mcp.tool` / `@server.tool` is either named in
+  `STATIC_PROMPT` or listed in `INTENTIONALLY_UNADVERTISED` with a
+  reason. 276 tests pass.
 - **#77 merged** (PR #83). Five behavior tests for the three
   lazy-mode fetch tools: each confirms routing to the right
   backing function with the right args, including default
@@ -150,15 +173,15 @@ Nothing actively in progress.
 
 ## Next Up
 
-1. **Deploy + live verify lazy mode.** First real-session
-   smoke test of M6 end-to-end: deploy, run a short
-   interactive session, confirm the agent calls the fetch
-   tools when it needs data, watch Logfire for the input-
-   token drop vs. baseline.
-2. **#71** — advertise `update_task` in STATIC_PROMPT + CI
-   drift-prevention test for @mcp.tool() coverage.
-3. **#72** — web UI: agent text before/after a tool call
-   renders on same line.
+1. **Live verify.** Next deploy will be the first through
+   the full CD + approval gate flow. Confirm /health returns
+   the new SHA, run a short interactive session with a tool
+   call to verify the #72 text rendering fix, watch Logfire
+   for the input-token drop from lazy mode.
+2. **#57** — redeploy Fly cron Machine with bearer token
+   as a Fly secret (DECISIONS.md). Token was rotated when
+   the leak was discovered; Machine not yet redeployed.
+3. **#80** — tighten `Memory.category` to a `Literal` type.
 4. **#57** — redeploy Fly cron Machine with bearer token as
    a Fly secret.
 5. **#80** — tighten `Memory.category` to a Literal type.
@@ -178,8 +201,12 @@ Nothing actively in progress.
 ## Key Context
 
 - Deployed on fly.io: `planning-agent` app, `ord` region, 512mb
-  shared-cpu-1x, 1GB volume at `/data`. Current image: e28f1b2.
-- Deploy command: `flyctl deploy -a planning-agent --build-arg GIT_COMMIT=$(git rev-parse --short HEAD)`
+  shared-cpu-1x, 1GB volume at `/data`. Current image: pending
+  first CD-triggered deploy.
+- Deploy is now automated: merge to main → CI passes → manual
+  approval in GitHub Actions → flyctl deploys. No manual deploy
+  command needed. `FLY_API_TOKEN` lives in the `production`
+  environment secret (not repo secrets).
 - Logfire tracing active in prod. Dashboard at
   logfire-us.pydantic.dev/pankok/planning-agent.
 - Branching strategy: per-issue branches in current practice
