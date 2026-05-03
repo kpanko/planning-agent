@@ -53,7 +53,7 @@ async def main() -> None:
     )
     logfire.instrument_pydantic_ai()
     console.print("Building context...")
-    ctx = build_context()
+    ctx = build_context(lazy=True)
 
     # Mutable holder so the confirm callback can
     # pause/resume the Live display during prompts.
