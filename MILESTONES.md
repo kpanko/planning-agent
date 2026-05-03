@@ -128,7 +128,7 @@ from today and earlier, and spreads them forward using the existing
   (replaces local cron docs). (#54)
 
 
-## Milestone 5: Fuzzy Recurring Tasks — `planned`
+## Milestone 5: Fuzzy Recurring Tasks — `in-progress`
 **Goal:** Add the fuzzy-recurring-task subsystem: a `fuzzy_recurring.json`
 store, MCP tools to manage it, and agent integration so maintenance tasks
 (e.g. "check spare tire ~every 6 months") surface during weekly planning.
@@ -146,16 +146,16 @@ Post-v1 but self-contained.
 - All operations covered by unit tests with no live API calls.
 
 **Tasks:**
-- [ ] Add `src/planning_context/fuzzy_recurring.py` with CRUD functions:
+- [x] Add `src/planning_context/fuzzy_recurring.py` with CRUD functions:
   `add_fuzzy_recurring`, `get_fuzzy_recurring`, `update_last_done`,
   `get_due_soon`, `remove_fuzzy_recurring`. (#20)
-- [ ] Expose the new functions as MCP tools in
+- [x] Expose the new functions as MCP tools in
   `src/planning_context/server.py`. (#21)
-- [ ] Implement seasonal constraint evaluation (`not_winter` blocks Dec–Feb). (#22)
-- [ ] Update `STATIC_PROMPT` in `agent.py` with a "Fuzzy Recurring Tasks"
+- [x] Implement seasonal constraint evaluation (`not_winter` blocks Dec–Feb). (#22)
+- [x] Update `STATIC_PROMPT` in `agent.py` with a "Fuzzy Recurring Tasks"
   section. (#23)
-- [ ] Add `get_due_soon` results to `build_context()` pre-loaded snapshot. (#24)
-- [ ] Add `tests/test_fuzzy_recurring.py` covering due-soon detection,
+- [x] Add `get_due_soon` results to `build_context()` pre-loaded snapshot. (#24)
+- [x] Add `tests/test_fuzzy_recurring.py` covering due-soon detection,
   seasonal suppression, and `update_last_done` persistence. (#25)
 
 

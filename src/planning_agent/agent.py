@@ -56,6 +56,11 @@ from planning_context.memories import (
     get_active as _get_active_memories,
     resolve_memory as _resolve_memory,
 )
+from planning_context.fuzzy_recurring import (
+    add_fuzzy_recurring as _add_fuzzy_recurring,
+    remove_fuzzy_recurring as _remove_fuzzy_recurring,
+    update_last_done as _update_fuzzy_last_done,
+)
 from planning_context.values import write_values
 from todoist_api_python.api import TodoistAPI
 from todoist_mcp import tools as _tools
@@ -245,6 +250,26 @@ schedule the furnace call?"
 - **Explain reasoning briefly when not obvious.**
 - **Frame maintenance tasks matter-of-factly.**
 
+## Fuzzy Recurring Tasks
+
+The "Fuzzy tasks due soon" section below lists maintenance \
+tasks with approximate intervals (e.g. "check spare tire \
+~every 180 days") that are coming due in the next 14 days. \
+These are stored in a local file, not in Todoist.
+
+During weekly planning, check that section and work any \
+due items into the schedule. After the user confirms they \
+did one, call `update_fuzzy_last_done` to record the date.
+
+Tools for managing fuzzy tasks:
+- `add_fuzzy_recurring_task(name, interval_days, \
+seasonal_constraints, notes)` — add a new fuzzy recurring \
+maintenance task
+- `update_fuzzy_last_done(task_id, date_str)` — mark a \
+fuzzy task as done on a date (YYYY-MM-DD)
+- `remove_fuzzy_recurring_task(task_id)` — remove a fuzzy \
+recurring task permanently
+
 ## What You Don't Do
 
 - Don't manage work tasks (unless told otherwise).
@@ -346,6 +371,9 @@ call `get_projects()` to look it up again.
 {deps.calendar_snapshot}"""
 
     footer = f"""
+
+### Fuzzy tasks due soon (next 14 days)
+{deps.fuzzy_due_soon}
 
 ### Right now
 {deps.current_datetime} — {deps.day_type} day"""
@@ -728,6 +756,85 @@ def create_agent(
             f"({len(content)} chars)",
             write_values,
             content,
+        )
+
+    # ---------------------------------------------------------------
+    # Fuzzy recurring task tools
+    # ---------------------------------------------------------------
+
+    @planning_agent.tool
+    async def add_fuzzy_recurring_task(  # pyright: ignore[reportUnusedFunction]
+        ctx: RunContext[PlanningContext],
+        name: str,
+        interval_days: int,
+        seasonal_constraints: Optional[list[str]] = None,
+        notes: Optional[str] = None,
+    ) -> str:
+        """Add a new fuzzy recurring maintenance task.
+
+        interval_days: approximate recurrence in days.
+        seasonal_constraints: e.g. ["not_winter"].
+        """
+        detail = f'"{name}" every {interval_days}d'
+        if not await confirm("add_fuzzy_recurring_task", detail):
+            return "Cancelled by user."
+
+        def _do_add() -> str:
+            t = _add_fuzzy_recurring(
+                name,
+                interval_days,
+                seasonal_constraints,
+                notes,
+            )
+            return f"Added: {t['id']} — {t['name']}"
+
+        return await _run_tool(
+            "add_fuzzy_recurring_task",
+            detail,
+            _do_add,
+        )
+
+    @planning_agent.tool
+    async def update_fuzzy_last_done(  # pyright: ignore[reportUnusedFunction]
+        ctx: RunContext[PlanningContext],
+        task_id: str,
+        date_str: str,
+    ) -> str:
+        """Mark a fuzzy recurring task as done on a date.
+
+        date_str: ISO date "YYYY-MM-DD".
+        """
+        detail = f"{task_id} on {date_str}"
+        if not await confirm("update_fuzzy_last_done", detail):
+            return "Cancelled by user."
+        return await _run_tool(
+            "update_fuzzy_last_done",
+            detail,
+            lambda: (
+                f"Marked {task_id} done on {date_str}."
+                if _update_fuzzy_last_done(task_id, date_str)
+                else f"Fuzzy task {task_id} not found."
+            ),
+        )
+
+    @planning_agent.tool
+    async def remove_fuzzy_recurring_task(  # pyright: ignore[reportUnusedFunction]
+        ctx: RunContext[PlanningContext],
+        task_id: str,
+    ) -> str:
+        """Remove a fuzzy recurring task permanently."""
+        if not await confirm(
+            "remove_fuzzy_recurring_task", task_id
+        ):
+            return "Cancelled by user."
+        return await _run_tool(
+            "remove_fuzzy_recurring_task",
+            task_id,
+            lambda: (
+                f"Removed fuzzy task {task_id}."
+                if _remove_fuzzy_recurring(task_id)
+                else f"Fuzzy task {task_id} not found."
+            ),
         )
 
     # ---------------------------------------------------------------
