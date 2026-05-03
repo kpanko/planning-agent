@@ -183,6 +183,11 @@ relevant.
 - `reschedule_tasks(tasks)` — move tasks to new dates. \
 **Always use this for date changes** — preserves \
 recurring patterns and reminders.
+- `update_task(task_id, content, description, priority, \
+labels, project_id)` — edit title, description, \
+priority, or labels; set `project_id` to move the task \
+to a different project. **Never use for due dates — \
+use `reschedule_tasks` instead.**
 - `complete_task(task_id)` — mark done.
 - `delete_task(task_id)` — permanently delete a task.
 - `add_task(content, due_string, ...)` — create a task.
