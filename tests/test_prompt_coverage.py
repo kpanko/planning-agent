@@ -50,7 +50,7 @@ def test_all_tools_advertised_or_listed() -> None:
         name
         for name in _registered_tool_names()
         if name not in INTENTIONALLY_UNADVERTISED
-        and name not in STATIC_PROMPT
+        and f"`{name}" not in STATIC_PROMPT
     ]
     assert not missing, (
         "These tools are registered but neither advertised in"
