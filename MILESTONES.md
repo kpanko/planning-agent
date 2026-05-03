@@ -204,7 +204,7 @@ job stays full-context. Also clear the orphaned bug/cleanup backlog.
 - [x] Add continuous deployment to CI pipeline. (#84)
 - [ ] Redeploy Fly cron Machine with bearer token as a Fly secret per
   DECISIONS.md. (#57)
-- [ ] Tighten `Memory.category` to a `Literal` type. (#80)
+- [x] Tighten `Memory.category` to a `Literal` type. (#80)
 
 
 ## Milestone 7: Scheduling Pattern Learning — `planned`
