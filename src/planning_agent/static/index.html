@@ -438,6 +438,9 @@
       } else if (data.type === "message") {
         addBubble("agent", data.content);
         setInputEnabled(true);
+      } else if (data.type === "tool_start") {
+        streamBubble = null;
+        streamRaw = "";
       } else if (data.type === "confirm") {
         streamBubble = null;
         streamRaw = "";

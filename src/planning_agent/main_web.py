@@ -16,6 +16,7 @@ from pydantic_ai.messages import (
     PartStartEvent,
     TextPart,
     TextPartDelta,
+    ToolCallPart,
 )
 
 from fastapi import Depends, FastAPI, Request, Response, WebSocket, WebSocketDisconnect
@@ -334,6 +335,15 @@ async def websocket_endpoint(ws: WebSocket) -> None:
                 ) -> None:
                     async for event in events:
                         if (
+                            isinstance(event, PartStartEvent)
+                            and isinstance(
+                                event.part, ToolCallPart
+                            )
+                        ):
+                            await ws.send_json(
+                                {"type": "tool_start"}
+                            )
+                        elif (
                             isinstance(event, PartStartEvent)
                             and isinstance(
                                 event.part, TextPart
