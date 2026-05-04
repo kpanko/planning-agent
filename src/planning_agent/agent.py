@@ -229,6 +229,8 @@ question needs before answering:
 days you need.
 - Memories: `get_memories()` — full active memory list.
 - Recent conversations: `get_recent_conversations(count)`.
+- Fuzzy maintenance tasks: `get_fuzzy_due_soon(days)` — \
+pass the planning window.
 
 Don't fetch what the question doesn't need. A quick \
 "what's on today?" needs today's tasks and today's \
@@ -252,26 +254,15 @@ schedule the furnace call?"
 
 ## Fuzzy Recurring Tasks
 
-The "Fuzzy tasks due soon" section below lists maintenance \
-tasks with approximate intervals (e.g. "check spare tire \
-~every 180 days") that are coming due in the next 14 days. \
-These are stored in a local file, not in Todoist.
-
-During weekly planning, check that section and work any \
-due items into the schedule. Only propose scheduling a task \
-when its seasonal_constraints allow it for the current month \
-— do not schedule out-of-season tasks. After the user \
-confirms they did one, call `update_fuzzy_last_done` to \
-record the date.
-
-Tools for managing fuzzy tasks:
-- `add_fuzzy_recurring_task(name, interval_days, \
-seasonal_constraints, notes)` — add a new fuzzy recurring \
-maintenance task
-- `update_fuzzy_last_done(task_id, date_str)` — mark a \
-fuzzy task as done on a date (YYYY-MM-DD)
-- `remove_fuzzy_recurring_task(task_id)` — remove a fuzzy \
-recurring task permanently
+Maintenance tasks with approximate intervals (e.g. "check \
+spare tire ~every 180 days") live in a local file, not in \
+Todoist. During weekly planning, call `get_fuzzy_due_soon()` \
+to see what's coming due in the next 14 days; respect any \
+seasonal constraints. After a confirmed completion, call \
+`update_fuzzy_last_done(task_id, date_str)`. Add new ones \
+with `add_fuzzy_recurring_task(name, interval_days, \
+seasonal_constraints, notes)` and remove with \
+`remove_fuzzy_recurring_task(task_id)`.
 
 ## What You Don't Do
 
@@ -351,7 +342,8 @@ call `get_projects()` to look it up again.
 - Tasks: {deps.n_overdue} overdue, {deps.n_upcoming} in next 14 days — call find_tasks / find_tasks_by_date
 - Calendar: not loaded — call get_calendar(days)
 - Memories: {deps.n_memories} active — call get_memories
-- Recent conversations: {deps.n_conversations} available — call get_recent_conversations"""
+- Recent conversations: {deps.n_conversations} available — call get_recent_conversations
+- Fuzzy tasks: {deps.n_fuzzy_due} due in next 14 days — call get_fuzzy_due_soon"""
     else:
         middle = f"""
 
@@ -373,10 +365,15 @@ call `get_projects()` to look it up again.
 ### Calendar (next 14 days)
 {deps.calendar_snapshot}"""
 
-    footer = f"""
+    if deps.is_lazy:
+        fuzzy_block = ""
+    else:
+        fuzzy_block = (
+            "\n\n### Fuzzy tasks due soon (next 14 days)"
+            f"\n{deps.fuzzy_due_soon}"
+        )
 
-### Fuzzy tasks due soon (next 14 days)
-{deps.fuzzy_due_soon}
+    footer = f"""{fuzzy_block}
 
 ### Right now
 {deps.current_datetime} — {deps.day_type} day"""
@@ -889,6 +886,27 @@ def create_agent(
             lambda: _format_conversations(
                 _get_recent_conversations(count)
             ),
+        )
+
+    @planning_agent.tool
+    async def get_fuzzy_due_soon(  # pyright: ignore[reportUnusedFunction]
+        ctx: RunContext[PlanningContext],
+        days: int = 14,
+    ) -> str:
+        """Fetch fuzzy maintenance tasks due within ``days``.
+
+        Respects seasonal constraints (e.g. ``not_winter``).
+        """
+        from .context import fetch_fuzzy_due_soon
+
+        def _fetch() -> str:
+            snapshot, _ = fetch_fuzzy_due_soon(days)
+            return snapshot
+
+        return await _run_tool(
+            "get_fuzzy_due_soon",
+            f"days={days}",
+            _fetch,
         )
 
     return planning_agent
