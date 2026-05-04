@@ -35,6 +35,9 @@ LAZY_TODOIST_PLACEHOLDER = (
 LAZY_CALENDAR_PLACEHOLDER = (
     "(not loaded — call get_calendar)"
 )
+LAZY_FUZZY_PLACEHOLDER = (
+    "(not loaded — call get_fuzzy_due_soon)"
+)
 
 
 @dataclass
@@ -55,6 +58,7 @@ class PlanningContext:
     n_memories: int
     n_conversations: int
     fuzzy_due_soon: str
+    n_fuzzy_due: int
 
 
 def _compute_day_type() -> str:
@@ -254,16 +258,19 @@ def _fetch_inbox_project(api: TodoistAPI) -> str:
     return "(Inbox project not found)"
 
 
-def _format_fuzzy_due_soon() -> str:
-    """Return formatted fuzzy-recurring due-soon tasks."""
+def fetch_fuzzy_due_soon(days: int = 14) -> tuple[str, int]:
+    """Return (formatted snapshot, count) of fuzzy due-soon tasks.
+
+    Lazy mode uses only the count; full mode renders the snapshot.
+    """
     from planning_context.fuzzy_recurring import get_due_soon
 
     try:
-        tasks = get_due_soon(14)
+        tasks = get_due_soon(days)
     except Exception as exc:
-        return f"(error loading fuzzy tasks: {exc})"
+        return f"(error loading fuzzy tasks: {exc})", 0
     if not tasks:
-        return "(none due in the next 14 days)"
+        return f"(none due in the next {days} days)", 0
     lines: list[str] = []
     for t in tasks:
         last = t.get("last_done") or "never done"
@@ -272,7 +279,7 @@ def _format_fuzzy_due_soon() -> str:
             f" (every {t['interval_days']} days,"
             f" last done {last})"
         )
-    return "\n".join(lines)
+    return "\n".join(lines), len(tasks)
 
 
 def build_context(lazy: bool = False) -> PlanningContext:
@@ -317,7 +324,11 @@ def build_context(lazy: bool = False) -> PlanningContext:
     current_datetime = now.strftime("%A, %B %d, %Y %I:%M %p")
     day_type = _compute_day_type()
 
-    fuzzy_due_soon = _format_fuzzy_due_soon()
+    fuzzy_snapshot, n_fuzzy_due = fetch_fuzzy_due_soon()
+    if lazy:
+        fuzzy_due_soon = LAZY_FUZZY_PLACEHOLDER
+    else:
+        fuzzy_due_soon = fuzzy_snapshot
 
     return PlanningContext(
         is_lazy=lazy,
@@ -334,4 +345,5 @@ def build_context(lazy: bool = False) -> PlanningContext:
         n_memories=len(memories),
         n_conversations=len(conversations),
         fuzzy_due_soon=fuzzy_due_soon,
+        n_fuzzy_due=n_fuzzy_due,
     )

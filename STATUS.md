@@ -1,26 +1,19 @@
 # Status
 
-**Last updated:** 2026-05-03 (session 14)
-**Active milestone:** Milestone 6 — Interactive Cost Reduction & Cleanup
+**Last updated:** 2026-05-03 (session 15)
+**Active milestone:** Milestone 5 — Fuzzy Recurring Tasks
 
 ## Recently Completed
 
-- **README rewrite** (session 14). Replaced the outdated "three
-  components that will be unified" framing with an accurate description
-  of the deployed system: web UI, all entry points, setup, deployment
-  flow, and conventions. Removed stale cron/Task Scheduler docs.
-- **#90 merged** (PR #91, session 14). Reverse prompt-coverage test:
-  asserts every tool named in `STATIC_PROMPT` (backtick+open-paren
-  pattern) is registered on the agent. Also added `()` to the
-  `get_memories` reference in `STATIC_PROMPT` for consistency. All
-  53 tests pass.
+- **M5 implemented** (session 15, PR #92 open). Fuzzy recurring task
+  subsystem: `fuzzy_recurring.py` CRUD, 5 MCP tools, `not_winter`
+  seasonal suppression, `fuzzy_due_soon` field in `PlanningContext`,
+  STATIC_PROMPT section, 10 tests. 287 tests pass. Awaiting merge.
+- **README rewrite** (session 14). Replaced the outdated framing with
+  an accurate description of the deployed system.
+- **#90 merged** (PR #91, session 14). Reverse prompt-coverage test.
 - **Full M6 live verification** (session 13). Lazy mode confirmed
-  working in production. Reschedule write, bubble fix, and
-  `update_task` / move-between-projects all verified.
-- **#80 merged** (PR #89). `MemoryCategory = Literal[...]`.
-- **#84 merged** (PR #87). CI auto-deploy to Fly.io on merge to main.
-- **#72 / update_task fix** (session 13). Bubble sealing for read-only
-  tools; `update_task` agent tool implemented.
+  working in production.
 
 ## In Progress
 
@@ -28,10 +21,13 @@ Nothing actively in progress.
 
 ## Next Up
 
-1. **#57** — Redeploy Fly cron Machine with bearer token as a Fly
-   secret (DECISIONS.md). Nightly job is still disabled. Last
-   remaining open M6 task.
-2. **Resume Milestone 5** — Fuzzy Recurring Tasks once M6 lands.
+1. **Merge PR #92** — M5 fuzzy recurring tasks. Ready to merge; all
+   tests pass, review complete.
+2. **#57** — Redeploy Fly cron Machine with bearer token as a Fly
+   secret (DECISIONS.md). Nightly job is still disabled. Last remaining
+   open M6 task.
+3. **M7** — Scheduling Pattern Learning (next planned milestone after
+   M5 and M6 land).
 
 ## Blockers / Open Questions
 
@@ -59,8 +55,10 @@ Nothing actively in progress.
 - Logfire tracing active in prod. Dashboard at
   logfire-us.pydantic.dev/pankok/planning-agent.
 - Branching strategy: per-issue branches for substantive work; direct
-  main pushes for small hotfixes (used several times this session).
-  PRs use `--merge --delete-branch`, never squash.
+  main pushes for small hotfixes. PRs use `--merge --delete-branch`,
+  never squash.
 - Anthropic prompt caching is on (`agent.py`, `anthropic_cache_instructions
   =True`, `anthropic_cache_messages=True`). Lazy mode (active in prod)
   targets short single-turn sessions that don't benefit from caching.
+- M5 (fuzzy recurring) was started before M6's last task (#57) by
+  user choice. M6 remains `in-progress` until #57 lands.
