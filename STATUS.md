@@ -1,10 +1,24 @@
 # Status
 
-**Last updated:** 2026-05-03 (session 15)
-**Active milestone:** Milestone 5 — Fuzzy Recurring Tasks
+**Last updated:** 2026-05-16 (session 16)
+**Active work:** Redesign — M-R1 Foundation (planned, awaiting M5
+merge + rebase before execution)
 
 ## Recently Completed
 
+- **Redesign brainstormed, spec + M-R1 plan written** (session 16).
+  Stepped back from current architecture. New direction: two
+  surfaces — Todoist Upcoming as the daily-use surface (no LLM),
+  smart brain runs only at three narrow moments (Sunday weekly
+  review, nightly replan, on-demand re-plan today). Memory pipeline
+  rebuilt around `rules.md` (load-bearing) + `observations.md`
+  (soft, hedged in-flow) replacing `memories.json`. Scheduling
+  pressure absorbed by tiered horizons, not by purging. Hard
+  cutover from current omni-chat. Reframes M7 (folds into M-R1 +
+  observations tier) and M8 (deferred until after redesign ships).
+  See `project-plans/redesign-2026-05.md` (spec) and
+  `project-plans/redesign-m-r1.md` (8-task TDD plan for the first
+  redesign milestone).
 - **M5 implemented** (session 15, PR #92 open). Fuzzy recurring task
   subsystem: `fuzzy_recurring.py` CRUD, 5 MCP tools, `not_winter`
   seasonal suppression, `fuzzy_due_soon` field in `PlanningContext`,
@@ -17,17 +31,37 @@
 
 ## In Progress
 
-Nothing actively in progress.
+Nothing actively in progress. Redesign branch is checked in but
+not pushed; execution paused pending M5 merge.
+
+## Redesign Branch State
+
+- Branch: `redesign-2026-05` (local only, **not pushed**).
+- Based on: `origin/main` at `6f8af04`.
+- Commits ahead of main: 2
+  - `e49de13` — `docs: redesign spec`
+  - `8ae3c0c` — `docs: M-R1 foundation implementation plan`
+- Files: `project-plans/redesign-2026-05.md` (spec) and
+  `project-plans/redesign-m-r1.md` (M-R1 plan).
+- Memory note saved: `feedback_no_hardcoded_name.md` — never embed
+  the user's real name in tests/prompts/specs; same fix as M1 #1.
 
 ## Next Up
 
-1. **Merge PR #92** — M5 fuzzy recurring tasks. Ready to merge; all
-   tests pass, review complete.
-2. **#57** — Redeploy Fly cron Machine with bearer token as a Fly
-   secret (DECISIONS.md). Nightly job is still disabled. Last remaining
-   open M6 task.
-3. **M7** — Scheduling Pattern Learning (next planned milestone after
-   M5 and M6 land).
+1. **Merge PR #92** — M5 fuzzy recurring tasks. Ready to merge.
+2. **Rebase `redesign-2026-05` on main** so M5's `fuzzy_recurring.py`
+   is present (M-R1 itself doesn't depend on it, but M-R2 will).
+3. **Execute M-R1** per `project-plans/redesign-m-r1.md` — 8 TDD
+   tasks: rules.md storage, observations.md storage, deferral
+   counter, tiered-horizon placement, visibility-in-flow helpers,
+   extraction rewrite, MCP tools, migration script. No user-visible
+   behavior change; foundation only.
+4. **Then M-R2** — Sunday weekly review end-to-end (web UI, new
+   system prompt, retire current omni-chat).
+5. **Then M-R3** — Nightly replan with tiered horizons + deferral
+   counter. Closes **#57** (Fly cron Machine redeploy) as part of
+   the milestone.
+6. **Then M-R4** — On-demand re-plan today (web, phone-friendly).
 
 ## Blockers / Open Questions
 
