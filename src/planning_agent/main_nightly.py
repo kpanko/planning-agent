@@ -26,7 +26,7 @@ from todoist_scheduler.scheduler import Scheduler
 # Matches "<num> hr[s]/week" or "<num> hour[s] per week".
 # Allows a leading "~" and decimals. Case-insensitive.
 _CAPACITY_RE = re.compile(
-    r"(\d+(?:\.\d+)?)\s*(?:hr|hour)s?\s*(?:/|per)\s*week",
+    r"(\d+(?:\.\d+)?)\s*(?:hr|hour)s?\s*(?:/|per)\s*week\b",
     re.IGNORECASE,
 )
 

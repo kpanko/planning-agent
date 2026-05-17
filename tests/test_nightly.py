@@ -80,6 +80,26 @@ class TestParseCapacity(unittest.TestCase):
             20.0,
         )
 
+    def test_weekday_does_not_match(self) -> None:
+        from planning_agent.main_nightly import (
+            _parse_capacity_from_rules,
+        )
+        text = "- work 8hrs per weekday on average\n"
+        self.assertEqual(
+            _parse_capacity_from_rules(text, fallback=42.0),
+            42.0,
+        )
+
+    def test_singular_hr_per_week(self) -> None:
+        from planning_agent.main_nightly import (
+            _parse_capacity_from_rules,
+        )
+        text = "- 40 hr/week\n"
+        self.assertEqual(
+            _parse_capacity_from_rules(text, fallback=99.0),
+            40.0,
+        )
+
 
 class TestFetchOverdueTasks(unittest.TestCase):
     """Tests for the fetch_overdue_tasks helper."""
