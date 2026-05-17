@@ -14,15 +14,12 @@ from todoist_api_python.api import TodoistAPI
 from todoist_api_python.models import Task
 
 from planning_agent import config
+from planning_context import deferrals, rules
+from todoist_scheduler.config import IGNORE_TASK_TAG
+from todoist_scheduler.overdue import fetch_overdue_tasks
+from todoist_scheduler.reschedule import reschedule_task
+
 from planning_agent.horizons import PlaceableTask, place_in_horizon
-from todoist_scheduler.config import (
-    IGNORE_TASK_TAG,
-    TASKS_PER_DAY,
-)
-from todoist_scheduler.overdue import (
-    fetch_overdue_tasks,
-)
-from todoist_scheduler.scheduler import Scheduler
 
 
 # Matches "<num> hr[s]/week" or "<num> hour[s] per week".
@@ -33,7 +30,7 @@ _CAPACITY_RE = re.compile(
 )
 
 
-def _parse_capacity_from_rules(  # pyright: ignore[reportUnusedFunction]
+def _parse_capacity_from_rules(
     text: str,
     fallback: float,
 ) -> float:
@@ -150,8 +147,8 @@ async def run_nightly(
 ) -> list[tuple[str, str, date]]:
     """Run the nightly replan.
 
-    Returns a list of (task_id, content, target_day)
-    for tasks that were (or would be) rescheduled.
+    Returns a list of (task_id, content, target_day) for tasks
+    that were (or would be) rescheduled.
     """
     if not config.TODOIST_API_KEY:
         logging.error("TODOIST_API_KEY is not set.")
@@ -163,8 +160,7 @@ async def run_nightly(
     ).date()
 
     logging.info(
-        "Nightly replan starting for %s "
-        "(dry_run=%s)",
+        "Nightly replan starting for %s (dry_run=%s)",
         today,
         dry_run,
     )
@@ -180,28 +176,56 @@ async def run_nightly(
         logging.info("Nothing to reschedule.")
         return []
 
-    scheduler = Scheduler(
-        api=api,
-        today=today,
-        tasks_per_day=TASKS_PER_DAY,
-        ignore_tag=IGNORE_TASK_TAG,
-        dry_run=dry_run,
+    # Record overdue appearances before doing any writes —
+    # even if the replan crashes mid-loop, the deferral
+    # signal for tonight is captured.
+    deferrals.record_overdue_today(
+        {t.id for t in overdue}, today,
     )
-    scheduler.schedule_and_push_down(overdue)
 
-    for _, content, day in scheduler.planned_moves:
-        logging.info(
-            "Rescheduled '%s' -> %s",
-            content,
-            day,
-        )
+    capacity = _parse_capacity_from_rules(
+        rules.read_rules(),
+        fallback=config.NIGHTLY_DEFAULT_CAPACITY_HOURS,
+    )
+    logging.info(
+        "Planning against %.1f hr/week capacity.", capacity,
+    )
+
+    placements = plan_nightly(
+        overdue,
+        today=today,
+        capacity_hours=capacity,
+        default_task_hours=config.NIGHTLY_DEFAULT_TASK_HOURS,
+    )
+
+    planned_moves: list[tuple[str, str, date]] = []
+    for task, day in placements:
+        planned_moves.append((task.id, task.content, day))
+        if dry_run:
+            logging.info(
+                "[DRY RUN] Would reschedule '%s' -> %s",
+                task.content,
+                day,
+            )
+            continue
+        try:
+            reschedule_task(api, task, day)
+            logging.info(
+                "Rescheduled '%s' -> %s", task.content, day,
+            )
+        except Exception:
+            # One bad task should not abort the whole night.
+            logging.exception(
+                "Failed to reschedule '%s' (%s)",
+                task.content,
+                task.id,
+            )
 
     logging.info(
-        "Nightly replan complete: "
-        "%d task(s) moved.",
-        len(scheduler.planned_moves),
+        "Nightly replan complete: %d task(s) moved.",
+        len(planned_moves),
     )
-    return scheduler.planned_moves
+    return planned_moves
 
 
 def main(

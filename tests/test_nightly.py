@@ -9,7 +9,6 @@ from freezegun import freeze_time
 
 from tests.conftest import create_task
 from todoist_scheduler.overdue import fetch_overdue_tasks
-from todoist_scheduler.scheduler import Scheduler
 
 
 class TestParseCapacity(unittest.TestCase):
@@ -176,6 +175,8 @@ class TestSchedulerDryRun(unittest.TestCase):
     """Tests for the Scheduler dry_run flag."""
 
     def setUp(self) -> None:
+        from todoist_scheduler.scheduler import Scheduler
+        self.Scheduler = Scheduler
         self.api = MagicMock()
         self.api.update_task.return_value = True
         self.today = date(2026, 4, 6)
@@ -188,7 +189,7 @@ class TestSchedulerDryRun(unittest.TestCase):
         self.addCleanup(self._verify_patcher.stop)
 
     def test_dry_run_collects_moves(self) -> None:
-        scheduler = Scheduler(
+        scheduler = self.Scheduler(
             self.api, self.today, 5,
             "no_reschedule", dry_run=True,
         )
@@ -207,7 +208,7 @@ class TestSchedulerDryRun(unittest.TestCase):
         self.assertEqual(day, self.today)
 
     def test_dry_run_skips_api_call(self) -> None:
-        scheduler = Scheduler(
+        scheduler = self.Scheduler(
             self.api, self.today, 5,
             "no_reschedule", dry_run=True,
         )
@@ -222,7 +223,7 @@ class TestSchedulerDryRun(unittest.TestCase):
         self.api.update_task.assert_not_called()
 
     def test_non_dry_run_records_moves(self) -> None:
-        scheduler = Scheduler(
+        scheduler = self.Scheduler(
             self.api, self.today, 5,
             "no_reschedule", dry_run=False,
         )
@@ -240,11 +241,30 @@ class TestSchedulerDryRun(unittest.TestCase):
 
 @freeze_time("2026-05-15 12:00:00")
 class TestRunNightly(unittest.TestCase):
-    """Tests for the run_nightly async function."""
+    """Tests for the run_nightly async function (new flow)."""
 
-    @patch(
-        "planning_agent.main_nightly.TodoistAPI"
-    )
+    def setUp(self) -> None:
+        # Every run_nightly call writes to deferral_counts.json
+        # under PLANNING_AGENT_DATA_DIR — isolate per test.
+        import tempfile
+
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self._env_patch = patch.dict(
+            "os.environ",
+            {"PLANNING_AGENT_DATA_DIR": self._tmp.name},
+        )
+        self._env_patch.start()
+        self.addCleanup(self._env_patch.stop)
+        # Skip read-after-write in reschedule.
+        self._verify_patcher = patch(
+            "todoist_scheduler.reschedule"
+            "._verify_due_date_matches"
+        )
+        self._verify_patcher.start()
+        self.addCleanup(self._verify_patcher.stop)
+
+    @patch("planning_agent.main_nightly.TodoistAPI")
     @patch("planning_agent.main_nightly.config")
     def test_dry_run_no_api_write(
         self,
@@ -253,6 +273,8 @@ class TestRunNightly(unittest.TestCase):
     ) -> None:
         mock_config.TODOIST_API_KEY = "fake-key"
         mock_config.USER_TZ = "America/New_York"
+        mock_config.NIGHTLY_DEFAULT_CAPACITY_HOURS = 50.0
+        mock_config.NIGHTLY_DEFAULT_TASK_HOURS = 1.0
         api = mock_api_cls.return_value
         api.update_task.return_value = True
 
@@ -263,26 +285,18 @@ class TestRunNightly(unittest.TestCase):
             "1", "Overdue",
             due_date_str=yesterday,
         )
-        # First call: fetch_overdue_tasks
-        # Second call: _get_tasks_for (inside
-        # schedule_and_push_down)
-        api.filter_tasks.side_effect = [
-            iter([[task]]),
-            iter([]),
-        ]
+        api.filter_tasks.return_value = iter([[task]])
 
-        from planning_agent.main_nightly import (
-            run_nightly,
-        )
+        from planning_agent.main_nightly import run_nightly
 
         moves = asyncio.run(run_nightly(dry_run=True))
 
         self.assertEqual(len(moves), 1)
         api.update_task.assert_not_called()
+        # Only one filter_tasks call now (no Scheduler).
+        api.filter_tasks.assert_called_once()
 
-    @patch(
-        "planning_agent.main_nightly.TodoistAPI"
-    )
+    @patch("planning_agent.main_nightly.TodoistAPI")
     @patch("planning_agent.main_nightly.config")
     def test_no_overdue_is_noop(
         self,
@@ -291,21 +305,19 @@ class TestRunNightly(unittest.TestCase):
     ) -> None:
         mock_config.TODOIST_API_KEY = "fake-key"
         mock_config.USER_TZ = "America/New_York"
+        mock_config.NIGHTLY_DEFAULT_CAPACITY_HOURS = 50.0
+        mock_config.NIGHTLY_DEFAULT_TASK_HOURS = 1.0
         api = mock_api_cls.return_value
         api.filter_tasks.return_value = iter([])
 
-        from planning_agent.main_nightly import (
-            run_nightly,
-        )
+        from planning_agent.main_nightly import run_nightly
 
         moves = asyncio.run(run_nightly(dry_run=False))
 
         self.assertEqual(moves, [])
         api.update_task.assert_not_called()
 
-    @patch(
-        "planning_agent.main_nightly.TodoistAPI"
-    )
+    @patch("planning_agent.main_nightly.TodoistAPI")
     @patch("planning_agent.main_nightly.config")
     def test_recurring_task_handled(
         self,
@@ -314,6 +326,8 @@ class TestRunNightly(unittest.TestCase):
     ) -> None:
         mock_config.TODOIST_API_KEY = "fake-key"
         mock_config.USER_TZ = "America/New_York"
+        mock_config.NIGHTLY_DEFAULT_CAPACITY_HOURS = 50.0
+        mock_config.NIGHTLY_DEFAULT_TASK_HOURS = 1.0
         api = mock_api_cls.return_value
         api.update_task.return_value = True
 
@@ -326,18 +340,133 @@ class TestRunNightly(unittest.TestCase):
             is_recurring=True,
             due_string="every day",
         )
-        api.filter_tasks.side_effect = [
-            iter([[task]]),
-            iter([]),
-        ]
+        api.filter_tasks.return_value = iter([[task]])
 
-        from planning_agent.main_nightly import (
-            run_nightly,
-        )
+        from planning_agent.main_nightly import run_nightly
 
         moves = asyncio.run(run_nightly(dry_run=True))
 
         self.assertEqual(len(moves), 1)
+
+    @patch("planning_agent.main_nightly.TodoistAPI")
+    @patch("planning_agent.main_nightly.config")
+    def test_records_deferrals(
+        self,
+        mock_config: MagicMock,
+        mock_api_cls: MagicMock,
+    ) -> None:
+        from planning_context import deferrals
+
+        mock_config.TODOIST_API_KEY = "fake-key"
+        mock_config.USER_TZ = "America/New_York"
+        mock_config.NIGHTLY_DEFAULT_CAPACITY_HOURS = 50.0
+        mock_config.NIGHTLY_DEFAULT_TASK_HOURS = 1.0
+        api = mock_api_cls.return_value
+        api.update_task.return_value = True
+
+        yesterday = (
+            date.today() - timedelta(days=1)
+        ).strftime("%Y-%m-%d")
+        tasks = [
+            create_task(
+                str(i), f"task {i}",
+                due_date_str=yesterday,
+            )
+            for i in range(3)
+        ]
+        api.filter_tasks.return_value = iter([tasks])
+
+        from planning_agent.main_nightly import run_nightly
+
+        asyncio.run(run_nightly(dry_run=True))
+
+        # Each overdue task id should have a deferral count of 1
+        # for today (recorded inside run_nightly).
+        for i in range(3):
+            self.assertEqual(deferrals.get_count(str(i)), 1)
+
+    @patch("planning_agent.main_nightly.TodoistAPI")
+    @patch("planning_agent.main_nightly.config")
+    def test_deferral_count_idempotent_per_day(
+        self,
+        mock_config: MagicMock,
+        mock_api_cls: MagicMock,
+    ) -> None:
+        """Two nightly runs on the same day must not
+        double-count a task."""
+        from planning_context import deferrals
+
+        mock_config.TODOIST_API_KEY = "fake-key"
+        mock_config.USER_TZ = "America/New_York"
+        mock_config.NIGHTLY_DEFAULT_CAPACITY_HOURS = 50.0
+        mock_config.NIGHTLY_DEFAULT_TASK_HOURS = 1.0
+        api = mock_api_cls.return_value
+        api.update_task.return_value = True
+
+        yesterday = (
+            date.today() - timedelta(days=1)
+        ).strftime("%Y-%m-%d")
+        task = create_task(
+            "1", "still overdue",
+            due_date_str=yesterday,
+        )
+        api.filter_tasks.side_effect = [
+            iter([[task]]),
+            iter([[task]]),
+        ]
+
+        from planning_agent.main_nightly import run_nightly
+
+        asyncio.run(run_nightly(dry_run=True))
+        asyncio.run(run_nightly(dry_run=True))
+
+        self.assertEqual(deferrals.get_count("1"), 1)
+
+    @patch("planning_agent.main_nightly.TodoistAPI")
+    @patch("planning_agent.main_nightly.config")
+    def test_capacity_read_from_rules(
+        self,
+        mock_config: MagicMock,
+        mock_api_cls: MagicMock,
+    ) -> None:
+        """When rules.md sets a capacity, run_nightly uses
+        that value instead of the config fallback."""
+        from planning_context import rules
+
+        mock_config.TODOIST_API_KEY = "fake-key"
+        mock_config.USER_TZ = "America/New_York"
+        mock_config.NIGHTLY_DEFAULT_CAPACITY_HOURS = 50.0
+        mock_config.NIGHTLY_DEFAULT_TASK_HOURS = 1.0
+        api = mock_api_cls.return_value
+        api.update_task.return_value = True
+
+        rules.write_rules("- ~5 hrs/week\n")
+
+        yesterday = (
+            date.today() - timedelta(days=1)
+        ).strftime("%Y-%m-%d")
+        # 8 one-hour tasks against 5 hr/week capacity — some
+        # must slide into a later week.
+        tasks = [
+            create_task(
+                str(i), f"task {i}",
+                due_date_str=yesterday,
+            )
+            for i in range(8)
+        ]
+        api.filter_tasks.return_value = iter([tasks])
+
+        from planning_agent.main_nightly import run_nightly
+
+        moves = asyncio.run(run_nightly(dry_run=True))
+
+        today_d = date.today()
+        max_offset = max(
+            (day - today_d).days for _, _, day in moves
+        )
+        # At least one task must land in week 2+ (≥7 days out)
+        # because week 1 fits only 5 hours.
+        self.assertGreaterEqual(max_offset, 7)
 
 
 class TestCliParsing(unittest.TestCase):
