@@ -10,7 +10,50 @@ for the coming week.
 
 from __future__ import annotations
 
+import logging
+
+from planning_context import (
+    deferrals as _deferrals,
+    observations as _observations,
+    rules as _rules,
+)
+
+from .context import PlanningContext, build_context
 from .visibility import VISIBILITY_INSTRUCTION
+
+logger = logging.getLogger("planning-agent")
+
+
+def _summarize_deferrals(threshold: int = 180) -> str:
+    """Return a short markdown bullet list of long-deferred
+    task IDs, or an empty string if none."""
+    stale = _deferrals.tasks_with_count_at_least(threshold)
+    if not stale:
+        return ""
+    return "\n".join(
+        f"- {tid} (deferred {_deferrals.get_count(tid)} days)"
+        for tid in sorted(stale)
+    )
+
+
+def build_sunday_context() -> PlanningContext:
+    """Full-fat context for the Sunday weekly review.
+
+    Unlike the lazy build, this loads everything up front —
+    the session is high-value enough to justify the tokens.
+    """
+    ctx = build_context(lazy=False)
+    ctx.rules_doc = _rules.read_rules()
+    ctx.observations_doc = _observations.read_observations()
+    ctx.deferral_summary = _summarize_deferrals()
+    logger.info(
+        "Sunday context: rules=%d chars, observations=%d"
+        " chars, deferral_summary=%d chars",
+        len(ctx.rules_doc),
+        len(ctx.observations_doc),
+        len(ctx.deferral_summary),
+    )
+    return ctx
 
 
 SUNDAY_PROMPT = f"""\

@@ -55,6 +55,11 @@ class PlanningContext:
     n_memories: int
     n_conversations: int
     fuzzy_due_soon: str
+    # Sunday-review extras: populated by build_sunday_context;
+    # default empty so non-Sunday callers keep working.
+    rules_doc: str = ""
+    observations_doc: str = ""
+    deferral_summary: str = ""
 
 
 def _compute_day_type() -> str:
