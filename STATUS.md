@@ -1,12 +1,33 @@
 # Status
 
-**Last updated:** 2026-05-17 (session 17)
-**Active work:** Redesign — M-R1 and M-R2 implemented on
-`redesign-2026-05`, PR #94 open. M-R3 (nightly replan) is next
-when the user is ready.
+**Last updated:** 2026-05-17 (session 18)
+**Active work:** Redesign — M-R1, M-R2, and M-R3 implemented on
+`redesign-2026-05`, PR #94 open. M-R4 (on-demand re-plan today)
+is next when the user is ready.
 
 ## Recently Completed
 
+- **M-R3 implemented** (session 18, PR #94). Nightly replan
+  rebuilt around tiered-horizon placement + the M-R1 deferral
+  counter. `main_nightly.run_nightly` now: fetches overdue
+  tasks, records the id set into `deferral_counts.json` via
+  `deferrals.record_overdue_today` (before any writes, so a
+  mid-loop crash still preserves the signal), parses weekly
+  capacity from `rules.md` (regex with `\b` after `week` so
+  `weekday`/`weekly` don't false-match; falls back to
+  `config.NIGHTLY_DEFAULT_CAPACITY_HOURS = 50`), calls
+  `plan_nightly` which converts Tasks to `PlaceableTask`s
+  (Todoist `Duration` minute/day units → hours;
+  `_HOURS_PER_TODOIST_DAY = 8.0`; `task.deadline.date`
+  isinstance-handled for date/datetime/str) and delegates to
+  `place_in_horizon`, then `reschedule_task`s per placement
+  with per-task try/except so one failure doesn't abort the
+  night. The old per-day `Scheduler` path is retired from
+  this module (still used by the standalone `todoist-scheduler`
+  CLI). Tests: `TestParseCapacity` (8), `TestTaskToPlaceable`
+  (5), `TestPlanNightly` (4), `TestRunNightly` rewritten to 6
+  including deferral count + idempotency + capacity-from-rules
+  assertions. Test count: 309 → 331.
 - **M-R2 implemented** (session 17, PR #94). Sunday weekly review
   ships end-to-end: `sunday_review.py` with `SUNDAY_PROMPT` +
   `build_sunday_context()` (full context: tasks, calendar, fuzzy,
@@ -35,45 +56,53 @@ when the user is ready.
 
 ## In Progress
 
-Nothing actively in progress. PR #94 is open with M-R1 + M-R2
-plus the M-R2 plan doc. Branch stays alive for M-R3/M-R4.
+Nothing actively in progress. PR #94 is open with M-R1 + M-R2 +
+M-R3 plus the M-R3 plan doc. Branch stays alive for M-R4.
 
 ## Redesign Branch State
 
 - Branch: `redesign-2026-05`, pushed.
 - PR: [#94](https://github.com/kpanko/planning-agent/pull/94)
-- Ahead of main: 21 commits (2 doc, 8 M-R1, 4 plan/review-fix,
-  7 M-R2). Roughly:
-  - `f105dc1` — `refactor: delete memories module and MCP tools`
-  - `799b6a9` — `refactor: retire omni-chat prompt and create_agent`
-  - `25910d7` — `feat(web): label index page as Sunday Weekly Review`
-  - `9a0bc5c` — `feat(web): /ws hosts Sunday review session`
-  - `462a811` — `feat(sunday_review): create_sunday_agent + helpers`
-  - `2596f2e` — `feat(sunday_review): build_sunday_context`
-  - `3091b7e` — `feat(planning_agent): Sunday review system prompt`
-  - (older: M-R1 + plan commits)
+- Ahead of main: ~31 commits. M-R3 added (most-recent first):
+  - `a1f74e3` — `revert: restore TestSchedulerDryRun to pre-Task-4 shape`
+  - `4649512` — `feat(nightly): horizons + deferral counter in run_nightly`
+  - `00d28c6` — `test(nightly): tighten test_fits_in_first_week`
+  - `ba5dfd7` — `feat(nightly): plan_nightly uses tiered horizons`
+  - `c2cc0d2` — `fix(nightly): harden deadline parser against datetime`
+  - `e08c56f` — `feat(nightly): convert Todoist tasks to PlaceableTasks`
+  - `5bbf195` — `docs(m-r3): generalize task-4 pyright-suppression cleanup`
+  - `bb3fff8` — `fix(nightly): require word boundary after 'week' in regex`
+  - `28093a2` — `docs: M-R3 nightly replan plan`
+  - `6742f61` — `feat(nightly): parse weekly capacity from rules.md`
+  - (older: M-R1, M-R2, plan + review-fix commits)
 - Plans: `project-plans/redesign-2026-05.md` (spec),
   `project-plans/redesign-m-r1.md`,
-  `project-plans/redesign-m-r2.md`.
+  `project-plans/redesign-m-r2.md`,
+  `project-plans/redesign-m-r3.md`.
 
 ## Next Up
 
 1. **Review and merge PR #94** when ready. The branch must NOT
-   be deleted on merge per the M-R1 plan — M-R3 and M-R4 will
-   continue to land on it.
-2. **Write M-R3 plan** — Nightly replan rebuilt around tiered
-   horizons + deferral counter, plus the cron Machine redeploy
-   that closes **#57**. The deferral counter `record_overdue_today`
-   call lands here.
-3. **Execute M-R3.**
-4. **Then M-R4** — On-demand re-plan today (web, phone-friendly).
-   Smaller scope: narrow context (today + what just changed),
-   own prompt, own route.
+   be deleted on merge per the M-R1 plan — M-R4 will continue
+   to land on it.
+2. **Redeploy the Fly cron Machine (#57)** — operational task,
+   not part of M-R3 by design. DEPLOY.md already documents the
+   correct Fly-secret-based commands. Verify with
+   `flyctl machine status -d` that no token appears in the env
+   block (per DECISIONS.md).
+3. **Write M-R4 plan** — On-demand re-plan today (web,
+   phone-friendly). Smaller scope: narrow context (today + what
+   just changed), own prompt, own route. Lands on the same
+   `redesign-2026-05` branch.
+4. **Execute M-R4.**
 
 ## Blockers / Open Questions
 
-- **Nightly job still disabled.** Cron Machine destroyed; token
-  rotated but Machine not yet redeployed. M-R3 closes this (#57).
+- **Nightly job still disabled in prod.** Cron Machine destroyed;
+  token rotated but Machine not yet redeployed. M-R3 rebuilt the
+  code, but the redeploy is a separate operational task (#57)
+  the user runs at their convenience. DEPLOY.md has the
+  Fly-secret-based commands.
 - **Todoist API is a persistent source of bugs.** Recurrence
   handling and date interpretation have caused multiple incidents
   (#55, #62). Defensive read-after-write is in place for date
