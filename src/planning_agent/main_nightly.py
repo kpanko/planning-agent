@@ -14,7 +14,7 @@ from todoist_api_python.api import TodoistAPI
 from todoist_api_python.models import Task
 
 from planning_agent import config
-from planning_agent.horizons import PlaceableTask
+from planning_agent.horizons import PlaceableTask, place_in_horizon
 from todoist_scheduler.config import (
     IGNORE_TASK_TAG,
     TASKS_PER_DAY,
@@ -56,7 +56,7 @@ def _parse_capacity_from_rules(  # pyright: ignore[reportUnusedFunction]
 _HOURS_PER_TODOIST_DAY = 8.0
 
 
-def _task_to_placeable(  # pyright: ignore[reportUnusedFunction]
+def _task_to_placeable(
     task: Task,
     default_hours: float,
 ) -> PlaceableTask:
@@ -92,6 +92,32 @@ def _task_to_placeable(  # pyright: ignore[reportUnusedFunction]
         duration_hours=hours,
         deadline=deadline,  # pyright: ignore[reportUnknownArgumentType]
     )
+
+
+def plan_nightly(
+    overdue: list[Task],
+    today: date,
+    capacity_hours: float,
+    default_task_hours: float,
+) -> list[tuple[Task, date]]:
+    """Place each overdue task into the tiered horizon.
+
+    Returns ``(task, target_day)`` pairs in input order. The
+    horizon expands as needed — no task is dropped.
+    """
+    if not overdue:
+        return []
+
+    placeables = [
+        _task_to_placeable(t, default_hours=default_task_hours)
+        for t in overdue
+    ]
+    placements = place_in_horizon(
+        placeables,
+        capacity_hours_per_week=capacity_hours,
+        today=today,
+    )
+    return [(t, placements[t.id]) for t in overdue]
 
 
 def build_parser() -> argparse.ArgumentParser:

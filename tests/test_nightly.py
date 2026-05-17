@@ -478,5 +478,95 @@ class TestTaskToPlaceable(unittest.TestCase):
         self.assertEqual(placeable.deadline, date(2026, 5, 20))
 
 
+class TestPlanNightly(unittest.TestCase):
+    """Tests for plan_nightly (pure placement)."""
+
+    def setUp(self) -> None:
+        self.today = date(2026, 5, 17)  # Sunday
+
+    def test_empty_input_returns_empty(self) -> None:
+        from planning_agent.main_nightly import plan_nightly
+        self.assertEqual(
+            plan_nightly([], today=self.today,
+                         capacity_hours=50.0,
+                         default_task_hours=1.0),
+            [],
+        )
+
+    def test_fits_in_first_week(self) -> None:
+        from planning_agent.main_nightly import plan_nightly
+        tasks = [
+            create_task(
+                str(i), f"task {i}",
+                due_date_str="2026-05-10",
+            )
+            for i in range(3)
+        ]
+        placements = plan_nightly(
+            tasks,
+            today=self.today,
+            capacity_hours=50.0,
+            default_task_hours=1.0,
+        )
+        self.assertEqual(len(placements), 3)
+        # All three default to 1hr; week capacity is 50 — they
+        # all land in the week containing today.
+        week_start = self.today  # Sunday-of-week edge case
+        # place_in_horizon uses Monday-of-week as week_start;
+        # the placement should be within the next 7 days.
+        for _, day in placements:
+            self.assertGreaterEqual(day, self.today)
+            self.assertLessEqual(
+                (day - self.today).days, 7,
+            )
+
+    def test_overflow_slides_to_later_week(self) -> None:
+        from planning_agent.main_nightly import plan_nightly
+        # 60 one-hour tasks against 50hr/week capacity → first
+        # 50 land in week 1, the next 10 must land in week 2+.
+        tasks = [
+            create_task(
+                str(i), f"task {i}",
+                due_date_str="2026-05-10",
+            )
+            for i in range(60)
+        ]
+        placements = plan_nightly(
+            tasks,
+            today=self.today,
+            capacity_hours=50.0,
+            default_task_hours=1.0,
+        )
+        self.assertEqual(len(placements), 60)
+        # At least one placement must be > 5 days from today
+        # (week 2 placements land on Saturday, which is 6 days
+        # after Sunday).
+        max_offset = max(
+            (day - self.today).days for _, day in placements
+        )
+        self.assertGreater(max_offset, 5)
+
+    def test_returned_pairs_carry_original_task(self) -> None:
+        from planning_agent.main_nightly import plan_nightly
+        tasks = [
+            create_task(
+                "abc", "named",
+                due_date_str="2026-05-10",
+            )
+        ]
+        placements = plan_nightly(
+            tasks,
+            today=self.today,
+            capacity_hours=50.0,
+            default_task_hours=1.0,
+        )
+        self.assertEqual(len(placements), 1)
+        task, _day = placements[0]
+        # plan_nightly must return the original Task object
+        # so run_nightly can pass it to reschedule_task.
+        self.assertEqual(task.id, "abc")
+        self.assertEqual(task.content, "named")
+
+
 if __name__ == "__main__":
     unittest.main()
