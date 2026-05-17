@@ -229,7 +229,20 @@ async def websocket_endpoint(ws: WebSocket) -> None:
 
     await ws.accept()
 
-    ctx = build_sunday_context()
+    try:
+        ctx = build_sunday_context()
+    except Exception as exc:
+        logger.exception(
+            "build_sunday_context failed; closing socket"
+        )
+        try:
+            await ws.send_json({
+                "type": "error",
+                "content": f"Could not load context: {exc}",
+            })
+        finally:
+            await ws.close(code=1011)
+        return
     history: list[Any] = []
 
     if ctx.calendar_snapshot == CALENDAR_NEEDS_RECONNECT:

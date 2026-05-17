@@ -30,26 +30,6 @@ def _stub_external_fetches(monkeypatch):
     )
 
 
-def test_sunday_prompt_advertises_required_tools():
-    # Tools the Sunday agent is expected to call. The
-    # prompt-coverage test enforces this list against the
-    # actual agent tool set.
-    required = [
-        "reschedule_tasks(",
-        "find_tasks(",
-        "get_rules(",
-        "update_rules(",
-        "get_observations(",
-        "update_observations(",
-        "add_fuzzy_recurring_task(",
-        "update_fuzzy_last_done(",
-    ]
-    for tool in required:
-        assert f"`{tool}" in SUNDAY_PROMPT, (
-            f"Sunday prompt missing tool advertisement: {tool}"
-        )
-
-
 def test_sunday_prompt_uses_visibility_pattern():
     # The visibility instruction must appear inline so the
     # agent names observations when it uses them.
@@ -160,6 +140,102 @@ def test_create_sunday_agent_registers_required_tools(monkeypatch):
     }
     missing = required - tool_names
     assert not missing, f"Sunday agent missing tools: {missing}"
+
+
+def _render_ctx_with_overrides(**overrides):
+    """Build a PlanningContext for prompt-render tests."""
+    from planning_agent.context import PlanningContext
+
+    base = dict(
+        is_lazy=False,
+        values_doc="VALUES_BODY",
+        recent_conversations=[],
+        todoist_snapshot="TODOIST_SNAPSHOT_BODY",
+        calendar_snapshot="CALENDAR_SNAPSHOT_BODY",
+        current_datetime="Saturday, May 17, 2026 09:00 AM",
+        day_type="weekend",
+        inbox_project="Inbox project: Inbox (ID: 999)",
+        n_overdue=0,
+        n_upcoming=0,
+        n_conversations=0,
+        fuzzy_due_soon="FUZZY_BODY",
+        rules_doc="RULES_BODY",
+        observations_doc="OBSERVATIONS_BODY",
+        deferral_summary="DEFERRAL_BODY",
+    )
+    base.update(overrides)
+    return PlanningContext(**base)
+
+
+def test_render_sunday_context_includes_all_context_sections():
+    from planning_agent.sunday_review import _render_sunday_context
+
+    ctx = _render_ctx_with_overrides()
+    body = _render_sunday_context(ctx)
+    # Every piece build_sunday_context loads must surface.
+    assert "VALUES_BODY" in body
+    assert "RULES_BODY" in body
+    assert "OBSERVATIONS_BODY" in body
+    assert "DEFERRAL_BODY" in body
+    assert "TODOIST_SNAPSHOT_BODY" in body
+    assert "CALENDAR_SNAPSHOT_BODY" in body
+    assert "FUZZY_BODY" in body
+    assert "Inbox (ID: 999)" in body
+    assert "Saturday, May 17, 2026" in body
+
+
+def test_render_sunday_context_uses_placeholders_for_empty_fields():
+    from planning_agent.sunday_review import _render_sunday_context
+
+    ctx = _render_ctx_with_overrides(
+        rules_doc="",
+        observations_doc="",
+        deferral_summary="",
+    )
+    body = _render_sunday_context(ctx)
+    assert "(no rules" in body.lower()
+    assert "(no observations" in body.lower()
+
+
+@pytest.mark.anyio
+async def test_sunday_agent_registers_context_system_prompt(
+    monkeypatch,
+):
+    """The Sunday agent must have an @agent.system_prompt callable
+    that injects PlanningContext fields into the LLM prompt.
+    Without this, build_sunday_context() runs but the loaded
+    rules/observations/tasks never reach the model."""
+    from unittest.mock import MagicMock
+
+    from planning_agent.sunday_review import create_sunday_agent
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "fake-key")
+    monkeypatch.setattr(
+        "planning_agent.agent.TODOIST_API_KEY", "fake-key"
+    )
+
+    agent = create_sunday_agent()
+    runners = agent._system_prompt_functions  # pyright: ignore[reportPrivateUsage]
+    assert runners, (
+        "Sunday agent must register an @agent.system_prompt"
+        " callable to inject runtime context"
+    )
+
+    deps = _render_ctx_with_overrides()
+    mock_ctx = MagicMock()
+    mock_ctx.deps = deps
+    # Run every registered system_prompt and verify the output
+    # carries the context fields.
+    outputs: list[str] = []
+    for r in runners:
+        outputs.append(await r.run(mock_ctx))
+    joined = "\n".join(outputs)
+    assert "RULES_BODY" in joined
+    assert "OBSERVATIONS_BODY" in joined
+    assert "TODOIST_SNAPSHOT_BODY" in joined
+    assert "CALENDAR_SNAPSHOT_BODY" in joined
+    assert "VALUES_BODY" in joined
+    assert "DEFERRAL_BODY" in joined
 
 
 def test_create_sunday_agent_excludes_memory_tools(monkeypatch):

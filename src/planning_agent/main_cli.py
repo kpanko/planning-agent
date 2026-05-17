@@ -186,7 +186,7 @@ async def main() -> None:
             continue
 
     if history:
-        print("Extracting memories...")
+        print("Extracting observations and saving summary...")
         await run_extraction(history)
         print("Done.")
 

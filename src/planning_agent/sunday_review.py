@@ -23,15 +23,20 @@ from planning_context import (
     rules as _rules,
 )
 
+from pydantic_ai import RunContext
+
 from .agent import (
     ConfirmFn,
     DebugFn,
-    _default_confirm,  # pyright: ignore[reportPrivateUsage]
+    _format_conversations,  # pyright: ignore[reportPrivateUsage]
+    default_confirm,
+    register_calendar_tool,
+    register_conversations_tool,
     register_fuzzy_tools,
-    register_misc_tools,
     register_observation_tools,
     register_rules_tools,
     register_todoist_tools,
+    register_values_tool,
 )
 from .config import LLM_MODEL
 from .context import PlanningContext, build_context
@@ -52,6 +57,55 @@ def _summarize_deferrals(threshold: int = 180) -> str:
     )
 
 
+def _render_sunday_context(deps: PlanningContext) -> str:
+    """Render the runtime-context block for the Sunday prompt.
+
+    Appended via ``@agent.system_prompt`` to the static
+    ``SUNDAY_PROMPT`` so the LLM sees the user's actual tasks,
+    calendar, rules, and observations. Without this, the
+    ``build_sunday_context`` work is wasted.
+    """
+    return f"""\
+
+---
+
+## Pre-loaded Context
+
+### Right now
+{deps.current_datetime} — {deps.day_type} day
+
+### Values and priorities
+{deps.values_doc or "(no values document yet)"}
+
+### Rules (load-bearing)
+{deps.rules_doc or "(no rules yet)"}
+
+### Observations (soft inferences — hedge when using)
+{deps.observations_doc or "(no observations yet)"}
+
+### Long-deferred tasks (180+ days, consider deletion)
+{deps.deferral_summary or "(none)"}
+
+### Todoist projects
+{deps.inbox_project}
+When the user asks about Inbox tasks, pass this ID as
+`project_id` to `find_tasks` — do not call `get_projects()`
+to look it up again.
+
+### Tasks (overdue + next 14 days)
+{deps.todoist_snapshot}
+
+### Calendar (next 14 days)
+{deps.calendar_snapshot}
+
+### Fuzzy tasks due soon (next 14 days)
+{deps.fuzzy_due_soon}
+
+### Recent conversations
+{_format_conversations(deps.recent_conversations)}
+"""
+
+
 def create_sunday_agent(
     confirm: ConfirmFn | None = None,
     debug_fn: DebugFn | None = None,
@@ -62,7 +116,7 @@ def create_sunday_agent(
     tool set. Memory tools are NOT registered — observations
     and rules replace them.
     """
-    confirm_fn = confirm or _default_confirm
+    confirm_fn = confirm or default_confirm
 
     sunday_agent: Agent[PlanningContext, str] = Agent(
         LLM_MODEL,
@@ -73,13 +127,30 @@ def create_sunday_agent(
             anthropic_cache_messages=True,
         ),
     )
+
+    @sunday_agent.system_prompt
+    async def _inject_context(  # pyright: ignore[reportUnusedFunction]
+        ctx: RunContext[PlanningContext],
+    ) -> str:
+        block = _render_sunday_context(ctx.deps)
+        if debug_fn:
+            await debug_fn(
+                "system_prompt_context",
+                {"content": block},
+            )
+        return block
+
     register_todoist_tools(sunday_agent, confirm_fn, debug_fn)
     register_rules_tools(sunday_agent, confirm_fn, debug_fn)
     register_observation_tools(
         sunday_agent, confirm_fn, debug_fn
     )
     register_fuzzy_tools(sunday_agent, confirm_fn, debug_fn)
-    register_misc_tools(sunday_agent, confirm_fn, debug_fn)
+    register_calendar_tool(sunday_agent, confirm_fn, debug_fn)
+    register_conversations_tool(
+        sunday_agent, confirm_fn, debug_fn
+    )
+    register_values_tool(sunday_agent, confirm_fn, debug_fn)
     return sunday_agent
 
 

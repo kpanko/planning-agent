@@ -3,14 +3,11 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 import traceback as _traceback
 from datetime import date
 from typing import Any, Awaitable, Callable, Optional
 
 from rich.console import Console
-
-logger = logging.getLogger("planning-agent")
 
 ConfirmFn = Callable[[str, str], Awaitable[bool]]
 DebugFn = Callable[[str, dict[str, Any]], Awaitable[None]]
@@ -30,7 +27,7 @@ def _tool_status(
     _console.print(msg)
 
 
-async def _default_confirm(  # pyright: ignore[reportUnusedFunction]
+async def default_confirm(
     name: str, detail: str = "",
 ) -> bool:
     """Default confirm: prompt via terminal (async).
@@ -529,18 +526,13 @@ def register_fuzzy_tools(
         )
 
 
-def register_misc_tools(
+def register_calendar_tool(
     agent: Agent[PlanningContext, str],
     confirm: ConfirmFn,
     debug_fn: DebugFn | None,
 ) -> None:
-    """Register calendar / conversation / values-doc tools.
-
-    These outlive the omni-chat — Sunday review (and later
-    on-demand mode) still needs calendar refetch, prior-
-    conversation summaries, and a way to update the values
-    document when priorities shift.
-    """
+    """Register the on-demand calendar refetch tool."""
+    del confirm  # read-only tool — no confirmation needed
     run_tool = _make_run_tool(debug_fn)
 
     @agent.tool
@@ -559,6 +551,16 @@ def register_misc_tools(
             days,
         )
 
+
+def register_conversations_tool(
+    agent: Agent[PlanningContext, str],
+    confirm: ConfirmFn,
+    debug_fn: DebugFn | None,
+) -> None:
+    """Register the past-conversation summaries tool."""
+    del confirm  # read-only tool — no confirmation needed
+    run_tool = _make_run_tool(debug_fn)
+
     @agent.tool
     async def get_recent_conversations(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
@@ -575,6 +577,15 @@ def register_misc_tools(
                 _get_recent_conversations(count)
             ),
         )
+
+
+def register_values_tool(
+    agent: Agent[PlanningContext, str],
+    confirm: ConfirmFn,
+    debug_fn: DebugFn | None,
+) -> None:
+    """Register the values-document write tool."""
+    run_tool = _make_run_tool(debug_fn)
 
     @agent.tool
     async def update_values_doc(  # pyright: ignore[reportUnusedFunction]
