@@ -44,6 +44,12 @@ INTENTIONALLY_UNADVERTISED: dict[str, str] = {
     "get_fuzzy_recurring_task": (
         "no direct agent use case; agent uses the pre-loaded list"
     ),
+    # planning_context — rules/observations ship in M-R1 but the
+    # agent prompt rewrite that advertises them lands in M-R2
+    "get_rules": "M-R2 will wire this into the agent prompt",
+    "update_rules": "M-R2 will wire this into the agent prompt",
+    "get_observations": "M-R2 will wire this into the agent prompt",
+    "update_observations": "M-R2 will wire this into the agent prompt",
 }
 
 
