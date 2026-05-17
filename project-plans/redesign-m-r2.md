@@ -113,7 +113,7 @@ def test_sunday_prompt_advertises_required_tools():
     # prompt-coverage test enforces this list against the
     # actual agent tool set.
     required = [
-        "reschedule_task(",
+        "reschedule_tasks(",
         "find_tasks(",
         "get_rules(",
         "update_rules(",
@@ -193,7 +193,7 @@ Produce concrete decisions, not options.
    - If a week's free time is full, slide the task to the
      next available week — **do not delete or purge**. The
      horizon absorbs the pressure.
-3. For each scheduling call you make, use `reschedule_task`
+3. For each scheduling call you make, use `reschedule_tasks`
    (never `update_task` for date changes — it loses
    recurrence and reminders).
 4. At the end, summarize: what landed this week, what
@@ -229,9 +229,19 @@ proposal. Do not delete without confirmation.
 ## Tools you have
 
 Scheduling and Todoist:
-- `reschedule_task(task_id, date)` — change a task's due date
-  (preserves recurrence + reminders).
+- `reschedule_tasks(items)` — change due dates on one or more
+  tasks (preserves recurrence + reminders). Always use this
+  for date changes, never `update_task`.
 - `find_tasks(query)` — search Todoist tasks.
+- `complete_task`, `delete_task`, `update_task`, `add_task`,
+  `find_tasks_by_date`, `get_task`, `get_projects` are also
+  available.
+
+Context:
+- `get_calendar(days)` — refetch the calendar window.
+- `get_recent_conversations(count)` — past session summaries.
+- `update_values_doc(content)` — replace the values document
+  (use only when priorities have clearly shifted).
 
 Rules and observations:
 - `get_rules()` / `update_rules(content)`
@@ -514,15 +524,29 @@ def test_create_sunday_agent_registers_required_tools(
         for t in agent._function_toolset.tools.values()  # pyright: ignore[reportPrivateUsage]
     }
     required = {
-        "reschedule_task",
+        # Todoist
+        "reschedule_tasks",
         "find_tasks",
+        "complete_task",
+        "delete_task",
+        "update_task",
+        "add_task",
+        "find_tasks_by_date",
+        "get_task",
+        "get_projects",
+        # Rules / observations
         "get_rules",
         "update_rules",
         "get_observations",
         "update_observations",
+        # Fuzzy recurring
         "add_fuzzy_recurring_task",
         "update_fuzzy_last_done",
         "remove_fuzzy_recurring_task",
+        # Misc context
+        "get_calendar",
+        "get_recent_conversations",
+        "update_values_doc",
     }
     missing = required - tool_names
     assert not missing, f"Sunday agent missing tools: {missing}"
@@ -567,6 +591,7 @@ from .agent import (
     DebugFn,
     _default_confirm,
     _register_fuzzy_tools,
+    _register_misc_tools,
     _register_observation_tools,
     _register_rules_tools,
     _register_todoist_tools,
@@ -597,6 +622,7 @@ def create_sunday_agent(
         sunday_agent, confirm_fn, debug_fn
     )
     _register_fuzzy_tools(sunday_agent, confirm_fn, debug_fn)
+    _register_misc_tools(sunday_agent, confirm_fn, debug_fn)
     return sunday_agent
 ```
 
@@ -690,6 +716,21 @@ def _register_fuzzy_tools(
     # ... move existing add_fuzzy_recurring_task /
     # update_fuzzy_last_done / remove_fuzzy_recurring_task
     # definitions here ...
+
+
+def _register_misc_tools(
+    agent: Agent[PlanningContext, str],
+    confirm: ConfirmFn,
+    debug_fn: DebugFn | None,
+) -> None:
+    """Register context-fetch + values-doc tools.
+
+    These outlive the omni-chat — Sunday review still needs
+    calendar refetch, prior-conversation summaries, and a way
+    to update the values document when priorities shift.
+    """
+    # ... move existing get_calendar / get_recent_conversations
+    # / update_values_doc definitions here ...
 ```
 
 Then in `create_agent`, replace the inline tool definitions
