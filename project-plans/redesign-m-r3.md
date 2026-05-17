@@ -602,21 +602,23 @@ git commit -m "feat(nightly): plan_nightly uses tiered horizons"
 The old `Scheduler` + `TASKS_PER_DAY` path is removed from
 this file.
 
-> **Also in this task — remove a temp suppression.** Task 1
-> added `# pyright: ignore[reportUnusedFunction]` to the
-> `def _parse_capacity_from_rules(` line because the helper
-> had no caller yet. Task 4 makes `run_nightly` call it, so
-> the suppression is no longer needed and must be deleted in
-> the same edit. Verify with `uv run pyright` after the
-> rewrite — 0 errors, including no fresh `reportUnusedFunction`
-> warning on the helper.
+> **Also in this task — remove temp pyright suppressions.**
+> Earlier tasks may have added
+> `# pyright: ignore[reportUnusedFunction]` to private helpers
+> (`_parse_capacity_from_rules` from Task 1; possibly
+> `plan_nightly` if Task 3 added one) because they had no
+> caller yet. Task 4 makes `run_nightly` call
+> `_parse_capacity_from_rules` and `plan_nightly` directly,
+> so those suppressions are no longer needed and must be
+> deleted in the same edit. Verify with `uv run pyright`
+> after the rewrite — 0 errors, with no fresh
+> `reportUnusedFunction` warnings on either helper.
 
 **Files:**
 - Modify: `src/planning_agent/main_nightly.py` (rewrite
   `run_nightly`, drop `Scheduler` and `TASKS_PER_DAY` imports,
-  drop the temporary
-  `# pyright: ignore[reportUnusedFunction]` on
-  `_parse_capacity_from_rules`)
+  drop every temporary
+  `# pyright: ignore[reportUnusedFunction]` added in Tasks 1–3)
 
 - [ ] **Step 1: Rewrite run_nightly**
 
