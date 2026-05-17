@@ -36,6 +36,14 @@ INTENTIONALLY_UNADVERTISED: dict[str, str] = {
     "add_project": "no current agent use case",
     "add_section": "no current agent use case",
     "add_comment": "no current agent use case",
+    # planning_context — fuzzy recurring tools not called directly
+    "get_due_soon_fuzzy": (
+        "results pre-loaded into build_context;"
+        " agent reads them from prompt"
+    ),
+    "get_fuzzy_recurring_task": (
+        "no direct agent use case; agent uses the pre-loaded list"
+    ),
 }
 
 

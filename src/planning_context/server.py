@@ -11,7 +11,7 @@ from typing import cast
 
 from fastmcp import FastMCP
 
-from . import conversations, memories, values
+from . import conversations, fuzzy_recurring, memories, values
 from .memories import MemoryCategory
 from .storage import get_data_dir
 
@@ -167,6 +167,108 @@ async def get_recent_conversations(count: int = 3) -> str:
         return "(No conversation history yet.)"
     logger.debug("get_recent_conversations returning %d records", len(recent))
     return json.dumps(recent, indent=2, ensure_ascii=False)
+
+
+# --- Fuzzy recurring tools ---
+
+
+@server.tool()
+async def add_fuzzy_recurring_task(
+    name: str,
+    interval_days: int,
+    seasonal_constraints: list[str] | None = None,
+    notes: str | None = None,
+) -> str:
+    """Add a new fuzzy recurring maintenance task.
+
+    interval_days: approximate recurrence in days.
+    seasonal_constraints: e.g. ["not_winter"].
+    """
+    logger.debug(
+        "Tool called: add_fuzzy_recurring_task name=%s", name
+    )
+    t = fuzzy_recurring.add_fuzzy_recurring(
+        name,
+        interval_days,
+        seasonal_constraints,
+        notes,
+    )
+    return f"Fuzzy recurring task added: {t['id']} — {t['name']}"
+
+
+@server.tool()
+async def get_fuzzy_recurring_task(task_id: str) -> str:
+    """Get a fuzzy recurring task by ID.
+
+    Returns JSON of the task record, or a not-found message.
+    """
+    logger.debug(
+        "Tool called: get_fuzzy_recurring_task id=%s", task_id
+    )
+    t = fuzzy_recurring.get_fuzzy_recurring(task_id)
+    if t is None:
+        return f"Fuzzy recurring task {task_id} not found."
+    return json.dumps(t, indent=2, ensure_ascii=False)
+
+
+@server.tool()
+async def update_fuzzy_last_done(
+    task_id: str,
+    date_str: str,
+) -> str:
+    """Mark a fuzzy recurring task as done on a date.
+
+    date_str: ISO date "YYYY-MM-DD".
+    """
+    logger.debug(
+        "Tool called: update_fuzzy_last_done id=%s date=%s",
+        task_id,
+        date_str,
+    )
+    t = fuzzy_recurring.update_last_done(task_id, date_str)
+    if t is None:
+        return f"Fuzzy recurring task {task_id} not found."
+    return (
+        f"Fuzzy recurring task {task_id} ({t['name']})"
+        f" marked done on {date_str}."
+    )
+
+
+@server.tool()
+async def remove_fuzzy_recurring_task(task_id: str) -> str:
+    """Remove a fuzzy recurring task by ID."""
+    logger.debug(
+        "Tool called: remove_fuzzy_recurring_task id=%s", task_id
+    )
+    removed = fuzzy_recurring.remove_fuzzy_recurring(task_id)
+    if not removed:
+        return f"Fuzzy recurring task {task_id} not found."
+    return f"Fuzzy recurring task {task_id} removed."
+
+
+@server.tool()
+async def get_due_soon_fuzzy(days_ahead: int = 14) -> str:
+    """Get fuzzy recurring tasks due within days_ahead days.
+
+    Returns formatted list, or a message if none are due.
+    """
+    logger.debug(
+        "Tool called: get_due_soon_fuzzy days_ahead=%d", days_ahead
+    )
+    tasks = fuzzy_recurring.get_due_soon(days_ahead)
+    if not tasks:
+        return (
+            f"(none due in the next {days_ahead} days)"
+        )
+    lines: list[str] = []
+    for t in tasks:
+        last = t.get("last_done") or "never done"
+        lines.append(
+            f"- {t['id']}: {t['name']}"
+            f" (every {t['interval_days']} days,"
+            f" last done {last})"
+        )
+    return "\n".join(lines)
 
 
 def main() -> None:

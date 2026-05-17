@@ -54,6 +54,7 @@ class PlanningContext:
     n_upcoming: int
     n_memories: int
     n_conversations: int
+    fuzzy_due_soon: str
 
 
 def _compute_day_type() -> str:
@@ -253,6 +254,27 @@ def _fetch_inbox_project(api: TodoistAPI) -> str:
     return "(Inbox project not found)"
 
 
+def _format_fuzzy_due_soon() -> str:
+    """Return formatted fuzzy-recurring due-soon tasks."""
+    from planning_context.fuzzy_recurring import get_due_soon
+
+    try:
+        tasks = get_due_soon(14)
+    except Exception as exc:
+        return f"(error loading fuzzy tasks: {exc})"
+    if not tasks:
+        return "(none due in the next 14 days)"
+    lines: list[str] = []
+    for t in tasks:
+        last = t.get("last_done") or "never done"
+        lines.append(
+            f"- {t['id']}: {t['name']}"
+            f" (every {t['interval_days']} days,"
+            f" last done {last})"
+        )
+    return "\n".join(lines)
+
+
 def build_context(lazy: bool = False) -> PlanningContext:
     """Assemble planning context for a conversation.
 
@@ -295,6 +317,8 @@ def build_context(lazy: bool = False) -> PlanningContext:
     current_datetime = now.strftime("%A, %B %d, %Y %I:%M %p")
     day_type = _compute_day_type()
 
+    fuzzy_due_soon = _format_fuzzy_due_soon()
+
     return PlanningContext(
         is_lazy=lazy,
         values_doc=values_doc,
@@ -309,4 +333,5 @@ def build_context(lazy: bool = False) -> PlanningContext:
         n_upcoming=n_upcoming,
         n_memories=len(memories),
         n_conversations=len(conversations),
+        fuzzy_due_soon=fuzzy_due_soon,
     )
