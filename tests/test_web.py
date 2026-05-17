@@ -212,6 +212,16 @@ class TestIndexRoute:
             response = client.get("/")
         assert "WebSocket" in response.text
 
+    def test_index_page_labels_sunday_review(self):
+        with patch(
+            "planning_agent.auth.WEB_SECRET", _TEST_SECRET
+        ):
+            client = TestClient(app)
+            client.cookies.update(_session_cookies())
+            response = client.get("/")
+        body = response.text.lower()
+        assert "sunday" in body and "review" in body
+
 
 # ── WebSocket: basic chat ─────────────────────────────────
 
