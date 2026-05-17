@@ -22,11 +22,6 @@ from planning_agent.context import (
     _fmt_task,
     build_context,
 )
-from planning_agent.extraction import (
-    ExtractionResult,
-    Memory as ExtractionMemory,
-    _apply,
-)
 from planning_context.conversations import Conversation
 from planning_context.memories import Memory
 from tests.conftest import create_task
@@ -534,105 +529,8 @@ class TestBuildContext:
 
 
 # -------------------------------------------------------------------
-# extraction models
+# extraction models — see tests/test_extraction.py
 # -------------------------------------------------------------------
-
-
-class TestExtractionResult:
-    def test_minimal_result(self):
-        result = ExtractionResult(
-            conversation_summary="Planned the week.",
-        )
-        assert result.new_memories == []
-        assert result.resolved_memory_ids == []
-        assert result.values_doc_update is None
-
-    def test_full_result(self):
-        result = ExtractionResult(
-            new_memories=[
-                ExtractionMemory(
-                    content="Prefers mornings",
-                    category="preference",
-                ),
-            ],
-            resolved_memory_ids=["m_001"],
-            values_doc_update="new values",
-            conversation_summary="Planned the week.",
-        )
-        assert len(result.new_memories) == 1
-        assert result.resolved_memory_ids == ["m_001"]
-
-
-class TestApplyExtraction:
-    @patch("planning_agent.extraction.write_values")
-    @patch("planning_agent.extraction.resolve_memory")
-    @patch("planning_agent.extraction.add_memory")
-    @patch("planning_agent.extraction.save_summary")
-    def test_applies_all_fields(
-        self,
-        mock_save,
-        mock_add,
-        mock_resolve,
-        mock_write,
-    ):
-        result = ExtractionResult(
-            new_memories=[
-                ExtractionMemory(
-                    content="Likes hiking",
-                    category="preference",
-                ),
-                ExtractionMemory(
-                    content="Dentist on March 20",
-                    category="fact",
-                    expiry_date="2026-03-20",
-                ),
-            ],
-            resolved_memory_ids=["m_002", "m_003"],
-            values_doc_update="updated values",
-            conversation_summary="Good session.",
-        )
-
-        _apply(result)
-
-        mock_save.assert_called_once_with(
-            "Good session."
-        )
-        assert mock_add.call_count == 2
-        mock_add.assert_any_call(
-            "Likes hiking", "preference", None,
-        )
-        mock_add.assert_any_call(
-            "Dentist on March 20",
-            "fact",
-            "2026-03-20",
-        )
-        mock_resolve.assert_any_call("m_002")
-        mock_resolve.assert_any_call("m_003")
-        mock_write.assert_called_once_with(
-            "updated values"
-        )
-
-    @patch("planning_agent.extraction.write_values")
-    @patch("planning_agent.extraction.resolve_memory")
-    @patch("planning_agent.extraction.add_memory")
-    @patch("planning_agent.extraction.save_summary")
-    def test_skips_values_when_none(
-        self,
-        mock_save,
-        mock_add,
-        mock_resolve,
-        mock_write,
-    ):
-        result = ExtractionResult(
-            conversation_summary="Quick chat.",
-        )
-
-        _apply(result)
-
-        mock_save.assert_called_once()
-        mock_add.assert_not_called()
-        mock_resolve.assert_not_called()
-        mock_write.assert_not_called()
 
 
 # -------------------------------------------------------------------
