@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import re
 import sys
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
@@ -20,6 +21,31 @@ from todoist_scheduler.overdue import (
     fetch_overdue_tasks,
 )
 from todoist_scheduler.scheduler import Scheduler
+
+
+# Matches "<num> hr[s]/week" or "<num> hour[s] per week".
+# Allows a leading "~" and decimals. Case-insensitive.
+_CAPACITY_RE = re.compile(
+    r"(\d+(?:\.\d+)?)\s*(?:hr|hour)s?\s*(?:/|per)\s*week",
+    re.IGNORECASE,
+)
+
+
+def _parse_capacity_from_rules(  # pyright: ignore[reportUnusedFunction]
+    text: str,
+    fallback: float,
+) -> float:
+    """Extract a weekly capacity in hours from rules.md.
+
+    Returns the first ``N hrs/week`` (or ``N hours per week``)
+    number found, or *fallback* if none matches. The rule file
+    is authoritative — if the user lists multiple, the first
+    wins.
+    """
+    match = _CAPACITY_RE.search(text or "")
+    if not match:
+        return fallback
+    return float(match.group(1))
 
 
 def build_parser() -> argparse.ArgumentParser:

@@ -12,6 +12,75 @@ from todoist_scheduler.overdue import fetch_overdue_tasks
 from todoist_scheduler.scheduler import Scheduler
 
 
+class TestParseCapacity(unittest.TestCase):
+    """Tests for _parse_capacity_from_rules."""
+
+    def test_parses_hrs_per_week_with_tilde(self) -> None:
+        from planning_agent.main_nightly import (
+            _parse_capacity_from_rules,
+        )
+        text = (
+            "- ~50 hrs/week of nominal free time\n"
+            "- outdoor tasks need daylight\n"
+        )
+        self.assertEqual(
+            _parse_capacity_from_rules(text, fallback=99.0),
+            50.0,
+        )
+
+    def test_parses_hours_per_week(self) -> None:
+        from planning_agent.main_nightly import (
+            _parse_capacity_from_rules,
+        )
+        text = "I have about 35 hours per week.\n"
+        self.assertEqual(
+            _parse_capacity_from_rules(text, fallback=99.0),
+            35.0,
+        )
+
+    def test_parses_decimal_hours(self) -> None:
+        from planning_agent.main_nightly import (
+            _parse_capacity_from_rules,
+        )
+        text = "- capacity is 12.5 hrs/week\n"
+        self.assertEqual(
+            _parse_capacity_from_rules(text, fallback=99.0),
+            12.5,
+        )
+
+    def test_falls_back_when_no_match(self) -> None:
+        from planning_agent.main_nightly import (
+            _parse_capacity_from_rules,
+        )
+        text = "- no schedule rules yet\n"
+        self.assertEqual(
+            _parse_capacity_from_rules(text, fallback=42.0),
+            42.0,
+        )
+
+    def test_falls_back_on_empty_text(self) -> None:
+        from planning_agent.main_nightly import (
+            _parse_capacity_from_rules,
+        )
+        self.assertEqual(
+            _parse_capacity_from_rules("", fallback=42.0),
+            42.0,
+        )
+
+    def test_uses_first_match_when_multiple(self) -> None:
+        from planning_agent.main_nightly import (
+            _parse_capacity_from_rules,
+        )
+        text = (
+            "- 20 hrs/week on weekdays\n"
+            "- 30 hrs/week on weekends\n"
+        )
+        self.assertEqual(
+            _parse_capacity_from_rules(text, fallback=99.0),
+            20.0,
+        )
+
+
 class TestFetchOverdueTasks(unittest.TestCase):
     """Tests for the fetch_overdue_tasks helper."""
 
