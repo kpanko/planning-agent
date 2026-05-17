@@ -393,39 +393,16 @@ def _get_api() -> TodoistAPI:
     return TodoistAPI(TODOIST_API_KEY)
 
 
-def create_agent(
-    confirm: ConfirmFn | None = None,
-    debug_fn: DebugFn | None = None,
-) -> Agent[PlanningContext, str]:
-    """Build and return the planning agent.
+RunToolFn = Callable[..., Awaitable[str]]
 
-    Deferred so import doesn't require API keys.
-    confirm: async callable(name, detail) -> bool used
-             for tool-call confirmation. Defaults to a
-             terminal prompt via stdin.
+
+def _make_run_tool(debug_fn: DebugFn | None) -> RunToolFn:
+    """Build a debug-aware tool-runner closure.
+
+    Each call to a register_* helper gets its own runner that
+    captures the agent's debug callback. Behaviour matches the
+    legacy inline _run_tool exactly.
     """
-    if confirm is None:
-        confirm = _default_confirm
-    planning_agent = Agent(
-        LLM_MODEL,
-        deps_type=PlanningContext,
-        model_settings=AnthropicModelSettings(
-            anthropic_cache_instructions=True,
-            anthropic_cache_messages=True,
-        ),
-    )
-
-    @planning_agent.system_prompt
-    async def build_system_prompt(  # pyright: ignore[reportUnusedFunction]
-        ctx: RunContext[PlanningContext],
-    ) -> str:
-        prompt = _render_system_prompt(ctx.deps)
-        if debug_fn:
-            await debug_fn(
-                "system_prompt", {"content": prompt}
-            )
-        return prompt
-
     async def _run_tool(
         name: str,
         detail: str,
@@ -459,11 +436,18 @@ def create_agent(
                 )
             raise
 
-    # ---------------------------------------------------------------
-    # Todoist tools
-    # ---------------------------------------------------------------
+    return _run_tool
 
-    @planning_agent.tool
+
+def register_todoist_tools(
+    agent: Agent[PlanningContext, str],
+    confirm: ConfirmFn,
+    debug_fn: DebugFn | None,
+) -> None:
+    """Register the 9 Todoist read/write tools onto the agent."""
+    run_tool = _make_run_tool(debug_fn)
+
+    @agent.tool
     async def reschedule_tasks(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
         tasks: list[RescheduleItem],
@@ -473,7 +457,7 @@ def create_agent(
         detail = repr(dumped)
         if not await confirm("reschedule_tasks", detail):
             return "Cancelled by user."
-        return await _run_tool(
+        return await run_tool(
             "reschedule_tasks",
             detail,
             _tools.reschedule_tasks,
@@ -481,7 +465,7 @@ def create_agent(
             dumped,
         )
 
-    @planning_agent.tool
+    @agent.tool
     async def complete_task(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
         task_id: str,
@@ -489,7 +473,7 @@ def create_agent(
         """Mark a task as complete."""
         if not await confirm("complete_task", task_id):
             return "Cancelled by user."
-        return await _run_tool(
+        return await run_tool(
             "complete_task",
             task_id,
             _tools.complete_task,
@@ -497,7 +481,7 @@ def create_agent(
             task_id,
         )
 
-    @planning_agent.tool
+    @agent.tool
     async def delete_task(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
         task_id: str,
@@ -505,7 +489,7 @@ def create_agent(
         """Permanently delete a task."""
         if not await confirm("delete_task", task_id):
             return "Cancelled by user."
-        return await _run_tool(
+        return await run_tool(
             "delete_task",
             task_id,
             _tools.delete_task,
@@ -513,7 +497,7 @@ def create_agent(
             task_id,
         )
 
-    @planning_agent.tool
+    @agent.tool
     async def update_task(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
         task_id: str,
@@ -534,7 +518,7 @@ def create_agent(
             detail += f" -> project {project_id}"
         if not await confirm("update_task", detail):
             return "Cancelled by user."
-        return await _run_tool(
+        return await run_tool(
             "update_task",
             detail,
             _tools.update_task,
@@ -547,7 +531,7 @@ def create_agent(
             project_id=project_id,
         )
 
-    @planning_agent.tool
+    @agent.tool
     async def add_task(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
         content: str,
@@ -569,7 +553,7 @@ def create_agent(
             detail += f" due={due_string}"
         if not await confirm("add_task", detail):
             return "Cancelled by user."
-        return await _run_tool(
+        return await run_tool(
             "add_task",
             detail,
             _tools.add_task,
@@ -584,7 +568,7 @@ def create_agent(
             labels,
         )
 
-    @planning_agent.tool
+    @agent.tool
     async def find_tasks(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
         query: Optional[str] = None,
@@ -614,7 +598,7 @@ def create_agent(
         if label:
             parts.append(f"label={label}")
         detail = ", ".join(parts) or ""
-        return await _run_tool(
+        return await run_tool(
             "find_tasks",
             detail,
             _tools.find_tasks,
@@ -625,7 +609,7 @@ def create_agent(
             label,
         )
 
-    @planning_agent.tool
+    @agent.tool
     async def find_tasks_by_date(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
         start_date: str,
@@ -639,7 +623,7 @@ def create_agent(
         detail = start_date
         if end_date:
             detail += f" to {end_date}"
-        return await _run_tool(
+        return await run_tool(
             "find_tasks_by_date",
             detail,
             _tools.find_tasks_by_date,
@@ -648,13 +632,13 @@ def create_agent(
             end_date,
         )
 
-    @planning_agent.tool
+    @agent.tool
     async def get_task(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
         task_id: str,
     ) -> str:
         """Fetch a single task by ID."""
-        return await _run_tool(
+        return await run_tool(
             "get_task",
             task_id,
             _tools.get_task,
@@ -662,21 +646,302 @@ def create_agent(
             task_id,
         )
 
-    @planning_agent.tool
+    @agent.tool
     async def get_projects(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
     ) -> str:
         """List all Todoist projects with their IDs."""
-        return await _run_tool(
+        return await run_tool(
             "get_projects",
             "",
             _tools.get_projects,
             _get_api(),
         )
 
+
+def register_rules_tools(
+    agent: Agent[PlanningContext, str],
+    confirm: ConfirmFn,
+    debug_fn: DebugFn | None,
+) -> None:
+    """Register the rules-document tools onto the agent."""
+    run_tool = _make_run_tool(debug_fn)
+
+    @agent.tool
+    async def get_rules(  # pyright: ignore[reportUnusedFunction]
+        ctx: RunContext[PlanningContext],
+    ) -> str:
+        """Return the user's rules document."""
+        from planning_context.rules import read_rules
+
+        return await run_tool(
+            "get_rules",
+            "",
+            lambda: read_rules() or "(No rules yet.)",
+        )
+
+    @agent.tool
+    async def update_rules(  # pyright: ignore[reportUnusedFunction]
+        ctx: RunContext[PlanningContext],
+        content: str,
+    ) -> str:
+        """Replace the rules document with new content."""
+        from planning_context.rules import write_rules
+
+        if not await confirm(
+            "update_rules", f"({len(content)} chars)"
+        ):
+            return "Cancelled by user."
+        return await run_tool(
+            "update_rules",
+            f"({len(content)} chars)",
+            write_rules,
+            content,
+        )
+
+
+def register_observation_tools(
+    agent: Agent[PlanningContext, str],
+    confirm: ConfirmFn,
+    debug_fn: DebugFn | None,
+) -> None:
+    """Register the observations-document tools onto the agent."""
+    run_tool = _make_run_tool(debug_fn)
+
+    @agent.tool
+    async def get_observations(  # pyright: ignore[reportUnusedFunction]
+        ctx: RunContext[PlanningContext],
+    ) -> str:
+        """Return the user's observations document."""
+        from planning_context.observations import read_observations
+
+        return await run_tool(
+            "get_observations",
+            "",
+            lambda: read_observations()
+            or "(No observations yet.)",
+        )
+
+    @agent.tool
+    async def update_observations(  # pyright: ignore[reportUnusedFunction]
+        ctx: RunContext[PlanningContext],
+        content: str,
+    ) -> str:
+        """Replace the observations document with new content."""
+        from planning_context.observations import write_observations
+
+        if not await confirm(
+            "update_observations", f"({len(content)} chars)"
+        ):
+            return "Cancelled by user."
+        return await run_tool(
+            "update_observations",
+            f"({len(content)} chars)",
+            write_observations,
+            content,
+        )
+
+
+def register_fuzzy_tools(
+    agent: Agent[PlanningContext, str],
+    confirm: ConfirmFn,
+    debug_fn: DebugFn | None,
+) -> None:
+    """Register fuzzy recurring task CRUD tools onto the agent."""
+    run_tool = _make_run_tool(debug_fn)
+
+    @agent.tool
+    async def add_fuzzy_recurring_task(  # pyright: ignore[reportUnusedFunction]
+        ctx: RunContext[PlanningContext],
+        name: str,
+        interval_days: int,
+        seasonal_constraints: Optional[list[str]] = None,
+        notes: Optional[str] = None,
+    ) -> str:
+        """Add a new fuzzy recurring maintenance task.
+
+        interval_days: approximate recurrence in days.
+        seasonal_constraints: e.g. ["not_winter"].
+        """
+        detail = f'"{name}" every {interval_days}d'
+        if not await confirm(
+            "add_fuzzy_recurring_task", detail
+        ):
+            return "Cancelled by user."
+
+        def _do_add() -> str:
+            t = _add_fuzzy_recurring(
+                name,
+                interval_days,
+                seasonal_constraints,
+                notes,
+            )
+            return f"Added: {t['id']} — {t['name']}"
+
+        return await run_tool(
+            "add_fuzzy_recurring_task",
+            detail,
+            _do_add,
+        )
+
+    @agent.tool
+    async def update_fuzzy_last_done(  # pyright: ignore[reportUnusedFunction]
+        ctx: RunContext[PlanningContext],
+        task_id: str,
+        date_str: str,
+    ) -> str:
+        """Mark a fuzzy recurring task as done on a date.
+
+        date_str: ISO date "YYYY-MM-DD".
+        """
+        try:
+            date.fromisoformat(date_str)
+        except ValueError:
+            return f"Invalid date {date_str!r}. Use YYYY-MM-DD."
+        detail = f"{task_id} on {date_str}"
+        if not await confirm(
+            "update_fuzzy_last_done", detail
+        ):
+            return "Cancelled by user."
+        return await run_tool(
+            "update_fuzzy_last_done",
+            detail,
+            lambda: (
+                f"Marked {task_id} done on {date_str}."
+                if _update_fuzzy_last_done(task_id, date_str)
+                else f"Fuzzy task {task_id} not found."
+            ),
+        )
+
+    @agent.tool
+    async def remove_fuzzy_recurring_task(  # pyright: ignore[reportUnusedFunction]
+        ctx: RunContext[PlanningContext],
+        task_id: str,
+    ) -> str:
+        """Remove a fuzzy recurring task permanently."""
+        if not await confirm(
+            "remove_fuzzy_recurring_task", task_id
+        ):
+            return "Cancelled by user."
+        return await run_tool(
+            "remove_fuzzy_recurring_task",
+            task_id,
+            lambda: (
+                f"Removed fuzzy task {task_id}."
+                if _remove_fuzzy_recurring(task_id)
+                else f"Fuzzy task {task_id} not found."
+            ),
+        )
+
+
+def register_misc_tools(
+    agent: Agent[PlanningContext, str],
+    confirm: ConfirmFn,
+    debug_fn: DebugFn | None,
+) -> None:
+    """Register calendar / conversation / values-doc tools.
+
+    These outlive the omni-chat — Sunday review (and later
+    on-demand mode) still needs calendar refetch, prior-
+    conversation summaries, and a way to update the values
+    document when priorities shift.
+    """
+    run_tool = _make_run_tool(debug_fn)
+
+    @agent.tool
+    async def get_calendar(  # pyright: ignore[reportUnusedFunction]
+        ctx: RunContext[PlanningContext],
+        days: int = 14,
+    ) -> str:
+        """Fetch upcoming Google Calendar events.
+
+        days: How far ahead to look (default 14).
+        """
+        return await run_tool(
+            "get_calendar",
+            f"days={days}",
+            fetch_calendar_snapshot,
+            days,
+        )
+
+    @agent.tool
+    async def get_recent_conversations(  # pyright: ignore[reportUnusedFunction]
+        ctx: RunContext[PlanningContext],
+        count: int = 3,
+    ) -> str:
+        """Fetch summaries of recent past conversations.
+
+        count: Number of recent days to include (default 3).
+        """
+        return await run_tool(
+            "get_recent_conversations",
+            f"count={count}",
+            lambda: _format_conversations(
+                _get_recent_conversations(count)
+            ),
+        )
+
+    @agent.tool
+    async def update_values_doc(  # pyright: ignore[reportUnusedFunction]
+        ctx: RunContext[PlanningContext],
+        content: str,
+    ) -> str:
+        """Rewrite the values document with new content.
+
+        Only use when priorities have clearly shifted.
+        """
+        if not await confirm("update_values_doc", ""):
+            return "Cancelled by user."
+        return await run_tool(
+            "update_values_doc",
+            f"({len(content)} chars)",
+            write_values,
+            content,
+        )
+
+
+def create_agent(
+    confirm: ConfirmFn | None = None,
+    debug_fn: DebugFn | None = None,
+) -> Agent[PlanningContext, str]:
+    """Build and return the planning agent.
+
+    Deferred so import doesn't require API keys.
+    confirm: async callable(name, detail) -> bool used
+             for tool-call confirmation. Defaults to a
+             terminal prompt via stdin.
+    """
+    if confirm is None:
+        confirm = _default_confirm
+    planning_agent = Agent(
+        LLM_MODEL,
+        deps_type=PlanningContext,
+        model_settings=AnthropicModelSettings(
+            anthropic_cache_instructions=True,
+            anthropic_cache_messages=True,
+        ),
+    )
+
+    @planning_agent.system_prompt
+    async def build_system_prompt(  # pyright: ignore[reportUnusedFunction]
+        ctx: RunContext[PlanningContext],
+    ) -> str:
+        prompt = _render_system_prompt(ctx.deps)
+        if debug_fn:
+            await debug_fn(
+                "system_prompt", {"content": prompt}
+            )
+        return prompt
+
+    register_todoist_tools(planning_agent, confirm, debug_fn)
+    register_fuzzy_tools(planning_agent, confirm, debug_fn)
+    register_misc_tools(planning_agent, confirm, debug_fn)
+
     # ---------------------------------------------------------------
-    # Planning context tools
+    # Memory tools (retired in M-R2: Task 6 deletes this block)
     # ---------------------------------------------------------------
+
+    run_tool = _make_run_tool(debug_fn)
 
     @planning_agent.tool
     async def add_memory(  # pyright: ignore[reportUnusedFunction]
@@ -734,7 +999,7 @@ def create_agent(
         """Mark a memory as resolved/no longer active."""
         if not await confirm("resolve_memory", memory_id):
             return "Cancelled by user."
-        return await _run_tool(
+        return await run_tool(
             "resolve_memory",
             memory_id,
             lambda: (
@@ -745,155 +1010,14 @@ def create_agent(
         )
 
     @planning_agent.tool
-    async def update_values_doc(  # pyright: ignore[reportUnusedFunction]
-        ctx: RunContext[PlanningContext],
-        content: str,
-    ) -> str:
-        """Rewrite the values document with new content.
-
-        Only use when priorities have clearly shifted.
-        """
-        if not await confirm("update_values_doc", ""):
-            return "Cancelled by user."
-        return await _run_tool(
-            "update_values_doc",
-            f"({len(content)} chars)",
-            write_values,
-            content,
-        )
-
-    # ---------------------------------------------------------------
-    # Fuzzy recurring task tools
-    # ---------------------------------------------------------------
-
-    @planning_agent.tool
-    async def add_fuzzy_recurring_task(  # pyright: ignore[reportUnusedFunction]
-        ctx: RunContext[PlanningContext],
-        name: str,
-        interval_days: int,
-        seasonal_constraints: Optional[list[str]] = None,
-        notes: Optional[str] = None,
-    ) -> str:
-        """Add a new fuzzy recurring maintenance task.
-
-        interval_days: approximate recurrence in days.
-        seasonal_constraints: e.g. ["not_winter"].
-        """
-        detail = f'"{name}" every {interval_days}d'
-        if not await confirm("add_fuzzy_recurring_task", detail):
-            return "Cancelled by user."
-
-        def _do_add() -> str:
-            t = _add_fuzzy_recurring(
-                name,
-                interval_days,
-                seasonal_constraints,
-                notes,
-            )
-            return f"Added: {t['id']} — {t['name']}"
-
-        return await _run_tool(
-            "add_fuzzy_recurring_task",
-            detail,
-            _do_add,
-        )
-
-    @planning_agent.tool
-    async def update_fuzzy_last_done(  # pyright: ignore[reportUnusedFunction]
-        ctx: RunContext[PlanningContext],
-        task_id: str,
-        date_str: str,
-    ) -> str:
-        """Mark a fuzzy recurring task as done on a date.
-
-        date_str: ISO date "YYYY-MM-DD".
-        """
-        try:
-            date.fromisoformat(date_str)
-        except ValueError:
-            return f"Invalid date {date_str!r}. Use YYYY-MM-DD."
-        detail = f"{task_id} on {date_str}"
-        if not await confirm("update_fuzzy_last_done", detail):
-            return "Cancelled by user."
-        return await _run_tool(
-            "update_fuzzy_last_done",
-            detail,
-            lambda: (
-                f"Marked {task_id} done on {date_str}."
-                if _update_fuzzy_last_done(task_id, date_str)
-                else f"Fuzzy task {task_id} not found."
-            ),
-        )
-
-    @planning_agent.tool
-    async def remove_fuzzy_recurring_task(  # pyright: ignore[reportUnusedFunction]
-        ctx: RunContext[PlanningContext],
-        task_id: str,
-    ) -> str:
-        """Remove a fuzzy recurring task permanently."""
-        if not await confirm(
-            "remove_fuzzy_recurring_task", task_id
-        ):
-            return "Cancelled by user."
-        return await _run_tool(
-            "remove_fuzzy_recurring_task",
-            task_id,
-            lambda: (
-                f"Removed fuzzy task {task_id}."
-                if _remove_fuzzy_recurring(task_id)
-                else f"Fuzzy task {task_id} not found."
-            ),
-        )
-
-    # ---------------------------------------------------------------
-    # Lazy-mode fetch tools
-    # ---------------------------------------------------------------
-    # Used when the system prompt is rendered in lazy mode and the
-    # agent needs to pull data that isn't pre-loaded. See the "Lazy
-    # Context Mode" section of STATIC_PROMPT for invocation rules.
-
-    @planning_agent.tool
-    async def get_calendar(  # pyright: ignore[reportUnusedFunction]
-        ctx: RunContext[PlanningContext],
-        days: int = 14,
-    ) -> str:
-        """Fetch upcoming Google Calendar events.
-
-        days: How far ahead to look (default 14).
-        """
-        return await _run_tool(
-            "get_calendar",
-            f"days={days}",
-            fetch_calendar_snapshot,
-            days,
-        )
-
-    @planning_agent.tool
     async def get_memories(  # pyright: ignore[reportUnusedFunction]
         ctx: RunContext[PlanningContext],
     ) -> str:
         """Fetch the full active-memory list."""
-        return await _run_tool(
+        return await run_tool(
             "get_memories",
             "",
             lambda: _format_memories(_get_active_memories()),
-        )
-
-    @planning_agent.tool
-    async def get_recent_conversations(  # pyright: ignore[reportUnusedFunction]
-        ctx: RunContext[PlanningContext],
-        count: int = 3,
-    ) -> str:
-        """Fetch summaries of recent past conversations.
-
-        count: Number of recent days to include (default 3).
-        """
-        return await _run_tool(
-            "get_recent_conversations",
-            f"count={count}",
-            lambda: _format_conversations(
-                _get_recent_conversations(count)
-            ),
         )
 
     return planning_agent

@@ -119,3 +119,65 @@ def test_sunday_context_is_not_lazy(
     # lazy placeholder, proving the lazy path wasn't taken.
     assert ctx.todoist_snapshot != LAZY_TODOIST_PLACEHOLDER
     assert ctx.is_lazy is False
+
+
+def test_create_sunday_agent_registers_required_tools(monkeypatch):
+    from planning_agent.sunday_review import create_sunday_agent
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "fake-key")
+    monkeypatch.setattr(
+        "planning_agent.agent.TODOIST_API_KEY", "fake-key"
+    )
+    agent = create_sunday_agent()
+    tool_names = {
+        t.name
+        for t in agent._function_toolset.tools.values()  # pyright: ignore[reportPrivateUsage]
+    }
+    required = {
+        # Todoist
+        "reschedule_tasks",
+        "find_tasks",
+        "complete_task",
+        "delete_task",
+        "update_task",
+        "add_task",
+        "find_tasks_by_date",
+        "get_task",
+        "get_projects",
+        # Rules / observations
+        "get_rules",
+        "update_rules",
+        "get_observations",
+        "update_observations",
+        # Fuzzy recurring
+        "add_fuzzy_recurring_task",
+        "update_fuzzy_last_done",
+        "remove_fuzzy_recurring_task",
+        # Misc context
+        "get_calendar",
+        "get_recent_conversations",
+        "update_values_doc",
+    }
+    missing = required - tool_names
+    assert not missing, f"Sunday agent missing tools: {missing}"
+
+
+def test_create_sunday_agent_excludes_memory_tools(monkeypatch):
+    from planning_agent.sunday_review import create_sunday_agent
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "fake-key")
+    monkeypatch.setattr(
+        "planning_agent.agent.TODOIST_API_KEY", "fake-key"
+    )
+    agent = create_sunday_agent()
+    tool_names = {
+        t.name
+        for t in agent._function_toolset.tools.values()  # pyright: ignore[reportPrivateUsage]
+    }
+    # Memory tools are gone in M-R2.
+    for forbidden in (
+        "add_memory",
+        "resolve_memory",
+        "get_memories",
+    ):
+        assert forbidden not in tool_names

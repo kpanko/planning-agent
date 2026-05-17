@@ -12,12 +12,25 @@ from __future__ import annotations
 
 import logging
 
+from pydantic_ai import Agent
+
 from planning_context import (
     deferrals as _deferrals,
     observations as _observations,
     rules as _rules,
 )
 
+from .agent import (
+    ConfirmFn,
+    DebugFn,
+    _default_confirm,  # pyright: ignore[reportPrivateUsage]
+    register_fuzzy_tools,
+    register_misc_tools,
+    register_observation_tools,
+    register_rules_tools,
+    register_todoist_tools,
+)
+from .config import LLM_MODEL
 from .context import PlanningContext, build_context
 from .visibility import VISIBILITY_INSTRUCTION
 
@@ -34,6 +47,33 @@ def _summarize_deferrals(threshold: int = 180) -> str:
         f"- {tid} (deferred {_deferrals.get_count(tid)} days)"
         for tid in sorted(stale)
     )
+
+
+def create_sunday_agent(
+    confirm: ConfirmFn | None = None,
+    debug_fn: DebugFn | None = None,
+) -> Agent[PlanningContext, str]:
+    """Build the agent used in a Sunday weekly review session.
+
+    Wires the Sunday system prompt and the Sunday-specific
+    tool set. Memory tools are NOT registered — observations
+    and rules replace them.
+    """
+    confirm_fn = confirm or _default_confirm
+
+    sunday_agent: Agent[PlanningContext, str] = Agent(
+        LLM_MODEL,
+        system_prompt=SUNDAY_PROMPT,
+        deps_type=PlanningContext,
+    )
+    register_todoist_tools(sunday_agent, confirm_fn, debug_fn)
+    register_rules_tools(sunday_agent, confirm_fn, debug_fn)
+    register_observation_tools(
+        sunday_agent, confirm_fn, debug_fn
+    )
+    register_fuzzy_tools(sunday_agent, confirm_fn, debug_fn)
+    register_misc_tools(sunday_agent, confirm_fn, debug_fn)
+    return sunday_agent
 
 
 def build_sunday_context() -> PlanningContext:
