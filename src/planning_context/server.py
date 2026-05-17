@@ -11,7 +11,14 @@ from typing import cast
 
 from fastmcp import FastMCP
 
-from . import conversations, fuzzy_recurring, memories, values
+from . import (
+    conversations,
+    fuzzy_recurring,
+    memories,
+    observations,
+    rules,
+    values,
+)
 from .memories import MemoryCategory
 from .storage import get_data_dir
 
@@ -78,6 +85,68 @@ async def update_values_doc(content: str) -> str:
     """
     logger.debug("Tool called: update_values_doc (%d chars)", len(content))
     return values.write_values(content)
+
+
+# --- Rules tools ---
+
+
+@server.tool()
+async def get_rules() -> str:
+    """Get the user's current rules document.
+
+    Rules are load-bearing facts and constraints that drive
+    scheduling decisions. Returns markdown text.
+    """
+    logger.debug("Tool called: get_rules")
+    content = rules.read_rules()
+    if not content.strip():
+        return "(No rules yet — rules.md is empty.)"
+    return content
+
+
+@server.tool()
+async def update_rules(content: str) -> str:
+    """Replace the rules document with new content.
+
+    Called when the user states or approves a new rule, or
+    promotes a soft observation to a rule.
+    """
+    logger.debug(
+        "Tool called: update_rules (%d chars)", len(content)
+    )
+    return rules.write_rules(content)
+
+
+# --- Observations tools ---
+
+
+@server.tool()
+async def get_observations() -> str:
+    """Get the user's current observations document.
+
+    Observations are soft inferences. Returns markdown text.
+    """
+    logger.debug("Tool called: get_observations")
+    content = observations.read_observations()
+    if not content.strip():
+        return (
+            "(No observations yet — observations.md is empty.)"
+        )
+    return content
+
+
+@server.tool()
+async def update_observations(content: str) -> str:
+    """Replace the observations document with new content.
+
+    Called by the extraction pipeline or by the planning
+    agent when an observation is added, refined, or removed.
+    """
+    logger.debug(
+        "Tool called: update_observations (%d chars)",
+        len(content),
+    )
+    return observations.write_observations(content)
 
 
 # --- Memory tools ---
