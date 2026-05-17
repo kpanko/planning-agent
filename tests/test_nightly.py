@@ -456,6 +456,27 @@ class TestTaskToPlaceable(unittest.TestCase):
         )
         self.assertEqual(placeable.deadline, date(2026, 5, 20))
 
+    def test_deadline_datetime_object_is_handled(self) -> None:
+        """Defensive: if Todoist ever returns a datetime for
+        deadline.date instead of a YYYY-MM-DD string, we must
+        still produce a clean date."""
+        from datetime import datetime as dt
+
+        from todoist_api_python.models import Deadline
+
+        from planning_agent.main_nightly import (
+            _task_to_placeable,
+        )
+        task = create_task(
+            "1", "datetime deadline",
+            due_date_str="2026-05-10",
+        )
+        task.deadline = Deadline(date=dt(2026, 5, 20, 14, 0))  # pyright: ignore[reportArgumentType]
+        placeable = _task_to_placeable(
+            task, default_hours=1.0,
+        )
+        self.assertEqual(placeable.deadline, date(2026, 5, 20))
+
 
 if __name__ == "__main__":
     unittest.main()

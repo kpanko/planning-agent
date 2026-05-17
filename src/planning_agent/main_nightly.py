@@ -74,20 +74,23 @@ def _task_to_placeable(  # pyright: ignore[reportUnusedFunction]
         hours = task.duration.amount / 60.0
     elif task.duration.unit == "day":
         hours = task.duration.amount * _HOURS_PER_TODOIST_DAY
-    else:  # defensive — DurationUnit is currently a Literal
+    else:  # Future-proof: fall back if a new DurationUnit is added upstream.
         hours = default_hours
 
     deadline: date | None = None
     if task.deadline is not None:
-        deadline_str: str = str(
-            task.deadline.date  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
-        )
-        deadline = date.fromisoformat(deadline_str)
+        raw = task.deadline.date  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
+        if isinstance(raw, datetime):  # pyright: ignore[reportUnnecessaryIsInstance]
+            deadline = raw.date()
+        elif isinstance(raw, date):  # pyright: ignore[reportUnnecessaryIsInstance]
+            deadline = raw  # pyright: ignore[reportUnknownVariableType]
+        else:
+            deadline = date.fromisoformat(str(raw))  # pyright: ignore[reportUnknownArgumentType]
 
     return PlaceableTask(
         id=task.id,
         duration_hours=hours,
-        deadline=deadline,
+        deadline=deadline,  # pyright: ignore[reportUnknownArgumentType]
     )
 
 
