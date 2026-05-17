@@ -23,7 +23,6 @@ from planning_agent.context import (
     build_context,
 )
 from planning_context.conversations import Conversation
-from planning_context.memories import Memory
 from tests.conftest import create_task
 
 
@@ -384,22 +383,19 @@ class TestBuildContext:
     )
     @patch("planning_agent.context.TODOIST_API_KEY", "")
     @patch("planning_agent.context.get_recent")
-    @patch("planning_agent.context.get_active")
     @patch("planning_agent.context.read_values")
     def test_builds_without_todoist(
-        self, mock_values, mock_active, mock_recent,
+        self, mock_values, mock_recent,
         mock_gcal_path,
     ):
         mock_gcal_path.exists.return_value = False
         mock_values.return_value = "my values"
-        mock_active.return_value = []
         mock_recent.return_value = []
 
         ctx = build_context()
 
         assert isinstance(ctx, PlanningContext)
         assert ctx.values_doc == "my values"
-        assert ctx.memories == []
         assert ctx.recent_conversations == []
         assert "(Todoist not connected)" in ctx.todoist_snapshot
         assert "(Todoist not connected)" in ctx.inbox_project
@@ -407,27 +403,6 @@ class TestBuildContext:
         assert ctx.day_type in (
             "remote", "office", "weekend",
         )
-
-    @patch("planning_agent.context.TODOIST_API_KEY", "")
-    @patch("planning_agent.context.get_recent")
-    @patch("planning_agent.context.get_active")
-    @patch("planning_agent.context.read_values")
-    def test_includes_memories(
-        self, mock_values, mock_active, mock_recent,
-    ):
-        mock_values.return_value = ""
-        mock_active.return_value = [
-            {
-                "id": "m_001",
-                "content": "Prefers morning errands",
-                "category": "preference",
-            },
-        ]
-        mock_recent.return_value = []
-
-        ctx = build_context()
-        assert len(ctx.memories) == 1
-        assert ctx.memories[0]["id"] == "m_001"
 
     @patch("planning_agent.context.fetch_calendar_snapshot")
     @patch("planning_agent.context._fetch_inbox_project")
@@ -441,16 +416,14 @@ class TestBuildContext:
         "fake-key",
     )
     @patch("planning_agent.context.get_recent")
-    @patch("planning_agent.context.get_active")
     @patch("planning_agent.context.read_values")
     def test_lazy_mode_skips_calendar_and_renders_placeholder(
         self,
-        mock_values, mock_active, mock_recent,
+        mock_values, mock_recent,
         _mock_api_cls,
         mock_todoist_snap, mock_inbox, mock_gcal,
     ):
         mock_values.return_value = "vals"
-        mock_active.return_value = [{"id": "m_001"}]
         mock_recent.return_value = [
             {"date": "2026-05-01"},
             {"date": "2026-04-30"},
@@ -468,7 +441,6 @@ class TestBuildContext:
         assert ctx.is_lazy is True
         assert ctx.n_overdue == 3
         assert ctx.n_upcoming == 7
-        assert ctx.n_memories == 1
         assert ctx.n_conversations == 2
         # Snapshot strings are placeholders, not full content
         assert ctx.todoist_snapshot == LAZY_TODOIST_PLACEHOLDER
@@ -481,10 +453,9 @@ class TestBuildContext:
     )
     @patch("planning_agent.context.TODOIST_API_KEY", "")
     @patch("planning_agent.context.get_recent")
-    @patch("planning_agent.context.get_active")
     @patch("planning_agent.context.read_values")
     def test_lazy_mode_without_todoist_key(
-        self, mock_values, mock_active, mock_recent,
+        self, mock_values, mock_recent,
         mock_gcal_path,
     ):
         # Lazy + no Todoist key: the "not connected" branch
@@ -492,7 +463,6 @@ class TestBuildContext:
         # placeholder, and counts stay zero.
         mock_gcal_path.exists.return_value = False
         mock_values.return_value = ""
-        mock_active.return_value = []
         mock_recent.return_value = []
 
         ctx = build_context(lazy=True)
@@ -500,7 +470,6 @@ class TestBuildContext:
         assert ctx.is_lazy is True
         assert ctx.n_overdue == 0
         assert ctx.n_upcoming == 0
-        assert ctx.n_memories == 0
         assert ctx.n_conversations == 0
         assert "(Todoist not connected)" in ctx.todoist_snapshot
         assert ctx.calendar_snapshot == LAZY_CALENDAR_PLACEHOLDER
@@ -569,18 +538,15 @@ def _make_ctx(
     *,
     todoist_snapshot: str = "FULL_TASKS_BODY",
     calendar_snapshot: str = "FULL_CAL_BODY",
-    memories: list[Memory] | None = None,
     conversations: list[Conversation] | None = None,
     n_overdue: int = 0,
     n_upcoming: int = 0,
-    n_memories: int = 0,
     n_conversations: int = 0,
     fuzzy_due_soon: str = "(none due in the next 14 days)",
 ) -> PlanningContext:
     return PlanningContext(
         is_lazy=is_lazy,
         values_doc="MY_VALUES_DOC",
-        memories=memories or [],
         recent_conversations=conversations or [],
         todoist_snapshot=todoist_snapshot,
         calendar_snapshot=calendar_snapshot,
@@ -589,7 +555,6 @@ def _make_ctx(
         inbox_project="Inbox project: Inbox (ID: 999)",
         n_overdue=n_overdue,
         n_upcoming=n_upcoming,
-        n_memories=n_memories,
         n_conversations=n_conversations,
         fuzzy_due_soon=fuzzy_due_soon,
     )

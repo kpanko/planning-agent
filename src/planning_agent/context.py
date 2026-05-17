@@ -8,7 +8,6 @@ from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 from planning_context.conversations import Conversation, get_recent
-from planning_context.memories import Memory, get_active
 from planning_context.values import read_values
 from todoist_api_python.api import TodoistAPI
 from todoist_api_python.models import Task
@@ -43,7 +42,6 @@ class PlanningContext:
 
     is_lazy: bool
     values_doc: str
-    memories: list[Memory]
     recent_conversations: list[Conversation]
     todoist_snapshot: str
     calendar_snapshot: str
@@ -52,7 +50,6 @@ class PlanningContext:
     inbox_project: str
     n_overdue: int
     n_upcoming: int
-    n_memories: int
     n_conversations: int
     fuzzy_due_soon: str
     # Sunday-review extras: populated by build_sunday_context;
@@ -285,12 +282,11 @@ def build_context(lazy: bool = False) -> PlanningContext:
 
     ``lazy=True`` skips the GCal fetch and the rendered task
     snapshot but still reads task counts from Todoist so the
-    shape summary in the prompt has numbers. Memories and
-    recent conversations are local file reads and are always
-    loaded; the prompt template decides whether to render them.
+    shape summary in the prompt has numbers. Recent
+    conversations are local file reads and are always loaded;
+    the prompt template decides whether to render them.
     """
     values_doc = read_values()
-    memories = get_active()
     conversations = get_recent(count=3)
 
     n_overdue = 0
@@ -327,7 +323,6 @@ def build_context(lazy: bool = False) -> PlanningContext:
     return PlanningContext(
         is_lazy=lazy,
         values_doc=values_doc,
-        memories=memories,
         recent_conversations=conversations,
         todoist_snapshot=todoist_snapshot,
         calendar_snapshot=calendar_snapshot,
@@ -336,7 +331,6 @@ def build_context(lazy: bool = False) -> PlanningContext:
         inbox_project=inbox_project,
         n_overdue=n_overdue,
         n_upcoming=n_upcoming,
-        n_memories=len(memories),
         n_conversations=len(conversations),
         fuzzy_due_soon=fuzzy_due_soon,
     )

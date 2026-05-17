@@ -24,16 +24,9 @@ INTENTIONALLY_UNADVERTISED: dict[str, str] = {
     "get_values_doc": (
         "pre-loaded into the system prompt; agent reads it directly"
     ),
-    "get_active_memories": (
-        "pre-loaded in full mode; lazy mode wraps it in the"
-        " get_memories agent tool"
-    ),
     "save_conversation_summary": (
         "called by the post-session extractor, not the agent"
     ),
-    # Memory MCP tools — deleted in Task 7 of M-R2
-    "add_memory": "deleted in M-R2 Task 7",
-    "resolve_memory": "deleted in M-R2 Task 7",
     # todoist_mcp — registered but no current agent use case;
     # promote to SUNDAY_PROMPT when a use case is identified
     "get_sections": "no current agent use case",

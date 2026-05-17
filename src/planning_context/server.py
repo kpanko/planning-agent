@@ -7,19 +7,15 @@ used by the AI planning agent.
 import json
 import logging
 import sys
-from typing import cast
-
 from fastmcp import FastMCP
 
 from . import (
     conversations,
     fuzzy_recurring,
-    memories,
     observations,
     rules,
     values,
 )
-from .memories import MemoryCategory
 from .storage import get_data_dir
 
 logger = logging.getLogger("planning-context")
@@ -147,65 +143,6 @@ async def update_observations(content: str) -> str:
         len(content),
     )
     return observations.write_observations(content)
-
-
-# --- Memory tools ---
-
-
-@server.tool()
-async def get_active_memories() -> str:
-    """Get all active memories (not resolved, not expired).
-
-    Returns memories as formatted text for inclusion in context.
-    """
-    logger.debug("Tool called: get_active_memories")
-    active = memories.get_active()
-    if not active:
-        return "(No active memories yet.)"
-    logger.debug("get_active_memories returning %d memories", len(active))
-    lines: list[str] = []
-    for m in active:
-        expiry = m.get("expiry_date")
-        lines.append(
-            f"[{m['id']}] ({m['category']}) {m['content']}"
-            + (f" [expires {expiry}]" if expiry else "")
-        )
-    return "\n".join(lines)
-
-
-@server.tool()
-async def add_memory(
-    content: str,
-    category: str,
-    expiry_date: str | None = None,
-) -> str:
-    """Store a new memory from the current conversation.
-
-    Categories: fact, observation, open_thread, preference.
-    Expiry date is optional (ISO format YYYY-MM-DD).
-    """
-    logger.debug("Tool called: add_memory category=%s", category)
-    try:
-        m = memories.add_memory(
-            content, cast(MemoryCategory, category), expiry_date
-        )
-        return f"Memory saved: {m['id']} — {m['content']}"
-    except ValueError as e:
-        logger.warning("add_memory validation error: %s", e)
-        return f"Error: {e}"
-
-
-@server.tool()
-async def resolve_memory(memory_id: str) -> str:
-    """Mark a memory as resolved (no longer active).
-
-    Used when a fact is outdated, a thread is closed, or info has changed.
-    """
-    logger.debug("Tool called: resolve_memory id=%s", memory_id)
-    m = memories.resolve_memory(memory_id)
-    if m is None:
-        return f"Memory {memory_id} not found."
-    return f"Memory {memory_id} resolved."
 
 
 # --- Conversation tools ---
