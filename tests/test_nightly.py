@@ -9,6 +9,7 @@ from freezegun import freeze_time
 
 from tests.conftest import create_task
 from todoist_scheduler.overdue import fetch_overdue_tasks
+from todoist_scheduler.scheduler import Scheduler
 
 
 class TestParseCapacity(unittest.TestCase):
@@ -175,8 +176,6 @@ class TestSchedulerDryRun(unittest.TestCase):
     """Tests for the Scheduler dry_run flag."""
 
     def setUp(self) -> None:
-        from todoist_scheduler.scheduler import Scheduler
-        self.Scheduler = Scheduler
         self.api = MagicMock()
         self.api.update_task.return_value = True
         self.today = date(2026, 4, 6)
@@ -189,7 +188,7 @@ class TestSchedulerDryRun(unittest.TestCase):
         self.addCleanup(self._verify_patcher.stop)
 
     def test_dry_run_collects_moves(self) -> None:
-        scheduler = self.Scheduler(
+        scheduler = Scheduler(
             self.api, self.today, 5,
             "no_reschedule", dry_run=True,
         )
@@ -208,7 +207,7 @@ class TestSchedulerDryRun(unittest.TestCase):
         self.assertEqual(day, self.today)
 
     def test_dry_run_skips_api_call(self) -> None:
-        scheduler = self.Scheduler(
+        scheduler = Scheduler(
             self.api, self.today, 5,
             "no_reschedule", dry_run=True,
         )
@@ -223,7 +222,7 @@ class TestSchedulerDryRun(unittest.TestCase):
         self.api.update_task.assert_not_called()
 
     def test_non_dry_run_records_moves(self) -> None:
-        scheduler = self.Scheduler(
+        scheduler = Scheduler(
             self.api, self.today, 5,
             "no_reschedule", dry_run=False,
         )
