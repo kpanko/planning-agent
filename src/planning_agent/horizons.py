@@ -95,8 +95,9 @@ def place_in_horizon(
         # Land on Saturday of the chosen week by default;
         # clamp to today so non-deadline tasks never land
         # in the past (e.g. when today is a Sunday).
-        # (M-R2 will add day-of-week preference logic when
-        # it builds the Sunday review.)
+        # Day-of-week preference is a future-work item; M-R3
+        # uses this default for the nightly job and M-R2's
+        # Sunday agent reasons about placement in the prompt.
         default_day = current_week + timedelta(days=5)
         placements[t.id] = max(today, default_day)
         week_used[current_week] = (

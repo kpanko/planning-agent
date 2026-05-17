@@ -108,11 +108,18 @@ M-R3 plus the M-R3 plan doc. Branch stays alive for M-R4.
   (#55, #62). Defensive read-after-write is in place for date
   changes, but treat any new Todoist write operation as unreliable
   until proven otherwise — log inputs and outputs, validate results.
-- **Tiered horizons are prompt-only in M-R2.** `place_in_horizon`
-  exists but isn't invoked from any tool yet — the Sunday agent
-  reasons about placement from the prompt instructions. If that
-  proves unreliable in real use, M-R4 or a follow-up adds a tool
-  wrapper.
+- **Tiered horizons in the Sunday agent are prompt-only.**
+  M-R3 wired `place_in_horizon` into `run_nightly` (so the
+  nightly job uses the algorithm directly), but the Sunday
+  agent still reasons about placement from prompt instructions
+  alone. If that proves unreliable, M-R4 or a follow-up can
+  add a tool wrapper.
+- **`run_nightly` non-dry-run path lacks integration test
+  coverage.** All `TestRunNightly` tests with overdue tasks
+  use `dry_run=True`. The `reschedule_task` call and the
+  per-task `try/except` aren't exercised end-to-end. Happy
+  path is implicitly covered by lower-level tests; track as a
+  follow-up if/when a real bug surfaces.
 - **CodeRabbit comment on the migration script wording**
   (untracked-vs-committed contradiction in
   `project-plans/redesign-m-r1.md`) was left as-is — the plan is
