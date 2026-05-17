@@ -22,7 +22,7 @@ from pydantic_ai.messages import (
 from fastapi import Depends, FastAPI, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
-from .agent import ConfirmFn, DebugFn, create_agent
+from .agent import ConfirmFn, DebugFn
 from .config import DEBUG_MODE
 from . import config
 from .main_nightly import run_nightly
@@ -40,11 +40,9 @@ from .auth import (
     verify_state_cookie,
     get_verifier_cookie,
 )
-from .context import (
-    CALENDAR_NEEDS_RECONNECT,
-    build_context,
-)
+from .context import CALENDAR_NEEDS_RECONNECT
 from .extraction import run_extraction
+from .sunday_review import build_sunday_context, create_sunday_agent
 from .version import GIT_COMMIT
 
 logger = logging.getLogger("planning-agent")
@@ -231,7 +229,7 @@ async def websocket_endpoint(ws: WebSocket) -> None:
 
     await ws.accept()
 
-    ctx = build_context(lazy=True)
+    ctx = build_sunday_context()
     history: list[Any] = []
 
     if ctx.calendar_snapshot == CALENDAR_NEEDS_RECONNECT:
@@ -295,7 +293,7 @@ async def websocket_endpoint(ws: WebSocket) -> None:
 
     confirm: ConfirmFn = web_confirm
     debug: DebugFn = send_debug
-    agent = create_agent(confirm=confirm, debug_fn=debug)
+    agent = create_sunday_agent(confirm=confirm, debug_fn=debug)
 
     async def receive_loop() -> None:
         """Route incoming WS messages to the right sink."""

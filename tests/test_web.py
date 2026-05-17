@@ -227,11 +227,11 @@ class TestWebSocketChat:
             ),
             patch("planning_agent.main_web.DEBUG_MODE", False),
             patch(
-                "planning_agent.main_web.create_agent",
+                "planning_agent.main_web.create_sunday_agent",
                 return_value=mock_agent,
             ),
             patch(
-                "planning_agent.main_web.build_context",
+                "planning_agent.main_web.build_sunday_context",
                 return_value=_make_mock_context(),
             ),
             patch(
@@ -268,11 +268,11 @@ class TestWebSocketChat:
                 _TEST_SECRET,
             ),
             patch(
-                "planning_agent.main_web.create_agent",
+                "planning_agent.main_web.create_sunday_agent",
                 return_value=mock_agent,
             ),
             patch(
-                "planning_agent.main_web.build_context",
+                "planning_agent.main_web.build_sunday_context",
                 return_value=_make_mock_context(),
             ),
             patch(
@@ -311,11 +311,11 @@ class TestWebSocketChat:
             ),
             patch("planning_agent.main_web.DEBUG_MODE", False),
             patch(
-                "planning_agent.main_web.create_agent",
+                "planning_agent.main_web.create_sunday_agent",
                 return_value=mock_agent,
             ),
             patch(
-                "planning_agent.main_web.build_context",
+                "planning_agent.main_web.build_sunday_context",
                 return_value=_make_mock_context(),
             ),
             patch(
@@ -351,11 +351,11 @@ class TestWebSocketChat:
                 False,
             ),
             patch(
-                "planning_agent.main_web.create_agent",
+                "planning_agent.main_web.create_sunday_agent",
                 return_value=mock_agent,
             ),
             patch(
-                "planning_agent.main_web.build_context",
+                "planning_agent.main_web.build_sunday_context",
                 return_value=_make_mock_context(),
             ),
             patch(
@@ -471,11 +471,11 @@ class TestWebSocketConfirm:
             ),
             patch("planning_agent.main_web.DEBUG_MODE", False),
             patch(
-                "planning_agent.main_web.create_agent",
+                "planning_agent.main_web.create_sunday_agent",
                 side_effect=capture_create_agent,
             ),
             patch(
-                "planning_agent.main_web.build_context",
+                "planning_agent.main_web.build_sunday_context",
                 return_value=_make_mock_context(),
             ),
             patch(
@@ -562,11 +562,11 @@ class TestWebSocketConfirm:
             ),
             patch("planning_agent.main_web.DEBUG_MODE", False),
             patch(
-                "planning_agent.main_web.create_agent",
+                "planning_agent.main_web.create_sunday_agent",
                 side_effect=capture_create_agent,
             ),
             patch(
-                "planning_agent.main_web.build_context",
+                "planning_agent.main_web.build_sunday_context",
                 return_value=_make_mock_context(),
             ),
             patch(
