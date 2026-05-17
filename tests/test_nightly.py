@@ -509,16 +509,17 @@ class TestPlanNightly(unittest.TestCase):
             default_task_hours=1.0,
         )
         self.assertEqual(len(placements), 3)
-        # All three default to 1hr; week capacity is 50 — they
-        # all land in the week containing today.
-        week_start = self.today  # Sunday-of-week edge case
-        # place_in_horizon uses Monday-of-week as week_start;
-        # the placement should be within the next 7 days.
+        # All three default to 1hr; week capacity is 50 — they all
+        # fit in the week containing today (Sunday 2026-05-17, i.e.
+        # Mon 5/11 – Sun 5/17). week2_start is Mon of the next week.
+        week2_start = (
+            self.today
+            - timedelta(days=self.today.weekday())
+            + timedelta(days=7)
+        )
         for _, day in placements:
             self.assertGreaterEqual(day, self.today)
-            self.assertLessEqual(
-                (day - self.today).days, 7,
-            )
+            self.assertLess(day, week2_start)
 
     def test_overflow_slides_to_later_week(self) -> None:
         from planning_agent.main_nightly import plan_nightly
