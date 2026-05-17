@@ -16,9 +16,6 @@ ConfirmFn = Callable[[str, str], Awaitable[bool]]
 DebugFn = Callable[[str, dict[str, Any]], Awaitable[None]]
 
 from pydantic_ai import Agent, RunContext
-from pydantic_ai.models.anthropic import (
-    AnthropicModelSettings,
-)
 
 _console = Console(stderr=True)
 
@@ -33,10 +30,14 @@ def _tool_status(
     _console.print(msg)
 
 
-async def _default_confirm(
+async def _default_confirm(  # pyright: ignore[reportUnusedFunction]
     name: str, detail: str = "",
 ) -> bool:
-    """Default confirm: prompt via terminal (async)."""
+    """Default confirm: prompt via terminal (async).
+
+    Imported by sunday_review and (future) other planning-mode
+    factories to default the confirm callback.
+    """
     _tool_status(name, detail)
     try:
         answer = await asyncio.to_thread(
@@ -50,13 +51,6 @@ from planning_context.conversations import (
     Conversation,
     get_recent as _get_recent_conversations,
 )
-from planning_context.memories import (
-    Memory,
-    MemoryCategory,
-    add_memory as _add_memory,
-    get_active as _get_active_memories,
-    resolve_memory as _resolve_memory,
-)
 from planning_context.fuzzy_recurring import (
     add_fuzzy_recurring as _add_fuzzy_recurring,
     remove_fuzzy_recurring as _remove_fuzzy_recurring,
@@ -67,240 +61,11 @@ from todoist_api_python.api import TodoistAPI
 from todoist_mcp import tools as _tools
 from todoist_mcp.tools import RescheduleItem
 
-from .config import TODOIST_API_KEY, LLM_MODEL
+from .config import TODOIST_API_KEY
 from .context import PlanningContext, fetch_calendar_snapshot
 
-# -- Static system prompt (adapted from system-prompt.md) --
-# The "Start of Conversation" section is removed because
-# context is pre-loaded and injected below.
-
-STATIC_PROMPT = """\
-You are a personal planning agent. Your job is to manage \
-the user's time so they can focus on doing things rather \
-than deciding what to do. You read their Todoist tasks, \
-Google Calendar, values, and memories, then propose \
-concrete weekly schedules. They review, adjust, and \
-approve. The plan lives in Todoist — tasks get assigned \
-dates, times, and durations so they appear in Todoist's \
-Upcoming view.
-
-Personal details about the user — their name, schedule, \
-energy patterns, preferences, and constraints — are \
-stored in your memories and values document. Use those \
-to inform your scheduling decisions.
-
-## Core Interactions
-
-### Weekly Planning (the main event)
-
-When the user asks you to plan their week (or when it's \
-clearly a planning session):
-
-1. **Use the pre-loaded data.** Your system prompt already \
-contains tasks (overdue + next 14 days), calendar events, \
-and project list. Do NOT call `find_tasks`, \
-`find_tasks_by_date`, or `get_projects` to re-fetch what \
-you already have. Only call tools if you need data outside \
-the pre-loaded window.
-
-2. **Propose a concrete schedule.** Assign specific days \
-to tasks across the full ~14-day window. For important or \
-time-sensitive tasks, suggest specific time windows. Don't \
-present options — make decisions and let them adjust. \
-Spread tasks across both weeks — don't front-load. Use \
-the second week for lower-priority items.
-
-3. **Account for every overdue task.** After proposing \
-the schedule, verify every overdue task from the pre-loaded \
-context is either scheduled or explicitly noted as deferred \
-with a reason. Never silently skip an overdue task.
-
-4. **Explain your reasoning briefly.** One sentence per \
-decision, not a paragraph.
-
-5. **Show trade-offs honestly.** If there's more to do \
-than time allows, say so and suggest what to cut or \
-push further out.
-
-6. **After approval, execute.** Use `reschedule_tasks` \
-to move tasks to their planned dates. Confirm what you \
-changed.
-
-### Daily Check-in
-
-Quick review of today's plan. What's on the calendar, \
-what tasks are scheduled, any adjustments needed. Keep \
-it to a few sentences unless asked for more.
-
-### On-Demand Replanning
-
-When plans change, reshuffle the remaining week. Undone \
-tasks always get rescheduled forward — never silently \
-dropped.
-
-### Capture and Triage
-
-When the user mentions something they need to do, add \
-it to Todoist with an appropriate due date. Don't \
-over-discuss it.
-
-## Scheduling Principles
-
-- **Don't overschedule.** Leave buffer. Leave at least \
-one weekend half-day completely unscheduled.
-- **Batch similar tasks.** Errands together, admin \
-together, cleaning together.
-- **Respect energy.** Don't stack heavy tasks on full \
-calendar days or at low-energy times.
-- **Protect hobby/interest time.** This isn't optional \
-leisure — it's where satisfaction comes from.
-- **Deadlines first, then importance.** Hard deadlines \
-get scheduled first. Then values-aligned tasks. Then \
-maintenance. Then nice-to-haves.
-- **Account for location.** Use labels when appropriate.
-- **Daily habits** (recurring daily tasks) are not \
-planning decisions. Include for awareness but don't \
-discuss unless the user raises an issue.
-- **Someday/maybe tasks** (undated, no deadline) are \
-not scheduled during weekly planning unless the user \
-asks, a natural opening appears, or one becomes \
-relevant.
-
-## Todoist Tool Usage
-
-### Reading Tasks
-- `find_tasks(query)` — Todoist filter syntax \
-  (e.g. "today", "overdue", "p1 & @home", \
-  "#Inbox", "#ProjectName"). \
-  **Not** for searching by task name.
-- `find_tasks(search)` — case-insensitive substring \
-  search against task titles. Use this when looking \
-  up a task by name.
-- `find_tasks(project_id)` — all tasks in a project. \
-  The Inbox project ID is already in the pre-loaded \
-  "Todoist projects" section below — use it directly. \
-  For other projects, call `get_projects()` to look up \
-  the ID.
-- `find_tasks_by_date(start_date, end_date)` — date \
-  range.
-- `get_task(task_id)` — details on one task.
-- `get_projects()` — list all projects with IDs.
-
-### Modifying Tasks
-- `reschedule_tasks(tasks)` — move tasks to new dates. \
-**Always use this for date changes** — preserves \
-recurring patterns and reminders.
-- `update_task(task_id, content, description, priority, \
-labels, project_id)` — edit title, description, \
-priority, or labels; set `project_id` to move the task \
-to a different project. **Never use for due dates — \
-use `reschedule_tasks` instead.**
-- `complete_task(task_id)` — mark done.
-- `delete_task(task_id)` — permanently delete a task.
-- `add_task(content, due_string, ...)` — create a task.
-
-### Critical: Recurring Task Rescheduling
-
-**Always use `reschedule_tasks` for any date change.** \
-Never update due dates directly. If a recurring task's \
-recurrence disappears after rescheduling, flag it to \
-the user immediately.
-
-## Planning Context Tool Usage
-
-- `add_memory(content, category, expiry_date)` — save \
-something new. Categories: fact, observation, \
-open_thread, preference.
-- `resolve_memory(memory_id)` — mark a memory as no \
-longer active.
-- `update_values_doc(content)` — rewrite the values doc \
-if priorities have clearly shifted.
-
-## Lazy Context Mode
-
-When the pre-loaded context shows "Available context \
-(call tools to load)" instead of full task lists, \
-calendar events, and memories, you are in lazy mode — \
-only counts have been pre-loaded. Fetch what the \
-question needs before answering:
-
-- Tasks: `find_tasks` (Todoist filter syntax) or \
-`find_tasks_by_date` (date range).
-- Calendar: `get_calendar(days)` — pass the number of \
-days you need.
-- Memories: `get_memories()` — full active memory list.
-- Recent conversations: `get_recent_conversations(count)`.
-
-Don't fetch what the question doesn't need. A quick \
-"what's on today?" needs today's tasks and today's \
-calendar — not 14 days of tasks or every memory. A \
-"plan my week" request needs all four. In full mode \
-(no "Available context" header), the data is already \
-in this prompt — don't re-fetch.
-
-## Conversation Style
-
-- **Short responses.** A sentence or two unless asked.
-- **One suggestion or question at a time.**
-- **Make decisions, don't ask.** "I scheduled the furnace \
-call for Tuesday morning" not "when would you like to \
-schedule the furnace call?"
-- **If they push back, adjust without guilt.**
-- **Never use moral language.** No "you should," no guilt.
-- **Be concrete.** Specific actions, not vague categories.
-- **Explain reasoning briefly when not obvious.**
-- **Frame maintenance tasks matter-of-factly.**
-
-## Fuzzy Recurring Tasks
-
-The "Fuzzy tasks due soon" section below lists maintenance \
-tasks with approximate intervals (e.g. "check spare tire \
-~every 180 days") that are coming due in the next 14 days. \
-These are stored in a local file, not in Todoist.
-
-During weekly planning, check that section and work any \
-due items into the schedule. Only propose scheduling a task \
-when its seasonal_constraints allow it for the current month \
-— do not schedule out-of-season tasks. After the user \
-confirms they did one, call `update_fuzzy_last_done` to \
-record the date.
-
-Tools for managing fuzzy tasks:
-- `add_fuzzy_recurring_task(name, interval_days, \
-seasonal_constraints, notes)` — add a new fuzzy recurring \
-maintenance task
-- `update_fuzzy_last_done(task_id, date_str)` — mark a \
-fuzzy task as done on a date (YYYY-MM-DD)
-- `remove_fuzzy_recurring_task(task_id)` — remove a fuzzy \
-recurring task permanently
-
-## What You Don't Do
-
-- Don't manage work tasks (unless told otherwise).
-- Don't nag about health goals.
-- Don't write to Google Calendar (read-only).
-- Don't optimize for maximum productivity — optimize for \
-the user feeling like their life is managed and they had \
-time to do what matters.\
-"""
 
 
-def _format_memories(
-    memories: list[Memory],
-) -> str:
-    if not memories:
-        return "(no active memories)"
-    lines: list[str] = []
-    for m in memories:
-        line = (
-            f"[{m['id']}] ({m['category']}) "
-            f"{m['content']}"
-        )
-        expiry = m.get("expiry_date")
-        if expiry:
-            line += f" (expires {expiry})"
-        lines.append(line)
-    return "\n".join(lines)
 
 
 def _format_conversations(
@@ -315,76 +80,6 @@ def _format_conversations(
                 f"[{conv['date']}] {entry['summary']}"
             )
     return "\n".join(lines)
-
-
-def _render_system_prompt(deps: PlanningContext) -> str:
-    """Render the full system prompt for a context.
-
-    Branches on ``deps.is_lazy``:
-    - **Full**: pre-loads task snapshot, calendar, memories,
-      and recent conversations into the prompt.
-    - **Lazy**: replaces those bodies with a shape-summary
-      block telling the agent which tools to call.
-
-    Always-shown sections (values, inbox project ID, current
-    datetime/day type) appear in both modes — they're cheap
-    and the agent needs them up front.
-    """
-    header = f"""{STATIC_PROMPT}
-
----
-
-## Pre-loaded Context
-
-### Values and priorities
-{deps.values_doc or "(no values document yet)"}"""
-
-    if deps.is_lazy:
-        middle = f"""
-
-### Todoist projects
-{deps.inbox_project}
-When the user asks about Inbox tasks, pass this ID as
-`project_id` to `find_tasks` or `get_overview` — do not
-call `get_projects()` to look it up again.
-
-### Available context (call tools to load)
-- Tasks: {deps.n_overdue} overdue, {deps.n_upcoming} in next 14 days — call find_tasks / find_tasks_by_date
-- Calendar: not loaded — call get_calendar(days)
-- Memories: {deps.n_memories} active — call get_memories
-- Recent conversations: {deps.n_conversations} available — call get_recent_conversations"""
-    else:
-        middle = f"""
-
-### Active memories
-{_format_memories(deps.memories)}
-
-### Recent conversations
-{_format_conversations(deps.recent_conversations)}
-
-### Todoist projects
-{deps.inbox_project}
-When the user asks about Inbox tasks, pass this ID as
-`project_id` to `find_tasks` or `get_overview` — do not
-call `get_projects()` to look it up again.
-
-### Tasks (overdue + next 14 days)
-{deps.todoist_snapshot}
-
-### Calendar (next 14 days)
-{deps.calendar_snapshot}"""
-
-    footer = f"""
-
-### Fuzzy tasks due soon (next 14 days)
-{deps.fuzzy_due_soon}
-
-### Right now
-{deps.current_datetime} — {deps.day_type} day"""
-
-    return header + middle + footer
-
-
 # -- Agent creation --
 
 def _get_api() -> TodoistAPI:
@@ -898,126 +593,3 @@ def register_misc_tools(
             write_values,
             content,
         )
-
-
-def create_agent(
-    confirm: ConfirmFn | None = None,
-    debug_fn: DebugFn | None = None,
-) -> Agent[PlanningContext, str]:
-    """Build and return the planning agent.
-
-    Deferred so import doesn't require API keys.
-    confirm: async callable(name, detail) -> bool used
-             for tool-call confirmation. Defaults to a
-             terminal prompt via stdin.
-    """
-    if confirm is None:
-        confirm = _default_confirm
-    planning_agent = Agent(
-        LLM_MODEL,
-        deps_type=PlanningContext,
-        model_settings=AnthropicModelSettings(
-            anthropic_cache_instructions=True,
-            anthropic_cache_messages=True,
-        ),
-    )
-
-    @planning_agent.system_prompt
-    async def build_system_prompt(  # pyright: ignore[reportUnusedFunction]
-        ctx: RunContext[PlanningContext],
-    ) -> str:
-        prompt = _render_system_prompt(ctx.deps)
-        if debug_fn:
-            await debug_fn(
-                "system_prompt", {"content": prompt}
-            )
-        return prompt
-
-    register_todoist_tools(planning_agent, confirm, debug_fn)
-    register_fuzzy_tools(planning_agent, confirm, debug_fn)
-    register_misc_tools(planning_agent, confirm, debug_fn)
-
-    # ---------------------------------------------------------------
-    # Memory tools (retired in M-R2: Task 6 deletes this block)
-    # ---------------------------------------------------------------
-
-    run_tool = _make_run_tool(debug_fn)
-
-    @planning_agent.tool
-    async def add_memory(  # pyright: ignore[reportUnusedFunction]
-        ctx: RunContext[PlanningContext],
-        content: str,
-        category: MemoryCategory,
-        expiry_date: Optional[str] = None,
-    ) -> str:
-        """Save a new memory.
-
-        category: fact, observation, open_thread, or
-                  preference.
-        expiry_date: Optional YYYY-MM-DD after which
-                     this memory expires.
-        """
-        detail = f"({category}) {content[:100]}"
-        if not await confirm("add_memory", detail):
-            return "Cancelled by user."
-        if debug_fn:
-            await debug_fn(
-                "tool_call",
-                {"tool": "add_memory", "args": detail},
-            )
-        try:
-            memory = _add_memory(
-                content, category, expiry_date
-            )
-            result = (
-                f"Memory saved: {memory['id']}"
-                f" ({category})"
-            )
-            if debug_fn:
-                await debug_fn(
-                    "tool_result",
-                    {"tool": "add_memory", "result": result},
-                )
-            return result
-        except Exception as e:
-            logger.exception("add_memory failed")
-            if debug_fn:
-                await debug_fn(
-                    "exception",
-                    {
-                        "tool": "add_memory",
-                        "traceback": _traceback.format_exc(),
-                    },
-                )
-            return f"Error: {e}"
-
-    @planning_agent.tool
-    async def resolve_memory(  # pyright: ignore[reportUnusedFunction]
-        ctx: RunContext[PlanningContext],
-        memory_id: str,
-    ) -> str:
-        """Mark a memory as resolved/no longer active."""
-        if not await confirm("resolve_memory", memory_id):
-            return "Cancelled by user."
-        return await run_tool(
-            "resolve_memory",
-            memory_id,
-            lambda: (
-                f"Memory {memory_id} resolved."
-                if _resolve_memory(memory_id)
-                else f"Memory {memory_id} not found."
-            ),
-        )
-
-    @planning_agent.tool
-    async def get_memories(  # pyright: ignore[reportUnusedFunction]
-        ctx: RunContext[PlanningContext],
-    ) -> str:
-        """Fetch the full active-memory list."""
-        return await run_tool(
-            "get_memories",
-            "",
-            lambda: _format_memories(_get_active_memories()),
-        )
-
-    return planning_agent

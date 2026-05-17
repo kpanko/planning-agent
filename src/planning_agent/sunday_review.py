@@ -13,6 +13,9 @@ from __future__ import annotations
 import logging
 
 from pydantic_ai import Agent
+from pydantic_ai.models.anthropic import (
+    AnthropicModelSettings,
+)
 
 from planning_context import (
     deferrals as _deferrals,
@@ -65,6 +68,10 @@ def create_sunday_agent(
         LLM_MODEL,
         system_prompt=SUNDAY_PROMPT,
         deps_type=PlanningContext,
+        model_settings=AnthropicModelSettings(
+            anthropic_cache_instructions=True,
+            anthropic_cache_messages=True,
+        ),
     )
     register_todoist_tools(sunday_agent, confirm_fn, debug_fn)
     register_rules_tools(sunday_agent, confirm_fn, debug_fn)

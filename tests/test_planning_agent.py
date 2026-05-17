@@ -539,30 +539,6 @@ class TestBuildContext:
 
 
 class TestAgentSystemPrompt:
-    def test_format_memories_empty(self):
-        from planning_agent.agent import (
-            _format_memories,
-        )
-        assert "(no active memories)" in (
-            _format_memories([])
-        )
-
-    def test_format_memories_with_data(self):
-        from planning_agent.agent import (
-            _format_memories,
-        )
-        memories = [
-            {
-                "id": "m_001",
-                "content": "Prefers mornings",
-                "category": "preference",
-            },
-        ]
-        result = _format_memories(memories)
-        assert "m_001" in result
-        assert "Prefers mornings" in result
-        assert "preference" in result
-
     def test_format_conversations_empty(self):
         from planning_agent.agent import (
             _format_conversations,
@@ -619,137 +595,9 @@ def _make_ctx(
     )
 
 
-class TestRenderSystemPrompt:
-    def test_full_mode_includes_snapshot_bodies(self):
-        from planning_agent.agent import (
-            STATIC_PROMPT,
-            _render_system_prompt,
-        )
-        ctx = _make_ctx(
-            is_lazy=False,
-            memories=[
-                {
-                    "id": "m_001",
-                    "content": "Likes mornings",
-                    "category": "preference",
-                },
-            ],
-            conversations=[
-                {
-                    "date": "2026-05-01",
-                    "entries": [
-                        {"summary": "Last session."},
-                    ],
-                },
-            ],
-        )
-        prompt = _render_system_prompt(ctx)
-
-        assert STATIC_PROMPT in prompt
-        assert "MY_VALUES_DOC" in prompt
-        assert "FULL_TASKS_BODY" in prompt
-        assert "FULL_CAL_BODY" in prompt
-        assert "Likes mornings" in prompt
-        assert "Last session." in prompt
-        assert "Tasks (overdue + next 14 days)" in prompt
-        assert "Calendar (next 14 days)" in prompt
-        # The lazy-block markdown header ("### Available context")
-        # only appears in lazy renders. The bare string "Available
-        # context (call tools to load)" is also referenced in the
-        # static prompt's Lazy Context Mode section, so we have to
-        # match the heading prefix specifically to distinguish.
-        assert "### Available context (call tools to load)" not in prompt
-
-    def test_lazy_mode_renders_shape_summary(self):
-        from planning_agent.agent import (
-            _render_system_prompt,
-        )
-        ctx = _make_ctx(
-            is_lazy=True,
-            n_overdue=27,
-            n_upcoming=18,
-            n_memories=6,
-            n_conversations=3,
-        )
-        prompt = _render_system_prompt(ctx)
-
-        assert "### Available context (call tools to load)" in prompt
-        assert "27 overdue, 18 in next 14 days" in prompt
-        assert "find_tasks / find_tasks_by_date" in prompt
-        assert "Calendar: not loaded — call get_calendar(days)" in prompt
-        assert "Memories: 6 active — call get_memories" in prompt
-        assert (
-            "Recent conversations: 3 available "
-            "— call get_recent_conversations"
-        ) in prompt
-
-    def test_lazy_mode_omits_full_snapshot_bodies(self):
-        from planning_agent.agent import (
-            _render_system_prompt,
-        )
-        ctx = _make_ctx(
-            is_lazy=True,
-            todoist_snapshot="SHOULD_NOT_APPEAR_TASKS",
-            calendar_snapshot="SHOULD_NOT_APPEAR_CAL",
-            memories=[
-                {
-                    "id": "m_999",
-                    "content": "SECRET_MEMORY_CONTENT",
-                    "category": "fact",
-                },
-            ],
-            conversations=[
-                {
-                    "date": "2026-05-01",
-                    "entries": [
-                        {"summary": "SECRET_CONV_SUMMARY"},
-                    ],
-                },
-            ],
-            n_memories=1,
-            n_conversations=1,
-        )
-        prompt = _render_system_prompt(ctx)
-
-        # Full bodies are not rendered — that's the whole point
-        # of lazy mode.
-        assert "SHOULD_NOT_APPEAR_TASKS" not in prompt
-        assert "SHOULD_NOT_APPEAR_CAL" not in prompt
-        assert "SECRET_MEMORY_CONTENT" not in prompt
-        assert "SECRET_CONV_SUMMARY" not in prompt
-        assert "Tasks (overdue + next 14 days)" not in prompt
-        assert "Calendar (next 14 days)" not in prompt
-        assert "Active memories" not in prompt
-
-    def test_always_shown_sections_present_in_both_modes(self):
-        from planning_agent.agent import (
-            _render_system_prompt,
-        )
-        for is_lazy in (False, True):
-            prompt = _render_system_prompt(_make_ctx(is_lazy))
-            # Values, inbox ID, current datetime, day type
-            # are cheap and live in the prompt regardless.
-            assert "MY_VALUES_DOC" in prompt, (
-                f"values missing in lazy={is_lazy}"
-            )
-            assert "Inbox project: Inbox (ID: 999)" in prompt, (
-                f"inbox missing in lazy={is_lazy}"
-            )
-            assert (
-                "Saturday, May 02, 2026 09:00 AM" in prompt
-            ), f"datetime missing in lazy={is_lazy}"
-            assert "weekend day" in prompt, (
-                f"day_type missing in lazy={is_lazy}"
-            )
-
-    def test_static_prompt_contains_lazy_context_section(self):
-        from planning_agent.agent import STATIC_PROMPT
-
-        assert "## Lazy Context Mode" in STATIC_PROMPT
-        # Names the fetch tools so the agent knows what to call.
-        assert "get_calendar(days)" in STATIC_PROMPT
-        assert "get_memories" in STATIC_PROMPT
-        assert "get_recent_conversations" in STATIC_PROMPT
+# TestRenderSystemPrompt deleted — _render_system_prompt and
+# STATIC_PROMPT removed in M-R2 hard cutover. The Sunday review
+# prompt has its own tests in tests/test_sunday_review.py.
 
 
 class TestLazyFetchTools:
@@ -757,20 +605,19 @@ class TestLazyFetchTools:
         "os.environ", {"ANTHROPIC_API_KEY": "fake-key"}
     )
     @patch("planning_agent.agent.TODOIST_API_KEY", "fake-key")
-    def test_lazy_fetch_tools_registered(self):
-        # The lazy prompt names these three tools (#74); without
-        # them registered the agent would hit a wall when lazy
-        # mode kicks in. Probes the pydantic-ai internal toolset
-        # rather than firing the LLM.
-        from planning_agent.agent import create_agent
+    def test_context_fetch_tools_registered(self):
+        # The Sunday agent exposes get_calendar and
+        # get_recent_conversations as on-demand context-refetch
+        # tools. Probes the pydantic-ai internal toolset rather
+        # than firing the LLM. (get_memories was removed in M-R2.)
+        from planning_agent.sunday_review import create_sunday_agent
 
-        agent = create_agent()
+        agent = create_sunday_agent()
         tool_names = {
             t.name
             for t in agent._function_toolset.tools.values()  # pyright: ignore[reportPrivateUsage]
         }
         assert "get_calendar" in tool_names
-        assert "get_memories" in tool_names
         assert "get_recent_conversations" in tool_names
 
     # ---------------------------------------------------------------
@@ -781,9 +628,9 @@ class TestLazyFetchTools:
 
     @staticmethod
     def _build_tool(name: str):
-        from planning_agent.agent import create_agent
+        from planning_agent.sunday_review import create_sunday_agent
 
-        agent = create_agent()
+        agent = create_sunday_agent()
         return agent._function_toolset.tools[name]  # pyright: ignore[reportPrivateUsage]
 
     @pytest.mark.anyio
@@ -818,32 +665,6 @@ class TestLazyFetchTools:
         await tool.function(MagicMock())
 
         mock_fetch.assert_called_once_with(14)
-
-    @pytest.mark.anyio
-    @patch.dict(
-        "os.environ", {"ANTHROPIC_API_KEY": "fake-key"}
-    )
-    @patch("planning_agent.agent.TODOIST_API_KEY", "fake-key")
-    @patch("planning_agent.agent._format_memories")
-    @patch("planning_agent.agent._get_active_memories")
-    async def test_get_memories_formats_active_list(
-        self,
-        mock_get_active: MagicMock,
-        mock_format: MagicMock,
-    ):
-        mock_get_active.return_value = [
-            {"id": "m_1", "content": "x", "category": "fact"},
-        ]
-        mock_format.return_value = "rendered memories"
-        tool = self._build_tool("get_memories")
-
-        result = await tool.function(MagicMock())
-
-        mock_get_active.assert_called_once_with()
-        mock_format.assert_called_once_with(
-            mock_get_active.return_value
-        )
-        assert result == "rendered memories"
 
     @pytest.mark.anyio
     @patch.dict(

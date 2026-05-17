@@ -1,6 +1,6 @@
-"""Every @mcp.tool / @server.tool must be named in STATIC_PROMPT
+"""Every @mcp.tool / @server.tool must be named in SUNDAY_PROMPT
 or listed in INTENTIONALLY_UNADVERTISED with a written reason.
-Every tool named in STATIC_PROMPT must be registered on the agent.
+Every tool named in SUNDAY_PROMPT must be registered on the agent.
 """
 from __future__ import annotations
 
@@ -10,11 +10,14 @@ from unittest.mock import patch
 
 import planning_context.server as planning_server
 import todoist_mcp.server as todoist_server
-from planning_agent.agent import STATIC_PROMPT
+from planning_agent.sunday_review import (
+    SUNDAY_PROMPT,
+    create_sunday_agent,
+)
 
 # Tools that exist but are intentionally not advertised to the agent.
 # Each entry documents why. Removing an entry without advertising the
-# tool in STATIC_PROMPT will fail test_all_tools_advertised_or_listed.
+# tool in SUNDAY_PROMPT will fail test_all_tools_advertised_or_listed.
 INTENTIONALLY_UNADVERTISED: dict[str, str] = {
     # planning_context — data pre-loaded into the prompt or handled
     # by the post-session extractor, not called by the agent directly
@@ -28,8 +31,11 @@ INTENTIONALLY_UNADVERTISED: dict[str, str] = {
     "save_conversation_summary": (
         "called by the post-session extractor, not the agent"
     ),
+    # Memory MCP tools — deleted in Task 7 of M-R2
+    "add_memory": "deleted in M-R2 Task 7",
+    "resolve_memory": "deleted in M-R2 Task 7",
     # todoist_mcp — registered but no current agent use case;
-    # promote to STATIC_PROMPT when a use case is identified
+    # promote to SUNDAY_PROMPT when a use case is identified
     "get_sections": "no current agent use case",
     "get_comments": "no current agent use case",
     "get_overview": "summary view; agent uses find_tasks instead",
@@ -44,12 +50,6 @@ INTENTIONALLY_UNADVERTISED: dict[str, str] = {
     "get_fuzzy_recurring_task": (
         "no direct agent use case; agent uses the pre-loaded list"
     ),
-    # planning_context — rules/observations ship in M-R1 but the
-    # agent prompt rewrite that advertises them lands in M-R2
-    "get_rules": "M-R2 will wire this into the agent prompt",
-    "update_rules": "M-R2 will wire this into the agent prompt",
-    "get_observations": "M-R2 will wire this into the agent prompt",
-    "update_observations": "M-R2 will wire this into the agent prompt",
 }
 
 
@@ -67,11 +67,11 @@ def test_all_tools_advertised_or_listed() -> None:
         name
         for name in _registered_tool_names()
         if name not in INTENTIONALLY_UNADVERTISED
-        and f"`{name}" not in STATIC_PROMPT
+        and f"`{name}" not in SUNDAY_PROMPT
     ]
     assert not missing, (
         "These tools are registered but neither advertised in"
-        f" STATIC_PROMPT nor listed in INTENTIONALLY_UNADVERTISED:"
+        f" SUNDAY_PROMPT nor listed in INTENTIONALLY_UNADVERTISED:"
         f" {missing}"
     )
 
@@ -90,7 +90,7 @@ def test_unadvertised_set_has_no_stale_entries() -> None:
 
 
 # -------------------------------------------------------------------
-# Reverse direction: every tool named in STATIC_PROMPT must be
+# Reverse direction: every tool named in SUNDAY_PROMPT must be
 # registered on the agent. Prevents the class of bug where a tool
 # is added to the prompt but the @planning_agent.tool decorator is
 # never wired up (as happened with update_task / issue #71).
@@ -99,8 +99,6 @@ def test_unadvertised_set_has_no_stale_entries() -> None:
 
 def _agent_tool_names() -> set[str]:
     """Return the set of tool names registered on the agent."""
-    from planning_agent.agent import create_agent
-
     with (
         patch.dict(
             "os.environ", {"ANTHROPIC_API_KEY": "fake-key"}
@@ -109,7 +107,7 @@ def _agent_tool_names() -> set[str]:
             "planning_agent.agent.TODOIST_API_KEY", "fake-key"
         ),
     ):
-        agent = create_agent()
+        agent = create_sunday_agent()
     return {
         t.name
         for t in agent._function_toolset.tools.values()  # pyright: ignore[reportPrivateUsage]
@@ -117,7 +115,7 @@ def _agent_tool_names() -> set[str]:
 
 
 def _prompt_tool_names() -> set[str]:
-    """Extract tool names from STATIC_PROMPT.
+    """Extract tool names from SUNDAY_PROMPT.
 
     Matches backtick-prefixed identifiers followed by ``(``
     (call-signature form). This is specific enough to avoid
@@ -125,7 +123,7 @@ def _prompt_tool_names() -> set[str]:
     backticks (e.g. ``project_id``).
     """
     return set(
-        re.findall(r"`([a-z][a-z0-9_]*)\s*\(", STATIC_PROMPT)
+        re.findall(r"`([a-z][a-z0-9_]*)\s*\(", SUNDAY_PROMPT)
     )
 
 
@@ -134,6 +132,6 @@ def test_prompt_tools_all_registered() -> None:
     registered = _agent_tool_names()
     missing = sorted(in_prompt - registered)
     assert not missing, (
-        "These tools are named in STATIC_PROMPT but not"
+        "These tools are named in SUNDAY_PROMPT but not"
         f" registered on the agent: {missing}"
     )
