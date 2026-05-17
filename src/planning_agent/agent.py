@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import traceback as _traceback
+from datetime import date
 from typing import Any, Awaitable, Callable, Optional
 
 from rich.console import Console
@@ -807,6 +808,10 @@ def create_agent(
 
         date_str: ISO date "YYYY-MM-DD".
         """
+        try:
+            date.fromisoformat(date_str)
+        except ValueError:
+            return f"Invalid date {date_str!r}. Use YYYY-MM-DD."
         detail = f"{task_id} on {date_str}"
         if not await confirm("update_fuzzy_last_done", detail):
             return "Cancelled by user."
