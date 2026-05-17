@@ -387,5 +387,75 @@ class TestCliParsing(unittest.TestCase):
             asyncio.run(run_nightly())
 
 
+class TestTaskToPlaceable(unittest.TestCase):
+    """Tests for _task_to_placeable."""
+
+    def test_no_duration_uses_default(self) -> None:
+        from planning_agent.main_nightly import (
+            _task_to_placeable,
+        )
+        task = create_task(
+            "1", "no duration",
+            due_date_str="2026-05-10",
+        )
+        placeable = _task_to_placeable(
+            task, default_hours=1.0,
+        )
+        self.assertEqual(placeable.id, "1")
+        self.assertEqual(placeable.duration_hours, 1.0)
+        self.assertIsNone(placeable.deadline)
+
+    def test_minute_duration_converts_to_hours(self) -> None:
+        from todoist_api_python.models import Duration
+
+        from planning_agent.main_nightly import (
+            _task_to_placeable,
+        )
+        task = create_task(
+            "1", "30 min task",
+            due_date_str="2026-05-10",
+            duration=Duration(amount=30, unit="minute"),
+        )
+        placeable = _task_to_placeable(
+            task, default_hours=1.0,
+        )
+        self.assertEqual(placeable.duration_hours, 0.5)
+
+    def test_day_duration_converts_to_eight_hours(self) -> None:
+        from todoist_api_python.models import Duration
+
+        from planning_agent.main_nightly import (
+            _task_to_placeable,
+        )
+        task = create_task(
+            "1", "all day",
+            due_date_str="2026-05-10",
+            duration=Duration(amount=1, unit="day"),
+        )
+        placeable = _task_to_placeable(
+            task, default_hours=1.0,
+        )
+        # An "all-day" task burns the equivalent of a working
+        # day of capacity, not a literal 24h.
+        self.assertEqual(placeable.duration_hours, 8.0)
+
+    def test_deadline_extracted(self) -> None:
+        from todoist_api_python.models import Deadline
+
+        from planning_agent.main_nightly import (
+            _task_to_placeable,
+        )
+        task = create_task(
+            "1", "with deadline",
+            due_date_str="2026-05-10",
+        )
+        # Deadline is a separate field on Task.
+        task.deadline = Deadline(date="2026-05-20")
+        placeable = _task_to_placeable(
+            task, default_hours=1.0,
+        )
+        self.assertEqual(placeable.deadline, date(2026, 5, 20))
+
+
 if __name__ == "__main__":
     unittest.main()

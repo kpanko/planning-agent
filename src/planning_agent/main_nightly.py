@@ -11,8 +11,10 @@ from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 from todoist_api_python.api import TodoistAPI
+from todoist_api_python.models import Task
 
 from planning_agent import config
+from planning_agent.horizons import PlaceableTask
 from todoist_scheduler.config import (
     IGNORE_TASK_TAG,
     TASKS_PER_DAY,
@@ -46,6 +48,47 @@ def _parse_capacity_from_rules(  # pyright: ignore[reportUnusedFunction]
     if not match:
         return fallback
     return float(match.group(1))
+
+
+# A Todoist "day" duration is treated as one working day's
+# worth of capacity, not 24 literal hours. Tunable if the
+# default proves wrong in practice.
+_HOURS_PER_TODOIST_DAY = 8.0
+
+
+def _task_to_placeable(  # pyright: ignore[reportUnusedFunction]
+    task: Task,
+    default_hours: float,
+) -> PlaceableTask:
+    """Convert a Todoist Task into a PlaceableTask.
+
+    - ``duration_hours``: Todoist's ``Duration`` (minute or
+      day) if set, else *default_hours*.
+    - ``deadline``: ``task.deadline.date`` parsed as a date,
+      else None. (``task.due`` is the soft schedule; only
+      ``task.deadline`` is the hard limit horizons must respect.)
+    """
+    if task.duration is None:
+        hours = default_hours
+    elif task.duration.unit == "minute":
+        hours = task.duration.amount / 60.0
+    elif task.duration.unit == "day":
+        hours = task.duration.amount * _HOURS_PER_TODOIST_DAY
+    else:  # defensive — DurationUnit is currently a Literal
+        hours = default_hours
+
+    deadline: date | None = None
+    if task.deadline is not None:
+        deadline_str: str = str(
+            task.deadline.date  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+        )
+        deadline = date.fromisoformat(deadline_str)
+
+    return PlaceableTask(
+        id=task.id,
+        duration_hours=hours,
+        deadline=deadline,
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
