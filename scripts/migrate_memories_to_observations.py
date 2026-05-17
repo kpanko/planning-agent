@@ -12,15 +12,29 @@ observations.md by hand.
 
 from __future__ import annotations
 
+import os
 import shutil
 import sys
 from datetime import date
+from pathlib import Path
 
-from planning_context.storage import get_data_dir
+
+def _data_dir() -> Path:
+    """Resolve the data dir without seeding default files.
+
+    ``planning_context.storage.get_data_dir`` auto-creates
+    ``memories.json`` as ``[]`` on first call, which would
+    mask the "no legacy file" case below. Probe the path
+    directly instead.
+    """
+    env_dir = os.environ.get("PLANNING_AGENT_DATA_DIR")
+    if env_dir:
+        return Path(env_dir)
+    return Path.home() / ".planning-agent"
 
 
 def main() -> int:
-    data_dir = get_data_dir()
+    data_dir = _data_dir()
     src = data_dir / "memories.json"
     if not src.exists():
         print(f"No memories.json at {src}; nothing to do.")

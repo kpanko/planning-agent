@@ -74,6 +74,18 @@ def place_in_horizon(
     # hours too.
     current_week = _week_start(today)
     for t in other_tasks:
+        # Oversized tasks can't fit any week — place in the
+        # earliest available week and advance, so the loop
+        # below never spins forever.
+        if t.duration_hours > capacity_hours_per_week:
+            default_day = current_week + timedelta(days=5)
+            placements[t.id] = max(today, default_day)
+            week_used[current_week] = (
+                week_used.get(current_week, 0.0)
+                + t.duration_hours
+            )
+            current_week = current_week + timedelta(days=7)
+            continue
         while (
             week_used.get(current_week, 0.0)
             + t.duration_hours
@@ -81,9 +93,12 @@ def place_in_horizon(
         ):
             current_week = current_week + timedelta(days=7)
         # Land on Saturday of the chosen week by default;
-        # callers can refine. (M-R2 will add day-of-week
-        # preference logic when it builds the Sunday review.)
-        placements[t.id] = current_week + timedelta(days=5)
+        # clamp to today so non-deadline tasks never land
+        # in the past (e.g. when today is a Sunday).
+        # (M-R2 will add day-of-week preference logic when
+        # it builds the Sunday review.)
+        default_day = current_week + timedelta(days=5)
+        placements[t.id] = max(today, default_day)
         week_used[current_week] = (
             week_used.get(current_week, 0.0) + t.duration_hours
         )

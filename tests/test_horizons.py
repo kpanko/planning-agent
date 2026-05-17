@@ -81,3 +81,32 @@ def test_no_overflow_surface_everything_placed():
         today=today,
     )
     assert set(placed.keys()) == {t.id for t in tasks}
+
+
+def test_task_larger_than_weekly_capacity_does_not_loop():
+    # 20-hour task with 10-hour weekly capacity must place,
+    # not infinite-loop.
+    today = date(2026, 5, 12)
+    placed = place_in_horizon(
+        [task("big", hours=20.0)],
+        capacity_hours_per_week=10,
+        today=today,
+    )
+    assert "big" in placed
+    assert placed["big"] >= today
+
+
+def test_placement_is_never_before_today():
+    # On a Sunday (weekday=6), Saturday of "this week" is
+    # yesterday. Placements must clamp to today or later.
+    sunday = date(2026, 5, 17)
+    assert sunday.weekday() == 6
+    placed = place_in_horizon(
+        [task("a"), task("b"), task("c")],
+        capacity_hours_per_week=10,
+        today=sunday,
+    )
+    for tid, d in placed.items():
+        assert d >= sunday, (
+            f"{tid} placed at {d}, before today {sunday}"
+        )

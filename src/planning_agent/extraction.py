@@ -116,8 +116,13 @@ async def run_extraction(
 
 
 def _apply(result: ExtractionResult) -> None:
-    """Write extraction results to the planning context."""
-    save_summary(result.conversation_summary)
+    """Write extraction results to the planning context.
+
+    Order matters: the conversation summary is persisted last,
+    so a failure in observations/rules writes does not leave a
+    summary referencing state that was never recorded.
+    """
     write_observations(result.observations_doc)
     if result.rules_doc_update is not None:
         write_rules(result.rules_doc_update)
+    save_summary(result.conversation_summary)
