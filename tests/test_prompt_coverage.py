@@ -6,10 +6,17 @@ from __future__ import annotations
 
 import asyncio
 import re
+from typing import Any, Callable
 from unittest.mock import patch
+
+import pytest
 
 import planning_context.server as planning_server
 import todoist_mcp.server as todoist_server
+from planning_agent.replan_today import (
+    TODAY_PROMPT,
+    create_today_agent,
+)
 from planning_agent.sunday_review import (
     SUNDAY_PROMPT,
     create_sunday_agent,
@@ -90,7 +97,9 @@ def test_unadvertised_set_has_no_stale_entries() -> None:
 # -------------------------------------------------------------------
 
 
-def _agent_tool_names() -> set[str]:
+def _agent_tool_names(
+    create_agent_fn: Callable[[], Any],
+) -> set[str]:
     """Return the set of tool names registered on the agent."""
     with (
         patch.dict(
@@ -100,15 +109,15 @@ def _agent_tool_names() -> set[str]:
             "planning_agent.agent.TODOIST_API_KEY", "fake-key"
         ),
     ):
-        agent = create_sunday_agent()
+        agent = create_agent_fn()
     return {
         t.name
         for t in agent._function_toolset.tools.values()  # pyright: ignore[reportPrivateUsage]
     }
 
 
-def _prompt_tool_names() -> set[str]:
-    """Extract tool names from SUNDAY_PROMPT.
+def _prompt_tool_names(prompt: str) -> set[str]:
+    """Extract tool names from a static prompt string.
 
     Matches backtick-prefixed identifiers followed by ``(``
     (call-signature form). This is specific enough to avoid
@@ -116,15 +125,59 @@ def _prompt_tool_names() -> set[str]:
     backticks (e.g. ``project_id``).
     """
     return set(
-        re.findall(r"`([a-z][a-z0-9_]*)\s*\(", SUNDAY_PROMPT)
+        re.findall(r"`([a-z][a-z0-9_]*)\s*\(", prompt)
     )
 
 
-def test_prompt_tools_all_registered() -> None:
-    in_prompt = _prompt_tool_names()
-    registered = _agent_tool_names()
-    missing = sorted(in_prompt - registered)
+# Per-mode allowlists for tools registered on the agent but not
+# advertised in call-signature form. SUNDAY_PROMPT lists these as
+# bare backticked names in a single "also available" line
+# (e.g. ``complete_task``); the regex only catches the call form.
+# They are advertised, just less prominently.
+SUNDAY_PROMPT_UNADVERTISED: set[str] = {
+    "add_task",
+    "complete_task",
+    "delete_task",
+    "find_tasks_by_date",
+    "get_projects",
+    "get_task",
+    "update_task",
+}
+TODAY_PROMPT_UNADVERTISED: set[str] = set()
+
+
+@pytest.mark.parametrize(
+    "prompt,create_agent_fn,unadvertised",
+    [
+        (
+            SUNDAY_PROMPT,
+            create_sunday_agent,
+            SUNDAY_PROMPT_UNADVERTISED,
+        ),
+        (
+            TODAY_PROMPT,
+            create_today_agent,
+            TODAY_PROMPT_UNADVERTISED,
+        ),
+    ],
+    ids=["sunday", "today"],
+)
+def test_prompt_advertisements_match_tools(
+    prompt: str,
+    create_agent_fn: Callable[[], Any],
+    unadvertised: set[str],
+) -> None:
+    advertised = _prompt_tool_names(prompt)
+    registered = _agent_tool_names(create_agent_fn)
+    missing = sorted(advertised - registered)
     assert not missing, (
-        "These tools are named in SUNDAY_PROMPT but not"
-        f" registered on the agent: {missing}"
+        "Prompt advertises but agent does not register:"
+        f" {missing}"
+    )
+    unmentioned = sorted(
+        registered - advertised - unadvertised
+    )
+    assert not unmentioned, (
+        "Agent registers but prompt does not advertise:"
+        f" {unmentioned}"
     )
