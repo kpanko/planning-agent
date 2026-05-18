@@ -213,3 +213,192 @@ class TestTodayPrompt:
 
         text = TODAY_PROMPT.lower()
         assert "sunday" in text
+
+
+class TestBuildTodayContext:
+    """Tests for build_today_context."""
+
+    @staticmethod
+    def _stub_external_fetches(monkeypatch):
+        monkeypatch.setattr(
+            "planning_agent.replan_today._fetch_todoist_snapshot",
+            lambda *a, **kw: ("(stub tasks)", 0, 0),
+        )
+        monkeypatch.setattr(
+            "planning_agent.replan_today.fetch_calendar_snapshot",
+            lambda *a, **kw: "(stub calendar)",
+        )
+        monkeypatch.setattr(
+            "planning_agent.replan_today._fetch_inbox_project",
+            lambda *a, **kw: "(stub inbox)",
+        )
+        monkeypatch.setattr(
+            "planning_agent.replan_today.TODOIST_API_KEY",
+            "fake-key",
+        )
+        monkeypatch.setattr(
+            "planning_agent.replan_today.TodoistAPI",
+            lambda *a, **kw: object(),
+        )
+
+    def test_loads_rules_doc(self, monkeypatch):
+        from planning_context import rules as rules_mod
+
+        rules_mod.write_rules("- ~50 hrs/week\n")
+        self._stub_external_fetches(monkeypatch)
+
+        from planning_agent.replan_today import (
+            build_today_context,
+        )
+
+        ctx = build_today_context()
+        assert "50 hrs/week" in ctx.rules_doc
+
+    def test_calendar_fetched_with_one_day(self, monkeypatch):
+        captured: dict[str, int] = {}
+
+        def _fake_cal(days: int = 14) -> str:
+            captured["days"] = days
+            return "(stub calendar)"
+
+        monkeypatch.setattr(
+            "planning_agent.replan_today.fetch_calendar_snapshot",
+            _fake_cal,
+        )
+        monkeypatch.setattr(
+            "planning_agent.replan_today._fetch_todoist_snapshot",
+            lambda *a, **kw: ("(stub tasks)", 0, 0),
+        )
+        monkeypatch.setattr(
+            "planning_agent.replan_today._fetch_inbox_project",
+            lambda *a, **kw: "(stub inbox)",
+        )
+        monkeypatch.setattr(
+            "planning_agent.replan_today.TODOIST_API_KEY",
+            "fake-key",
+        )
+        monkeypatch.setattr(
+            "planning_agent.replan_today.TodoistAPI",
+            lambda *a, **kw: object(),
+        )
+
+        from planning_agent.replan_today import (
+            build_today_context,
+        )
+
+        build_today_context()
+        assert captured["days"] == 1
+
+    def test_todoist_fetched_with_days_ahead_zero(
+        self, monkeypatch,
+    ):
+        captured: dict[str, int] = {}
+
+        def _fake_fetch(api, days_ahead: int = 14):
+            captured["days_ahead"] = days_ahead
+            return "(stub tasks)", 0, 0
+
+        monkeypatch.setattr(
+            "planning_agent.replan_today._fetch_todoist_snapshot",
+            _fake_fetch,
+        )
+        monkeypatch.setattr(
+            "planning_agent.replan_today.fetch_calendar_snapshot",
+            lambda *a, **kw: "(stub calendar)",
+        )
+        monkeypatch.setattr(
+            "planning_agent.replan_today._fetch_inbox_project",
+            lambda *a, **kw: "(stub inbox)",
+        )
+        monkeypatch.setattr(
+            "planning_agent.replan_today.TODOIST_API_KEY",
+            "fake-key",
+        )
+        monkeypatch.setattr(
+            "planning_agent.replan_today.TodoistAPI",
+            lambda *a, **kw: object(),
+        )
+
+        from planning_agent.replan_today import (
+            build_today_context,
+        )
+
+        build_today_context()
+        assert captured["days_ahead"] == 0
+
+    def test_omits_full_context_fields(self, monkeypatch):
+        self._stub_external_fetches(monkeypatch)
+
+        from planning_agent.replan_today import (
+            build_today_context,
+        )
+
+        ctx = build_today_context()
+        assert ctx.observations_doc == ""
+        assert ctx.deferral_summary == ""
+        assert ctx.fuzzy_due_soon == ""
+        assert ctx.values_doc == ""
+        assert ctx.recent_conversations == []
+        assert ctx.n_conversations == 0
+        assert ctx.is_lazy is False
+
+
+class TestRenderTodayContext:
+    """Tests for _render_today_context."""
+
+    def test_renders_pre_loaded_blocks(self):
+        from planning_agent.context import PlanningContext
+        from planning_agent.replan_today import (
+            _render_today_context,
+        )
+
+        ctx = PlanningContext(
+            is_lazy=False,
+            values_doc="",
+            recent_conversations=[],
+            todoist_snapshot="(today tasks)",
+            calendar_snapshot="(today events)",
+            current_datetime="Sun Apr 26, 2026 02:30 PM",
+            day_type="weekend",
+            inbox_project="Inbox project: Inbox (ID: 123)",
+            n_overdue=2,
+            n_upcoming=3,
+            n_conversations=0,
+            fuzzy_due_soon="",
+            rules_doc="- no work after 9pm",
+        )
+        block = _render_today_context(ctx)
+        assert "(today tasks)" in block
+        assert "(today events)" in block
+        assert "no work after 9pm" in block
+        assert "Sun Apr 26, 2026 02:30 PM" in block
+        assert "weekend" in block
+        assert "ID: 123" in block
+
+    def test_omits_observation_block_when_empty(self):
+        from planning_agent.context import PlanningContext
+        from planning_agent.replan_today import (
+            _render_today_context,
+        )
+
+        ctx = PlanningContext(
+            is_lazy=False,
+            values_doc="",
+            recent_conversations=[],
+            todoist_snapshot="(tasks)",
+            calendar_snapshot="(events)",
+            current_datetime="now",
+            day_type="office",
+            inbox_project="(inbox)",
+            n_overdue=0,
+            n_upcoming=0,
+            n_conversations=0,
+            fuzzy_due_soon="",
+            rules_doc="",
+        )
+        block = _render_today_context(ctx)
+        assert "Values" not in block
+        assert "Observations" not in block
+        assert "Fuzzy" not in block
+        assert "Recent conversations" not in block
+        assert "Long-deferred" not in block

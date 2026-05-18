@@ -89,3 +89,109 @@ Context:
 update_rules / update_observations / update_values, recent
 conversations — are not available here by design.)
 """
+
+
+import logging
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+from todoist_api_python.api import TodoistAPI
+
+from planning_context.rules import read_rules
+
+from .config import TODOIST_API_KEY, USER_TZ
+from .context import (
+    PlanningContext,
+    _compute_day_type,  # pyright: ignore[reportPrivateUsage]
+    _fetch_inbox_project,  # pyright: ignore[reportPrivateUsage]
+    _fetch_todoist_snapshot,  # pyright: ignore[reportPrivateUsage]
+    fetch_calendar_snapshot,
+)
+
+logger = logging.getLogger("planning-agent")
+
+
+def _render_today_context(  # pyright: ignore[reportUnusedFunction]
+    deps: PlanningContext,
+) -> str:
+    """Render the runtime-context block for the today prompt.
+
+    Mirrors sunday_review._render_sunday_context but renders
+    only the narrow pre-loaded slice. No values, conversations,
+    fuzzy, observations, or deferral summary — those would
+    bloat the prompt for a session that does not need them.
+    """
+    return f"""\
+
+---
+
+## Pre-loaded Context
+
+### Right now
+{deps.current_datetime} — {deps.day_type} day
+
+### Rules (load-bearing)
+{deps.rules_doc or "(no rules yet)"}
+
+### Todoist projects
+{deps.inbox_project}
+When the user asks about Inbox tasks, pass this ID as
+`project_id` to `find_tasks`.
+
+### Tasks (overdue + today)
+{deps.todoist_snapshot}
+
+### Calendar (today)
+{deps.calendar_snapshot}
+"""
+
+
+def build_today_context() -> PlanningContext:
+    """Narrow context for the on-demand re-plan-today session.
+
+    Pre-loads today's tasks, today's calendar, and rules.md.
+    Everything else is left empty and fetched on demand via
+    tools the agent decides to call.
+    """
+    n_overdue = 0
+    n_upcoming = 0
+
+    if TODOIST_API_KEY:
+        api = TodoistAPI(TODOIST_API_KEY)
+        todoist_snapshot, n_overdue, n_upcoming = (
+            _fetch_todoist_snapshot(api, days_ahead=0)
+        )
+        inbox_project = _fetch_inbox_project(api)
+    else:
+        todoist_snapshot = "(Todoist not connected)"
+        inbox_project = "(Todoist not connected)"
+
+    calendar_snapshot = fetch_calendar_snapshot(days=1)
+
+    now = datetime.now(ZoneInfo(USER_TZ))
+    current_datetime = now.strftime("%A, %B %d, %Y %I:%M %p")
+    day_type = _compute_day_type()
+
+    ctx = PlanningContext(
+        is_lazy=False,
+        values_doc="",
+        recent_conversations=[],
+        todoist_snapshot=todoist_snapshot,
+        calendar_snapshot=calendar_snapshot,
+        current_datetime=current_datetime,
+        day_type=day_type,
+        inbox_project=inbox_project,
+        n_overdue=n_overdue,
+        n_upcoming=n_upcoming,
+        n_conversations=0,
+        fuzzy_due_soon="",
+    )
+    ctx.rules_doc = read_rules()
+    logger.info(
+        "Today context: rules=%d chars,"
+        " overdue=%d, today=%d",
+        len(ctx.rules_doc),
+        n_overdue,
+        n_upcoming,
+    )
+    return ctx
