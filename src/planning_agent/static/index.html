@@ -6,6 +6,7 @@
         content="width=device-width, initial-scale=1">
   <title>Sunday Weekly Review</title>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
 
@@ -325,6 +326,29 @@
 
   // ── helpers ──────────────────────────────────────────
 
+  function safeUrl(raw) {
+    // Return raw only if it's a same-origin path or an
+    // http/https URL. Otherwise null. Blocks javascript:,
+    // data:, vbscript:, and any other scheme.
+    if (typeof raw !== "string") return null;
+    if (raw.startsWith("/") && !raw.startsWith("//")) {
+      return raw;
+    }
+    try {
+      const u = new URL(raw, location.origin);
+      if (u.protocol === "http:" || u.protocol === "https:") {
+        return u.href;
+      }
+    } catch (_) {
+      // fall through
+    }
+    return null;
+  }
+
+  function renderMarkdown(text) {
+    return DOMPurify.sanitize(marked.parse(text));
+  }
+
   function setStatus(state, label) {
     statusDot.className = state;
     statusLabel.textContent = label;
@@ -340,7 +364,7 @@
     const div = document.createElement("div");
     div.className = `bubble ${role}`;
     if (role === "agent") {
-      div.innerHTML = marked.parse(html);
+      div.innerHTML = renderMarkdown(html);
     } else {
       div.textContent = html;
     }
@@ -389,11 +413,20 @@
     }
     const next = confirmQueue.shift();
     pendingConfirmId = next.id;
-    confirmText.innerHTML =
-      `Run <strong>${next.tool}</strong>` +
-      (next.detail
-        ? ` <code>${next.detail}</code>`
-        : "") + `?`;
+    while (confirmText.firstChild) {
+      confirmText.removeChild(confirmText.firstChild);
+    }
+    confirmText.appendChild(document.createTextNode("Run "));
+    const strong = document.createElement("strong");
+    strong.textContent = String(next.tool ?? "");
+    confirmText.appendChild(strong);
+    if (next.detail) {
+      confirmText.appendChild(document.createTextNode(" "));
+      const code = document.createElement("code");
+      code.textContent = String(next.detail);
+      confirmText.appendChild(code);
+    }
+    confirmText.appendChild(document.createTextNode("?"));
     confirmBanner.classList.add("visible");
     setInputEnabled(false);
   }
@@ -444,7 +477,7 @@
           messages.appendChild(streamBubble);
         }
         streamRaw += data.content;
-        streamBubble.innerHTML = marked.parse(streamRaw);
+        streamBubble.innerHTML = renderMarkdown(streamRaw);
         messages.scrollTop = messages.scrollHeight;
       } else if (data.type === "message_done") {
         streamBubble = null;
@@ -473,6 +506,8 @@
       } else if (data.type === "debug") {
         addDebug(data.event, data);
       } else if (data.type === "calendar_reconnect") {
+        const safe = safeUrl(data.url);
+        if (!safe) return;
         const old = document.getElementById(
           "gcal-reconnect"
         );
@@ -482,17 +517,23 @@
         bar.style.cssText =
           "background:#f59e0b;color:#000;padding:8px 16px;"
           + "text-align:center;font-size:14px;";
-        bar.innerHTML =
+        bar.appendChild(document.createTextNode(
           "Google Calendar disconnected. "
-          + '<a href="' + data.url
-          + '" style="font-weight:600;'
-          + 'text-decoration:underline">'
-          + "Reconnect</a>"
-          + ' <button onclick='
-          + '"this.parentElement.remove()"'
-          + ' style="margin-left:12px;background:none;'
-          + 'border:none;cursor:pointer;font-size:16px"'
-          + ">&times;</button>";
+        ));
+        const link = document.createElement("a");
+        link.href = safe;
+        link.textContent = "Reconnect";
+        link.style.cssText =
+          "font-weight:600;text-decoration:underline;";
+        bar.appendChild(link);
+        bar.appendChild(document.createTextNode(" "));
+        const close = document.createElement("button");
+        close.textContent = "×";
+        close.style.cssText =
+          "margin-left:12px;background:none;border:none;"
+          + "cursor:pointer;font-size:16px;";
+        close.addEventListener("click", () => bar.remove());
+        bar.appendChild(close);
         document.body.prepend(bar);
       }
     };

@@ -88,7 +88,8 @@ def tasks_with_count_at_least(threshold: int) -> list[str]:
     months of accumulated deferrals).
     """
     state = _load()
-    return [
-        tid for tid, days in state.items()
+    return sorted(
+        tid
+        for tid, days in state.items()
         if len(days) >= threshold
-    ]
+    )

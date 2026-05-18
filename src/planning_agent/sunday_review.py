@@ -75,16 +75,16 @@ def _render_sunday_context(deps: PlanningContext) -> str:
 {deps.current_datetime} — {deps.day_type} day
 
 ### Values and priorities
-{deps.values_doc or "(no values document yet)"}
+{deps.values_doc.strip() or "(no values document yet)"}
 
 ### Rules (load-bearing)
-{deps.rules_doc or "(no rules yet)"}
+{deps.rules_doc.strip() or "(no rules yet)"}
 
 ### Observations (soft inferences — hedge when using)
-{deps.observations_doc or "(no observations yet)"}
+{deps.observations_doc.strip() or "(no observations yet)"}
 
 ### Long-deferred tasks (180+ days, consider deletion)
-{deps.deferral_summary or "(none)"}
+{deps.deferral_summary.strip() or "(none)"}
 
 ### Todoist projects
 {deps.inbox_project}

@@ -331,6 +331,12 @@ async def _run_session(
                         data.get("enabled")
                     )
         except WebSocketDisconnect:
+            # Resolve any awaiting confirms as denied so the
+            # agent.run loop doesn't hang on a dropped socket.
+            for fut in pending_confirms.values():
+                if not fut.done():
+                    fut.set_result(False)
+            pending_confirms.clear()
             await chat_queue.put(None)  # signal done
 
     recv_task = asyncio.create_task(receive_loop())

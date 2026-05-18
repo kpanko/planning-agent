@@ -138,7 +138,7 @@ def _render_today_context(deps: PlanningContext) -> str:
 {deps.current_datetime} — {deps.day_type} day
 
 ### Rules (load-bearing)
-{deps.rules_doc or "(no rules yet)"}
+{deps.rules_doc.strip() or "(no rules yet)"}
 
 ### Todoist projects
 {deps.inbox_project}
