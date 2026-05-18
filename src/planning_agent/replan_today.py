@@ -13,7 +13,36 @@ to the Sunday review.
 
 from __future__ import annotations
 
+import logging
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+from pydantic_ai import Agent, RunContext
+from pydantic_ai.models.anthropic import AnthropicModelSettings
+from todoist_api_python.api import TodoistAPI
+
+from planning_context.rules import read_rules
+
+from .agent import (
+    ConfirmFn,
+    DebugFn,
+    default_confirm,
+    register_calendar_tool,
+    register_observation_tools,
+    register_rules_tools,
+    register_todoist_tools,
+)
+from .config import LLM_MODEL, TODOIST_API_KEY, USER_TZ
+from .context import (
+    PlanningContext,
+    _compute_day_type,  # pyright: ignore[reportPrivateUsage]
+    _fetch_inbox_project,  # pyright: ignore[reportPrivateUsage]
+    _fetch_todoist_snapshot,  # pyright: ignore[reportPrivateUsage]
+    fetch_calendar_snapshot,
+)
 from .visibility import VISIBILITY_INSTRUCTION
+
+logger = logging.getLogger("planning-agent")
 
 
 TODAY_PROMPT = f"""\
@@ -91,29 +120,7 @@ conversations — are not available here by design.)
 """
 
 
-import logging
-from datetime import datetime
-from zoneinfo import ZoneInfo
-
-from todoist_api_python.api import TodoistAPI
-
-from planning_context.rules import read_rules
-
-from .config import TODOIST_API_KEY, USER_TZ
-from .context import (
-    PlanningContext,
-    _compute_day_type,  # pyright: ignore[reportPrivateUsage]
-    _fetch_inbox_project,  # pyright: ignore[reportPrivateUsage]
-    _fetch_todoist_snapshot,  # pyright: ignore[reportPrivateUsage]
-    fetch_calendar_snapshot,
-)
-
-logger = logging.getLogger("planning-agent")
-
-
-def _render_today_context(  # pyright: ignore[reportUnusedFunction]
-    deps: PlanningContext,
-) -> str:
+def _render_today_context(deps: PlanningContext) -> str:
     """Render the runtime-context block for the today prompt.
 
     Mirrors sunday_review._render_sunday_context but renders
@@ -195,3 +202,49 @@ def build_today_context() -> PlanningContext:
         n_upcoming,
     )
     return ctx
+
+
+def create_today_agent(
+    confirm: ConfirmFn | None = None,
+    debug_fn: DebugFn | None = None,
+) -> Agent[PlanningContext, str]:
+    """Build the agent used in an on-demand re-plan-today session.
+
+    Wires the today system prompt and a lean tool set:
+    full Todoist + read-only rules/observations + get_calendar.
+    No fuzzy, no model-edit tools, no past-conversation reads —
+    those belong to the Sunday review.
+    """
+    confirm_fn = confirm or default_confirm
+
+    today_agent: Agent[PlanningContext, str] = Agent(
+        LLM_MODEL,
+        system_prompt=TODAY_PROMPT,
+        deps_type=PlanningContext,
+        model_settings=AnthropicModelSettings(
+            anthropic_cache_instructions=True,
+            anthropic_cache_messages=True,
+        ),
+    )
+
+    @today_agent.system_prompt
+    async def _inject_context(  # pyright: ignore[reportUnusedFunction]
+        ctx: RunContext[PlanningContext],
+    ) -> str:
+        block = _render_today_context(ctx.deps)
+        if debug_fn:
+            await debug_fn(
+                "system_prompt_context",
+                {"content": block},
+            )
+        return block
+
+    register_todoist_tools(today_agent, confirm_fn, debug_fn)
+    register_rules_tools(
+        today_agent, confirm_fn, debug_fn, read_only=True,
+    )
+    register_observation_tools(
+        today_agent, confirm_fn, debug_fn, read_only=True,
+    )
+    register_calendar_tool(today_agent, confirm_fn, debug_fn)
+    return today_agent

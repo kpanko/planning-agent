@@ -402,3 +402,73 @@ class TestRenderTodayContext:
         assert "Fuzzy" not in block
         assert "Recent conversations" not in block
         assert "Long-deferred" not in block
+
+
+class TestCreateTodayAgent:
+    """Tests for create_today_agent."""
+
+    def test_registers_lean_tool_set(self, monkeypatch):
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "fake-key")
+        monkeypatch.setattr(
+            "planning_agent.agent.TODOIST_API_KEY",
+            "fake-key",
+        )
+
+        from planning_agent.replan_today import (
+            create_today_agent,
+        )
+
+        agent = create_today_agent()
+        names = {
+            t.name
+            for t in agent._function_toolset.tools.values()  # pyright: ignore[reportPrivateUsage]
+        }
+        required = {
+            "reschedule_tasks",
+            "complete_task",
+            "delete_task",
+            "update_task",
+            "add_task",
+            "find_tasks",
+            "find_tasks_by_date",
+            "get_task",
+            "get_projects",
+            "get_rules",
+            "get_observations",
+            "get_calendar",
+        }
+        missing = required - names
+        assert not missing, (
+            f"create_today_agent missing tools: {missing}"
+        )
+
+    def test_excludes_forbidden_tools(self, monkeypatch):
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "fake-key")
+        monkeypatch.setattr(
+            "planning_agent.agent.TODOIST_API_KEY",
+            "fake-key",
+        )
+
+        from planning_agent.replan_today import (
+            create_today_agent,
+        )
+
+        agent = create_today_agent()
+        names = {
+            t.name
+            for t in agent._function_toolset.tools.values()  # pyright: ignore[reportPrivateUsage]
+        }
+        forbidden = {
+            "update_rules",
+            "update_observations",
+            "update_values_doc",
+            "add_fuzzy_recurring_task",
+            "update_fuzzy_last_done",
+            "remove_fuzzy_recurring_task",
+            "get_recent_conversations",
+        }
+        present_forbidden = forbidden & names
+        assert not present_forbidden, (
+            f"create_today_agent must not register: "
+            f"{present_forbidden}"
+        )
