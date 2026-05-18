@@ -1,12 +1,30 @@
 # Status
 
-**Last updated:** 2026-05-17 (session 18)
-**Active work:** Redesign — M-R1, M-R2, and M-R3 implemented on
-`redesign-2026-05`, PR #94 open. M-R4 (on-demand re-plan today)
-is next when the user is ready.
+**Last updated:** 2026-05-18 (session 19)
+**Active work:** Redesign — M-R1, M-R2, M-R3 implemented on
+`redesign-2026-05`, PR #94 open. M-R4 plan written this session,
+awaiting user review before execution.
 
 ## Recently Completed
 
+- **M-R4 plan written** (session 19, branch `redesign-2026-05`,
+  not yet committed/executed). `project-plans/redesign-m-r4.md`
+  — 10 TDD tasks for on-demand re-plan-today. Design captured
+  through brainstorming: free-text disruption input, separate
+  `/today` route + `/ws/today`, narrow pre-load (today's tasks
+  via `_fetch_todoist_snapshot(days_ahead=0)` + today's calendar
+  via `fetch_calendar_snapshot(days=1)` + `rules.md`), lean
+  tool surface (full Todoist + read-only rules/observations +
+  `get_calendar` only; no fuzzy, no model-edit tools, no
+  conversations), no extraction on disconnect, no horizon
+  math. Plan introduces a `read_only` flag on
+  `register_rules_tools`/`register_observation_tools`, a
+  `days_ahead` param on `_fetch_todoist_snapshot`, a
+  `_run_session` extraction from `websocket_endpoint` to share
+  the chat protocol, a `_render_today_context` mirroring
+  Sunday's renderer, and a `create_today_agent` factory.
+  Extraction skip enforced via `run_extraction_on_close=False`
+  on `/ws/today`.
 - **M-R3 implemented** (session 18, PR #94). Nightly replan
   rebuilt around tiered-horizon placement + the M-R1 deferral
   counter. `main_nightly.run_nightly` now: fetches overdue
@@ -57,7 +75,8 @@ is next when the user is ready.
 ## In Progress
 
 Nothing actively in progress. PR #94 is open with M-R1 + M-R2 +
-M-R3 plus the M-R3 plan doc. Branch stays alive for M-R4.
+M-R3. M-R4 plan written but awaiting user review before
+execution. Branch stays alive for M-R4 work to land on.
 
 ## Redesign Branch State
 
@@ -78,23 +97,25 @@ M-R3 plus the M-R3 plan doc. Branch stays alive for M-R4.
 - Plans: `project-plans/redesign-2026-05.md` (spec),
   `project-plans/redesign-m-r1.md`,
   `project-plans/redesign-m-r2.md`,
-  `project-plans/redesign-m-r3.md`.
+  `project-plans/redesign-m-r3.md`,
+  `project-plans/redesign-m-r4.md` (new this session,
+  untracked).
 
 ## Next Up
 
-1. **Review and merge PR #94** when ready. The branch must NOT
-   be deleted on merge per the M-R1 plan — M-R4 will continue
-   to land on it.
-2. **Redeploy the Fly cron Machine (#57)** — operational task,
-   not part of M-R3 by design. DEPLOY.md already documents the
-   correct Fly-secret-based commands. Verify with
+1. **User reviews M-R4 plan.** `project-plans/redesign-m-r4.md`
+   is the artifact. Open questions, scope pushback, or task-
+   ordering changes happen before execution starts.
+2. **Execute M-R4** (10 tasks, TDD). Lands on the same
+   `redesign-2026-05` branch / PR #94.
+3. **Review and merge PR #94** when M-R4 is in. The branch
+   must NOT be deleted on merge per the M-R1 plan — keep it
+   alive for any redesign-adjacent follow-ups.
+4. **Redeploy the Fly cron Machine (#57)** — operational task,
+   independent of the redesign. DEPLOY.md has the
+   Fly-secret-based commands. Verify with
    `flyctl machine status -d` that no token appears in the env
    block (per DECISIONS.md).
-3. **Write M-R4 plan** — On-demand re-plan today (web,
-   phone-friendly). Smaller scope: narrow context (today + what
-   just changed), own prompt, own route. Lands on the same
-   `redesign-2026-05` branch.
-4. **Execute M-R4.**
 
 ## Blockers / Open Questions
 
