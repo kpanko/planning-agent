@@ -135,3 +135,33 @@ unless (a) the upstream fetch is genuinely slow, or (b) the
 data source is rate-limited. Only skip the fetch outright when
 the cost of fetching outweighs the prompt-design value of having
 exact shape numbers.
+
+## XSS defense-in-depth in static chat UIs
+
+**Decision:** Both `static/index.html` and `static/today.html`
+sanitize all rendered Markdown through DOMPurify and never
+interpolate untrusted strings into innerHTML. Tool names,
+confirm details, and the calendar-reconnect URL go through
+`createElement` + `textContent` / a `safeUrl(...)` helper that
+only accepts http/https or same-origin paths.
+
+**Rationale:** The app is single-user and Google-OAuth-gated;
+no realistic attacker path exists today. CodeRabbit flagged
+`marked.parse(...)` without DOMPurify and innerHTML
+interpolation as critical XSS risks. We added the hardening
+anyway because (a) the content being rendered comes from an
+LLM whose outputs we don't fully control, (b) if a future
+change accidentally exposes a route to a second user or to
+unauthenticated traffic, the unsafe primitives become a real
+hole, and (c) the cost is small — one CDN script tag and a
+shared `renderMarkdown` / `safeUrl` helper.
+
+**How to apply:** Any new markdown-rendering site must go
+through `renderMarkdown(text)` (sanitizes via DOMPurify) — do
+not call `marked.parse(...)` directly. Any new dynamic
+`<a href>`, `<iframe src>`, etc. must run the URL through
+`safeUrl(...)` first. Do not use `innerHTML` to inject content
+that contains values from the WebSocket payload — use
+`createElement` + `textContent`. If a future requirement
+needs to render trusted HTML (e.g. a server-rendered help
+page), prefer a separate route that doesn't share this script.

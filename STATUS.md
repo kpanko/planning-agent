@@ -2,11 +2,51 @@
 
 **Last updated:** 2026-05-18 (session 20)
 **Active work:** Redesign feature-complete on
-`redesign-2026-05`. PR #94 carries M-R1 + M-R2 + M-R3 + M-R4.
-Awaiting review and merge.
+`redesign-2026-05`. PR #94 carries M-R1 + M-R2 + M-R3 + M-R4
+plus a follow-up CodeRabbit pass. Awaiting review and merge.
 
 ## Recently Completed
 
+- **CodeRabbit pass on PR #94** (session 20, commits
+  `00fcb9c` and `cde2a2a`). Fixed 6 real findings: (1)
+  nightly `dry_run=True` was writing `deferral_counts.json`
+  (preview run polluted the signal — now gated on
+  `if not dry_run`; added `test_dry_run_does_not_record_deferrals`
+  and rotated two existing deferral tests to `dry_run=False`
+  since they were really testing recording, not preview
+  mode), (2) `planned_moves` was appended before
+  `reschedule_task`, so failures appeared in the
+  "task(s) moved" log — append now lives after the
+  success branch with `continue` past the except; new
+  `test_failed_reschedule_excluded_from_moves` covers it,
+  (3) Sunday/Today renderers now `.strip()` before the
+  `or "(no … yet)"` fallback so whitespace-only docs
+  render as the explicit placeholder, (4)
+  `tasks_with_count_at_least` wraps the comprehension in
+  `sorted(…)` for deterministic prompt output, (5) on
+  `WebSocketDisconnect` `_run_session` now resolves any
+  outstanding `pending_confirms` futures as `False`
+  before signalling done — previously `agent.run(...)`
+  could hang on a dropped socket mid-confirm, (6) XSS
+  defense-in-depth on `static/index.html` and
+  `static/today.html`: load DOMPurify via CDN,
+  `marked.parse(...)` calls now wrapped in
+  `DOMPurify.sanitize(...)` via a shared
+  `renderMarkdown` helper; confirm-banner content built
+  via `createElement` + `textContent` instead of
+  innerHTML interpolation; `calendar_reconnect` link
+  validates `data.url` through `safeUrl(...)` (http/https
+  or same-origin paths only) before assigning to
+  `link.href`, and the close-button uses `addEventListener`
+  instead of inline `onclick`. Replied to 11 CR threads
+  (5 verified-already-fixed false positives; 6 fixed in
+  these two commits) and posted a summary comment for
+  the outside-diff item + two nitpicks not posted inline.
+  Skipped per YAGNI: `config.py` float validation
+  (operator-controlled fly-secret-sourced env vars),
+  plan-doc markdownlint nits (no CI), EN DASH in test
+  comment (no Ruff in CI), M-R1 plan doc contradiction
+  (historical). Test count: 357 → 359.
 - **M-R4 implemented** (session 20, PR #94). On-demand
   re-plan-today shipped end-to-end. New `replan_today`
   module: `TODAY_PROMPT` (purpose-built phone-friendly
@@ -103,7 +143,9 @@ branch.
 
 - Branch: `redesign-2026-05`, pushed.
 - PR: [#94](https://github.com/kpanko/planning-agent/pull/94)
-- Ahead of main: ~40 commits. M-R4 added (most-recent first):
+- Ahead of main: ~42 commits. CodeRabbit fixes added (most-recent first):
+  - `cde2a2a` — `fix: address remaining CodeRabbit findings (strip, sort, confirm-on-disconnect, XSS hardening)`
+  - `00fcb9c` — `fix(nightly): dry-run side-effect-free; only count successful reschedules`
   - `dd237ad` — `test(prompt-coverage): cover TODAY_PROMPT against create_today_agent`
   - `76d8750` — `feat(web): /ws/today hosts on-demand re-plan session`
   - `3c4abbd` — `feat(web): add GET /today page and index link`
