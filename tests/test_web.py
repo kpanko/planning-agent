@@ -251,6 +251,64 @@ class TestTodayRoute:
         assert "replan today" in body
 
 
+class TestWebSocketToday:
+    def test_ws_today_uses_today_context_and_agent(self):
+        import inspect
+
+        import planning_agent.main_web as web
+
+        src = inspect.getsource(web.websocket_today_endpoint)
+        assert "build_today_context" in src
+        assert "create_today_agent" in src
+        assert "run_extraction_on_close=False" in src
+
+    def test_ws_today_does_not_fire_extraction(self):
+        """A /ws/today session must NOT call run_extraction."""
+        mock_agent = _make_mock_agent("ok")
+        extraction_calls: list[Any] = []
+
+        async def _fake_extraction(history: Any) -> None:
+            extraction_calls.append(history)
+
+        with (
+            patch(
+                "planning_agent.auth.WEB_SECRET",
+                _TEST_SECRET,
+            ),
+            patch("planning_agent.main_web.DEBUG_MODE", False),
+            patch(
+                "planning_agent.main_web.create_today_agent",
+                return_value=mock_agent,
+            ),
+            patch(
+                "planning_agent.main_web.build_today_context",
+                return_value=_make_mock_context(),
+            ),
+            patch(
+                "planning_agent.main_web.run_extraction",
+                side_effect=_fake_extraction,
+            ),
+        ):
+            with TestClient(app) as client:
+                client.cookies.update(_session_cookies())
+                with client.websocket_connect(
+                    "/ws/today"
+                ) as ws:
+                    ws.receive_json()  # debug_state
+                    ws.send_json(
+                        {"type": "chat", "content": "go"}
+                    )
+                    while ws.receive_json().get(
+                        "type"
+                    ) != "message_done":
+                        pass
+                # Disconnect by leaving the context manager.
+
+        assert not extraction_calls, (
+            "extraction must not fire on /ws/today"
+        )
+
+
 # ── WebSocket: basic chat ─────────────────────────────────
 
 

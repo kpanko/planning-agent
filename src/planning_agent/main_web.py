@@ -43,6 +43,7 @@ from .auth import (
 )
 from .context import CALENDAR_NEEDS_RECONNECT, PlanningContext
 from .extraction import run_extraction
+from .replan_today import build_today_context, create_today_agent
 from .sunday_review import build_sunday_context, create_sunday_agent
 from .version import GIT_COMMIT
 
@@ -447,6 +448,27 @@ async def websocket_endpoint(ws: WebSocket) -> None:
         build_sunday_context,
         create_sunday_agent,
         run_extraction_on_close=True,
+    )
+
+
+@app.websocket("/ws/today")
+async def websocket_today_endpoint(ws: WebSocket) -> None:
+    """Handle an on-demand re-plan-today chat session.
+
+    Same protocol as /ws but with the narrow today context,
+    the today-mode agent, and no post-session extraction.
+    """
+    email = get_session(ws)  # type: ignore[arg-type]
+    if not email:
+        await ws.close(code=4403)
+        return
+
+    await ws.accept()
+    await _run_session(
+        ws,
+        build_today_context,
+        create_today_agent,
+        run_extraction_on_close=False,
     )
 
 
