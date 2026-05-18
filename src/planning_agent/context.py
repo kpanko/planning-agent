@@ -96,11 +96,14 @@ def _fmt_task(task: Task) -> str:
 
 def _fetch_todoist_snapshot(
     api: TodoistAPI,
+    days_ahead: int = 14,
 ) -> tuple[str, int, int]:
-    """Fetch overdue + next 14 days of tasks.
+    """Fetch overdue + next ``days_ahead`` days of tasks.
 
     Returns ``(snapshot, n_overdue, n_upcoming)``. Lazy mode uses
     only the counts; full mode renders the snapshot string.
+    ``days_ahead=0`` returns overdue + today only, used by the
+    on-demand re-plan-today mode.
     """
     lines: list[str] = []
     n_overdue = 0
@@ -119,7 +122,7 @@ def _fetch_todoist_snapshot(
                 lines.append(f"  {_fmt_task(t)}")
 
         today = datetime.now(ZoneInfo(USER_TZ)).date()
-        end = today + timedelta(days=14)
+        end = today + timedelta(days=days_ahead)
         after = (
             (today - timedelta(days=1))
             .strftime("%Y-%m-%d")
@@ -138,9 +141,14 @@ def _fetch_todoist_snapshot(
         ]
         n_upcoming = len(upcoming)
         if upcoming:
-            lines.append(
-                f"\nNext 14 days ({len(upcoming)}):"
-            )
+            if days_ahead == 0:
+                header = f"\nToday ({len(upcoming)}):"
+            else:
+                header = (
+                    f"\nNext {days_ahead} days"
+                    f" ({len(upcoming)}):"
+                )
+            lines.append(header)
             for t in upcoming:
                 lines.append(f"  {_fmt_task(t)}")
 
