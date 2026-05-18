@@ -355,8 +355,14 @@ def register_rules_tools(
     agent: Agent[PlanningContext, str],
     confirm: ConfirmFn,
     debug_fn: DebugFn | None,
+    read_only: bool = False,
 ) -> None:
-    """Register the rules-document tools onto the agent."""
+    """Register the rules-document tools onto the agent.
+
+    When ``read_only=True`` only ``get_rules`` is registered.
+    Used by planning modes that should not edit the user model
+    mid-session (e.g. the on-demand re-plan-today mode).
+    """
     run_tool = _make_run_tool(debug_fn)
 
     @agent.tool
@@ -371,6 +377,9 @@ def register_rules_tools(
             "",
             lambda: read_rules() or "(No rules yet.)",
         )
+
+    if read_only:
+        return
 
     @agent.tool
     async def update_rules(  # pyright: ignore[reportUnusedFunction]
@@ -396,8 +405,14 @@ def register_observation_tools(
     agent: Agent[PlanningContext, str],
     confirm: ConfirmFn,
     debug_fn: DebugFn | None,
+    read_only: bool = False,
 ) -> None:
-    """Register the observations-document tools onto the agent."""
+    """Register the observations-document tools onto the agent.
+
+    When ``read_only=True`` only ``get_observations`` is registered.
+    Used by planning modes that should not edit the user model
+    mid-session (e.g. the on-demand re-plan-today mode).
+    """
     run_tool = _make_run_tool(debug_fn)
 
     @agent.tool
@@ -413,6 +428,9 @@ def register_observation_tools(
             lambda: read_observations()
             or "(No observations yet.)",
         )
+
+    if read_only:
+        return
 
     @agent.tool
     async def update_observations(  # pyright: ignore[reportUnusedFunction]
