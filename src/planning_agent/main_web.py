@@ -210,6 +210,20 @@ async def index(
     )
 
 
+@app.get("/today", response_class=HTMLResponse)
+async def today_page(
+    _: str = Depends(require_session),
+) -> str:
+    """Serve the on-demand re-plan-today UI (requires login)."""
+    html = (_STATIC / "today.html").read_text(
+        encoding="utf-8"
+    )
+    return html.replace(
+        'id="version-label"',
+        f'id="version-label" data-v="{GIT_COMMIT}"',
+    )
+
+
 async def _run_session(
     ws: WebSocket,
     build_ctx: _BuildCtxFn,

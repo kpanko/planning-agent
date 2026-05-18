@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport"
         content="width=device-width, initial-scale=1">
-  <title>Sunday Weekly Review</title>
+  <title>Replan Today</title>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
@@ -205,19 +205,6 @@
     }
     #logout-link:hover { color: #ccc; }
 
-    .mode-link {
-      padding: 0.25rem 0.6rem;
-      color: #93c5fd;
-      font-size: 0.8rem;
-      text-decoration: none;
-      border: 1px solid #1e3a8a;
-      border-radius: 5px;
-    }
-    .mode-link:hover {
-      color: #dbeafe;
-      border-color: #2563eb;
-    }
-
     #version-label {
       font-size: 0.65rem;
       color: #555;
@@ -271,10 +258,9 @@
 <body>
 
 <header>
-  <span id="page-title">Sunday Weekly Review</span>
+  <span id="page-title">Replan Today</span>
   <div id="status-dot" class="connecting"></div>
   <span id="status-label">Connecting…</span>
-  <a href="/today" class="mode-link">Replan today →</a>
   <button id="debug-toggle">Debug</button>
   <button id="disconnect-btn">Disconnect</button>
   <span id="version-label"></span>
@@ -413,7 +399,7 @@
 
   function connect() {
     const proto = location.protocol === "https:" ? "wss" : "ws";
-    ws = new WebSocket(`${proto}://${location.host}/ws`);
+    ws = new WebSocket(`${proto}://${location.host}/ws/today`);
 
     ws.onopen = () => {
       setStatus("connected", "Connected");

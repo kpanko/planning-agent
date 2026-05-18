@@ -222,6 +222,34 @@ class TestIndexRoute:
         body = response.text.lower()
         assert "sunday" in body and "review" in body
 
+    def test_index_links_to_today(self):
+        with patch(
+            "planning_agent.auth.WEB_SECRET", _TEST_SECRET
+        ):
+            client = TestClient(app)
+            client.cookies.update(_session_cookies())
+            response = client.get("/")
+        assert response.status_code == 200
+        assert 'href="/today"' in response.text
+
+
+class TestTodayRoute:
+    def test_today_page_requires_auth(self):
+        with TestClient(app, follow_redirects=False) as c:
+            resp = c.get("/today")
+        assert resp.status_code in (303, 401)
+
+    def test_today_page_with_auth_renders(self):
+        with patch(
+            "planning_agent.auth.WEB_SECRET", _TEST_SECRET
+        ):
+            client = TestClient(app)
+            client.cookies.update(_session_cookies())
+            resp = client.get("/today")
+        assert resp.status_code == 200
+        body = resp.text.lower()
+        assert "replan today" in body
+
 
 # ── WebSocket: basic chat ─────────────────────────────────
 
