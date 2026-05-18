@@ -153,3 +153,63 @@ class TestFetchTodoistSnapshotDaysAhead:
         )
         assert "today" in snapshot.lower()
         assert "next 14 days" not in snapshot.lower()
+
+
+class TestTodayPrompt:
+    """Tests for the static TODAY_PROMPT content."""
+
+    def test_advertises_required_tools(self):
+        from planning_agent.replan_today import TODAY_PROMPT
+
+        required = [
+            "reschedule_tasks(",
+            "find_tasks(",
+            "find_tasks_by_date(",
+            "complete_task(",
+            "add_task(",
+            "get_calendar(",
+            "get_rules(",
+            "get_observations(",
+        ]
+        for tool in required:
+            assert f"`{tool}" in TODAY_PROMPT, (
+                f"TODAY_PROMPT missing tool advert: {tool}"
+            )
+
+    def test_does_not_advertise_forbidden_tools(self):
+        from planning_agent.replan_today import TODAY_PROMPT
+
+        forbidden = [
+            "update_rules(",
+            "update_observations(",
+            "update_values_doc(",
+            "add_fuzzy_recurring_task(",
+            "update_fuzzy_last_done(",
+            "remove_fuzzy_recurring_task(",
+            "get_recent_conversations(",
+        ]
+        for tool in forbidden:
+            assert f"`{tool}" not in TODAY_PROMPT, (
+                f"TODAY_PROMPT must not advertise {tool}"
+            )
+
+    def test_uses_visibility_instruction(self):
+        from planning_agent.replan_today import TODAY_PROMPT
+        from planning_agent.visibility import (
+            VISIBILITY_INSTRUCTION,
+        )
+
+        assert VISIBILITY_INSTRUCTION in TODAY_PROMPT
+
+    def test_frames_session_as_today_only(self):
+        from planning_agent.replan_today import TODAY_PROMPT
+
+        text = TODAY_PROMPT.lower()
+        assert "today" in text
+        assert "disrupt" in text or "salvage" in text
+
+    def test_defers_horizon_work_to_sunday(self):
+        from planning_agent.replan_today import TODAY_PROMPT
+
+        text = TODAY_PROMPT.lower()
+        assert "sunday" in text
