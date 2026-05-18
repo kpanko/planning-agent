@@ -1,30 +1,51 @@
 # Status
 
-**Last updated:** 2026-05-18 (session 19)
-**Active work:** Redesign — M-R1, M-R2, M-R3 implemented on
-`redesign-2026-05`, PR #94 open. M-R4 plan written this session,
-awaiting user review before execution.
+**Last updated:** 2026-05-18 (session 20)
+**Active work:** Redesign feature-complete on
+`redesign-2026-05`. PR #94 carries M-R1 + M-R2 + M-R3 + M-R4.
+Awaiting review and merge.
 
 ## Recently Completed
 
-- **M-R4 plan written** (session 19, branch `redesign-2026-05`,
-  not yet committed/executed). `project-plans/redesign-m-r4.md`
-  — 10 TDD tasks for on-demand re-plan-today. Design captured
-  through brainstorming: free-text disruption input, separate
-  `/today` route + `/ws/today`, narrow pre-load (today's tasks
-  via `_fetch_todoist_snapshot(days_ahead=0)` + today's calendar
-  via `fetch_calendar_snapshot(days=1)` + `rules.md`), lean
-  tool surface (full Todoist + read-only rules/observations +
-  `get_calendar` only; no fuzzy, no model-edit tools, no
-  conversations), no extraction on disconnect, no horizon
-  math. Plan introduces a `read_only` flag on
-  `register_rules_tools`/`register_observation_tools`, a
-  `days_ahead` param on `_fetch_todoist_snapshot`, a
-  `_run_session` extraction from `websocket_endpoint` to share
-  the chat protocol, a `_render_today_context` mirroring
-  Sunday's renderer, and a `create_today_agent` factory.
-  Extraction skip enforced via `run_extraction_on_close=False`
-  on `/ws/today`.
+- **M-R4 implemented** (session 20, PR #94). On-demand
+  re-plan-today shipped end-to-end. New `replan_today`
+  module: `TODAY_PROMPT` (purpose-built phone-friendly
+  prompt — "salvage today" framing, defers week-scale work
+  to Sunday, no model edits), `build_today_context` (narrow
+  pre-load: today's tasks via `_fetch_todoist_snapshot(
+  days_ahead=0)` + today's calendar via
+  `fetch_calendar_snapshot(days=1)` + `rules.md`),
+  `_render_today_context` (omits values/observations/fuzzy/
+  conversations/deferral-summary blocks), `create_today_agent`
+  (lean tool set: full Todoist + read-only rules/observations
+  + `get_calendar`; Anthropic caching enabled). New web
+  routes `GET /today` (serves `static/today.html`, a
+  styled-twin of `index.html` with title/header/WS-URL
+  swapped) and `WebSocket /ws/today` (drives
+  `_run_session` with `run_extraction_on_close=False`).
+  Refactor: extracted `_run_session` helper from
+  `websocket_endpoint` so Sunday and Today share the chat
+  protocol (auth + accept stays per-route).
+  `register_rules_tools`/`register_observation_tools`
+  gained `read_only: bool = False` (gates `update_*`
+  registration); `_fetch_todoist_snapshot` gained
+  `days_ahead: int = 14` with dynamic "Today" vs "Next N
+  days" header. `index.html` now carries a `Replan today →`
+  mode link near the header for one-tap phone access.
+  Prompt-coverage test parametrized over Sunday and Today:
+  drift check now runs in both directions (advertised →
+  registered AND registered → advertised) for both modes,
+  with per-mode `SUNDAY_PROMPT_UNADVERTISED` /
+  `TODAY_PROMPT_UNADVERTISED` allowlists (Sunday lists 7
+  tools bare-backticked in an "also available" block; the
+  regex only catches call-form). Tests: 6 in
+  `test_replan_today.py` plus 3 new web tests
+  (`test_today_page_*`, `test_index_links_to_today`) and 2
+  WS-today tests (extraction non-fire + endpoint-source
+  sanity). Test count: 331 → 357.
+- **M-R4 plan written** (session 19, branch
+  `redesign-2026-05`). `project-plans/redesign-m-r4.md` —
+  10 TDD tasks; executed cleanly in session 20.
 - **M-R3 implemented** (session 18, PR #94). Nightly replan
   rebuilt around tiered-horizon placement + the M-R1 deferral
   counter. `main_nightly.run_nightly` now: fetches overdue
@@ -74,48 +95,53 @@ awaiting user review before execution.
 
 ## In Progress
 
-Nothing actively in progress. PR #94 is open with M-R1 + M-R2 +
-M-R3. M-R4 plan written but awaiting user review before
-execution. Branch stays alive for M-R4 work to land on.
+Nothing actively in progress. PR #94 is open with M-R1 +
+M-R2 + M-R3 + M-R4. The redesign is feature-complete on the
+branch.
 
 ## Redesign Branch State
 
 - Branch: `redesign-2026-05`, pushed.
 - PR: [#94](https://github.com/kpanko/planning-agent/pull/94)
-- Ahead of main: ~31 commits. M-R3 added (most-recent first):
-  - `a1f74e3` — `revert: restore TestSchedulerDryRun to pre-Task-4 shape`
-  - `4649512` — `feat(nightly): horizons + deferral counter in run_nightly`
-  - `00d28c6` — `test(nightly): tighten test_fits_in_first_week`
-  - `ba5dfd7` — `feat(nightly): plan_nightly uses tiered horizons`
-  - `c2cc0d2` — `fix(nightly): harden deadline parser against datetime`
-  - `e08c56f` — `feat(nightly): convert Todoist tasks to PlaceableTasks`
-  - `5bbf195` — `docs(m-r3): generalize task-4 pyright-suppression cleanup`
-  - `bb3fff8` — `fix(nightly): require word boundary after 'week' in regex`
-  - `28093a2` — `docs: M-R3 nightly replan plan`
-  - `6742f61` — `feat(nightly): parse weekly capacity from rules.md`
-  - (older: M-R1, M-R2, plan + review-fix commits)
+- Ahead of main: ~40 commits. M-R4 added (most-recent first):
+  - `dd237ad` — `test(prompt-coverage): cover TODAY_PROMPT against create_today_agent`
+  - `76d8750` — `feat(web): /ws/today hosts on-demand re-plan session`
+  - `3c4abbd` — `feat(web): add GET /today page and index link`
+  - `ba4d27f` — `refactor(web): extract _run_session helper from websocket_endpoint`
+  - `6d2af96` — `feat(replan_today): create_today_agent factory`
+  - `f244910` — `feat(replan_today): build_today_context + render`
+  - `71444d1` — `feat(replan_today): add TODAY_PROMPT`
+  - `a21a1dc` — `feat(context): add days_ahead param to _fetch_todoist_snapshot`
+  - `1820ea7` — `feat(agent): add read_only flag to rules/observation register helpers`
+  - (older: M-R1, M-R2, M-R3 + plans + review-fix commits)
 - Plans: `project-plans/redesign-2026-05.md` (spec),
   `project-plans/redesign-m-r1.md`,
   `project-plans/redesign-m-r2.md`,
   `project-plans/redesign-m-r3.md`,
-  `project-plans/redesign-m-r4.md` (new this session,
-  untracked).
+  `project-plans/redesign-m-r4.md` (committed as `921620d`).
 
 ## Next Up
 
-1. **User reviews M-R4 plan.** `project-plans/redesign-m-r4.md`
-   is the artifact. Open questions, scope pushback, or task-
-   ordering changes happen before execution starts.
-2. **Execute M-R4** (10 tasks, TDD). Lands on the same
-   `redesign-2026-05` branch / PR #94.
-3. **Review and merge PR #94** when M-R4 is in. The branch
-   must NOT be deleted on merge per the M-R1 plan — keep it
-   alive for any redesign-adjacent follow-ups.
-4. **Redeploy the Fly cron Machine (#57)** — operational task,
-   independent of the redesign. DEPLOY.md has the
+1. **Review and merge PR #94.** The branch must NOT be
+   deleted on merge per the M-R1 plan — keep it alive for
+   any redesign-adjacent follow-ups (e.g.
+   `place_in_horizon`-as-a-Sunday-tool experiment from
+   M-R3's notes). Merge with `gh pr merge 94 --merge`
+   (drop `--delete-branch`).
+2. **Redeploy the Fly cron Machine (#57)** — operational
+   task, independent of the redesign. DEPLOY.md has the
    Fly-secret-based commands. Verify with
-   `flyctl machine status -d` that no token appears in the env
-   block (per DECISIONS.md).
+   `flyctl machine status -d` that no token appears in the
+   env block (per DECISIONS.md).
+3. **Manual smoke test of `/today`** on a phone browser:
+   open `/`, tap "Replan today →", confirm the URL is
+   `/today` and the title reads "Replan Today"; drive a
+   short disruption ("kid got sick, push everything after
+   2pm to tomorrow") and confirm the agent proposes
+   `reschedule_tasks` calls. Disconnect and verify no new
+   conversation summary appears under
+   `~/.planning-agent/conversations/` (extraction does
+   not run on `/today`).
 
 ## Blockers / Open Questions
 
