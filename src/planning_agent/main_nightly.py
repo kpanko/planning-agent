@@ -178,10 +178,12 @@ async def run_nightly(
 
     # Record overdue appearances before doing any writes —
     # even if the replan crashes mid-loop, the deferral
-    # signal for tonight is captured.
-    deferrals.record_overdue_today(
-        {t.id for t in overdue}, today,
-    )
+    # signal for tonight is captured. Skip in dry-run so
+    # preview runs don't artificially age tasks.
+    if not dry_run:
+        deferrals.record_overdue_today(
+            {t.id for t in overdue}, today,
+        )
 
     capacity = _parse_capacity_from_rules(
         rules.read_rules(),
@@ -200,8 +202,8 @@ async def run_nightly(
 
     planned_moves: list[tuple[str, str, date]] = []
     for task, day in placements:
-        planned_moves.append((task.id, task.content, day))
         if dry_run:
+            planned_moves.append((task.id, task.content, day))
             logging.info(
                 "[DRY RUN] Would reschedule '%s' -> %s",
                 task.content,
@@ -210,9 +212,6 @@ async def run_nightly(
             continue
         try:
             reschedule_task(api, task, day)
-            logging.info(
-                "Rescheduled '%s' -> %s", task.content, day,
-            )
         except Exception:
             # One bad task should not abort the whole night.
             logging.exception(
@@ -220,6 +219,11 @@ async def run_nightly(
                 task.content,
                 task.id,
             )
+            continue
+        planned_moves.append((task.id, task.content, day))
+        logging.info(
+            "Rescheduled '%s' -> %s", task.content, day,
+        )
 
     logging.info(
         "Nightly replan complete: %d task(s) moved.",

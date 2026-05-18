@@ -377,12 +377,90 @@ class TestRunNightly(unittest.TestCase):
 
         from planning_agent.main_nightly import run_nightly
 
-        asyncio.run(run_nightly(dry_run=True))
+        asyncio.run(run_nightly(dry_run=False))
 
         # Each overdue task id should have a deferral count of 1
         # for today (recorded inside run_nightly).
         for i in range(3):
             self.assertEqual(deferrals.get_count(str(i)), 1)
+
+    @patch(
+        "planning_agent.main_nightly.reschedule_task",
+    )
+    @patch("planning_agent.main_nightly.TodoistAPI")
+    @patch("planning_agent.main_nightly.config")
+    def test_failed_reschedule_excluded_from_moves(
+        self,
+        mock_config: MagicMock,
+        mock_api_cls: MagicMock,
+        mock_reschedule: MagicMock,
+    ) -> None:
+        """A reschedule_task that raises must not appear in
+        the returned ``planned_moves`` list."""
+        mock_config.TODOIST_API_KEY = "fake-key"
+        mock_config.USER_TZ = "America/New_York"
+        mock_config.NIGHTLY_DEFAULT_CAPACITY_HOURS = 50.0
+        mock_config.NIGHTLY_DEFAULT_TASK_HOURS = 1.0
+        api = mock_api_cls.return_value
+        api.update_task.return_value = True
+
+        yesterday = (
+            date.today() - timedelta(days=1)
+        ).strftime("%Y-%m-%d")
+        good = create_task(
+            "good", "ok task", due_date_str=yesterday,
+        )
+        bad = create_task(
+            "bad", "fails", due_date_str=yesterday,
+        )
+        api.filter_tasks.return_value = iter([[good, bad]])
+
+        def _maybe_fail(_api, task, _day):
+            if task.id == "bad":
+                raise RuntimeError("simulated")
+
+        mock_reschedule.side_effect = _maybe_fail
+
+        from planning_agent.main_nightly import run_nightly
+
+        moves = asyncio.run(run_nightly(dry_run=False))
+
+        ids = [tid for tid, _content, _day in moves]
+        self.assertIn("good", ids)
+        self.assertNotIn("bad", ids)
+
+    @patch("planning_agent.main_nightly.TodoistAPI")
+    @patch("planning_agent.main_nightly.config")
+    def test_dry_run_does_not_record_deferrals(
+        self,
+        mock_config: MagicMock,
+        mock_api_cls: MagicMock,
+    ) -> None:
+        """Preview runs must be side-effect free —
+        ``deferral_counts.json`` is a real state change."""
+        from planning_context import deferrals
+
+        mock_config.TODOIST_API_KEY = "fake-key"
+        mock_config.USER_TZ = "America/New_York"
+        mock_config.NIGHTLY_DEFAULT_CAPACITY_HOURS = 50.0
+        mock_config.NIGHTLY_DEFAULT_TASK_HOURS = 1.0
+        api = mock_api_cls.return_value
+        api.update_task.return_value = True
+
+        yesterday = (
+            date.today() - timedelta(days=1)
+        ).strftime("%Y-%m-%d")
+        task = create_task(
+            "99", "overdue preview",
+            due_date_str=yesterday,
+        )
+        api.filter_tasks.return_value = iter([[task]])
+
+        from planning_agent.main_nightly import run_nightly
+
+        asyncio.run(run_nightly(dry_run=True))
+
+        self.assertEqual(deferrals.get_count("99"), 0)
 
     @patch("planning_agent.main_nightly.TodoistAPI")
     @patch("planning_agent.main_nightly.config")
@@ -416,8 +494,8 @@ class TestRunNightly(unittest.TestCase):
 
         from planning_agent.main_nightly import run_nightly
 
-        asyncio.run(run_nightly(dry_run=True))
-        asyncio.run(run_nightly(dry_run=True))
+        asyncio.run(run_nightly(dry_run=False))
+        asyncio.run(run_nightly(dry_run=False))
 
         self.assertEqual(deferrals.get_count("1"), 1)
 
