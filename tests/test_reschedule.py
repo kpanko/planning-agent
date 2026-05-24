@@ -553,6 +553,37 @@ class TestRescheduleTask(unittest.TestCase):
         self.assertEqual(err.reminders, snapshot)
         self.assertIs(err.__cause__, cause)
 
+    @patch(
+        "todoist_scheduler.reschedule.fetch_reminders"
+    )
+    @patch(
+        "todoist_scheduler.reschedule.delete_reminders"
+    )
+    @patch(
+        "todoist_scheduler.reschedule.restore_reminders"
+    )
+    def test_delete_reminders_failure_does_not_raise(
+        self,
+        mock_restore,
+        mock_delete,
+        mock_fetch,
+    ):
+        mock_fetch.return_value = [
+            {"id": "r1", "item_id": "1"},
+        ]
+        mock_delete.side_effect = RuntimeError(
+            "sync API down"
+        )
+        task = create_task(
+            '1', 'Task', due_date_str='2024-01-10',
+        )
+        # Should not raise — delete failures are warnings only.
+        reschedule_task(
+            self.api, task, date(2024, 1, 15),
+        )
+        # Restore still ran after the delete failure.
+        mock_restore.assert_called_once()
+
 
 class TestStripRecurrencePattern(unittest.TestCase):
 
