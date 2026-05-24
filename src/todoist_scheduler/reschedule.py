@@ -222,18 +222,11 @@ def reschedule_task(
         return
     validate_recurring_preserved(task, due_string)
 
-    # Save reminders before the update drops them
+    # Save reminders before the update drops them. Fail-fast — if we
+    # can't read them, we'd silently lose them on the date change.
     token: str = api._token  # pyright: ignore[reportPrivateUsage]
-    reminders: list[dict[str, Any]] = []
     old_date = _parse_task_date(task)
-    try:
-        reminders = fetch_reminders(token, task.id)
-    except Exception:
-        logging.warning(
-            "Failed to fetch reminders for '%s'",
-            task.content,
-            exc_info=True,
-        )
+    reminders = fetch_reminders(token, task.id)
 
     logging.info(
         f"Sending the task '{task.content}' to {day}"

@@ -300,25 +300,32 @@ class TestRescheduleTask(unittest.TestCase):
             '1', 'Task', due_date_str='2024-01-15',
         )
 
-    def test_calls_api(self):
+    @patch("todoist_scheduler.reschedule.fetch_reminders")
+    def test_calls_api(self, mock_fetch):
+        mock_fetch.return_value = []
         task = create_task('1', 'Task', due_date_str='2024-01-10')
         reschedule_task(self.api, task, date(2024, 1, 15))
         self.api.update_task.assert_called_once_with(
             task_id='1', due_string='2024-01-15',
         )
 
-    def test_skips_when_already_on_day(self):
+    @patch("todoist_scheduler.reschedule.fetch_reminders")
+    def test_skips_when_already_on_day(self, mock_fetch):
         task = create_task('1', 'Task', due_date_str='2024-01-15')
         reschedule_task(self.api, task, date(2024, 1, 15))
         self.api.update_task.assert_not_called()
 
-    def test_raises_on_failure(self):
+    @patch("todoist_scheduler.reschedule.fetch_reminders")
+    def test_raises_on_failure(self, mock_fetch):
+        mock_fetch.return_value = []
         self.api.update_task.return_value = False
         task = create_task('1', 'Task', due_date_str='2024-01-10')
         with self.assertRaises(Exception):
             reschedule_task(self.api, task, date(2024, 1, 15))
 
-    def test_preserves_duration(self):
+    @patch("todoist_scheduler.reschedule.fetch_reminders")
+    def test_preserves_duration(self, mock_fetch):
+        mock_fetch.return_value = []
         task = create_task(
             '1', 'Task',
             due_date_str='2024-01-10',
@@ -332,7 +339,9 @@ class TestRescheduleTask(unittest.TestCase):
             duration_unit='minute',
         )
 
-    def test_preserves_day_duration(self):
+    @patch("todoist_scheduler.reschedule.fetch_reminders")
+    def test_preserves_day_duration(self, mock_fetch):
+        mock_fetch.return_value = []
         task = create_task(
             '1', 'Task',
             due_date_str='2024-01-10',
@@ -346,7 +355,9 @@ class TestRescheduleTask(unittest.TestCase):
             duration_unit='day',
         )
 
-    def test_no_duration_omits_params(self):
+    @patch("todoist_scheduler.reschedule.fetch_reminders")
+    def test_no_duration_omits_params(self, mock_fetch):
+        mock_fetch.return_value = []
         task = create_task(
             '1', 'Task', due_date_str='2024-01-10',
         )
@@ -356,7 +367,9 @@ class TestRescheduleTask(unittest.TestCase):
             due_string='2024-01-15',
         )
 
-    def test_time_override_passed_to_api(self):
+    @patch("todoist_scheduler.reschedule.fetch_reminders")
+    def test_time_override_passed_to_api(self, mock_fetch):
+        mock_fetch.return_value = []
         self.api.get_task.return_value = create_task(
             '1', 'Task',
             due_date_str='2024-01-15',
@@ -374,7 +387,9 @@ class TestRescheduleTask(unittest.TestCase):
             due_string='2024-01-15 09:30',
         )
 
-    def test_recurring_with_time_preserves_pattern(self):
+    @patch("todoist_scheduler.reschedule.fetch_reminders")
+    def test_recurring_with_time_preserves_pattern(self, mock_fetch):
+        mock_fetch.return_value = []
         self.api.get_task.return_value = create_task(
             '1', 'Task',
             due_date_str='2024-01-15',
@@ -398,9 +413,11 @@ class TestRescheduleTask(unittest.TestCase):
             ),
         )
 
-    def test_raises_on_post_write_date_mismatch(self):
+    @patch("todoist_scheduler.reschedule.fetch_reminders")
+    def test_raises_on_post_write_date_mismatch(self, mock_fetch):
         # Simulates the #62 class of failure: Todoist accepts our
         # update but stores a different date than we asked for.
+        mock_fetch.return_value = []
         self.api.get_task.return_value = create_task(
             '1', 'Task',
             due_date_str='2024-01-22',
@@ -449,6 +466,23 @@ class TestRescheduleTask(unittest.TestCase):
             5,
         )
 
+
+    @patch(
+        "todoist_scheduler.reschedule.fetch_reminders"
+    )
+    def test_fetch_reminders_failure_raises_without_mutating(
+        self,
+        mock_fetch,
+    ):
+        mock_fetch.side_effect = RuntimeError("sync API down")
+        task = create_task(
+            '1', 'Task', due_date_str='2024-01-10',
+        )
+        with self.assertRaises(RuntimeError):
+            reschedule_task(
+                self.api, task, date(2024, 1, 15),
+            )
+        self.api.update_task.assert_not_called()
 
     @patch(
         "todoist_scheduler.reschedule.fetch_reminders"
