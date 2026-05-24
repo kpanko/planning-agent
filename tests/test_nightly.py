@@ -186,6 +186,13 @@ class TestSchedulerDryRun(unittest.TestCase):
         )
         self._verify_patcher.start()
         self.addCleanup(self._verify_patcher.stop)
+        # Stop fetch_reminders from hitting the real Sync API.
+        self._fetch_patcher = patch(
+            "todoist_scheduler.reschedule.fetch_reminders",
+            return_value=[],
+        )
+        self._fetch_patcher.start()
+        self.addCleanup(self._fetch_patcher.stop)
 
     def test_dry_run_collects_moves(self) -> None:
         scheduler = Scheduler(
@@ -262,6 +269,13 @@ class TestRunNightly(unittest.TestCase):
         )
         self._verify_patcher.start()
         self.addCleanup(self._verify_patcher.stop)
+        # Stop fetch_reminders from hitting the real Sync API.
+        self._fetch_patcher = patch(
+            "todoist_scheduler.reschedule.fetch_reminders",
+            return_value=[],
+        )
+        self._fetch_patcher.start()
+        self.addCleanup(self._fetch_patcher.stop)
 
     @patch("planning_agent.main_nightly.TodoistAPI")
     @patch("planning_agent.main_nightly.config")

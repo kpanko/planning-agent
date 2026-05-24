@@ -69,10 +69,14 @@ class TestBuildParser(unittest.TestCase):
 
 class TestMain(unittest.TestCase):
 
+    @patch(
+        "todoist_scheduler.reschedule.fetch_reminders",
+        return_value=[],
+    )
     @patch("todoist_scheduler.cli.TodoistAPI")
     @patch("todoist_scheduler.cli.config")
     def test_reschedules_task(
-        self, mock_config, mock_api_cls
+        self, mock_config, mock_api_cls, mock_fetch
     ):
         mock_config.TODOIST_API_KEY = "test-key"
         mock_config.USER_TZ = "UTC"
