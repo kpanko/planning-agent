@@ -140,6 +140,25 @@ class DueDateMismatchError(Exception):
     """
 
 
+class PriorityProtectedError(Exception):
+    """Refused to reschedule a P1 (highest priority) task.
+
+    P1 tasks are never auto-rescheduled — leaving them overdue is
+    the user's signal to do them now. To move a P1, downgrade the
+    priority first or move it manually. See #97.
+    """
+
+    def __init__(self, task_id: str, task_content: str) -> None:
+        self.task_id = task_id
+        self.task_content = task_content
+        super().__init__(
+            f"Refusing to reschedule P1 task "
+            f"'{task_content}' ({task_id}): P1 tasks are not "
+            f"auto-rescheduled. Downgrade priority or move "
+            f"manually."
+        )
+
+
 class ReminderRestoreError(Exception):
     """Date update succeeded but reminders could not be restored.
 
@@ -217,6 +236,10 @@ def reschedule_task(
     time: str | None = None,
 ) -> None:
     """Reschedule a task to a new date via the Todoist API."""
+    # Todoist API priority: 1=p4 (lowest) ... 4=p1 (highest).
+    # Policy: P1 tasks are never auto-rescheduled. See #97.
+    if task.priority == 4:
+        raise PriorityProtectedError(task.id, task.content)
     due_string = compute_due_string(task, day, time)
     if due_string is None:
         return
