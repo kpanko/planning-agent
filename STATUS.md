@@ -1,13 +1,35 @@
 # Status
 
 **Last updated:** 2026-05-24 (session 21)
-**Active work:** None. PR #94 merged (commit `2ad95bb`).
-Redesign (M-R1 + M-R2 + M-R3 + M-R4) shipped to `main`;
-branch `redesign-2026-05` deleted. Next is the Fly cron
-redeploy (#57) and the manual `/today` smoke test.
+**Active work:** None. PR #94 merged (`2ad95bb`) — redesign on
+main. `/today` smoke test confirmed (replan flow works, no
+extraction on disconnect). PR #98 merged (`45fe37a`) — P1
+reschedule guard. Next is the Fly cron redeploy (#57), held
+until after Sunday-night + nightly-job testing.
 
 ## Recently Completed
 
+- **PR #98 merged — P1 reschedule guard (#97)** (session 21,
+  commit `45fe37a`). `reschedule_task` raises
+  `PriorityProtectedError` on `task.priority == 4` before any
+  API mutation; MCP `reschedule_tasks` surfaces the refusal via
+  its existing per-task error formatting. Triggered by a
+  2026-05-24 incident: overdue weekly-recurring P1, agent
+  asked to move to today, Todoist snapped recurrence anchor
+  forward to next Friday, #62's `DueDateMismatchError`
+  reported failure — but the call should never have run.
+  Original `todoist_scheduler` had the rule at the
+  fetch-filter layer (`overdue & ! p1`); the redesigned
+  Sunday/Today agents read the snapshot directly and bypassed
+  it. Putting it in the tool layer makes the policy survive
+  any future context/prompt changes. DECISIONS.md updated.
+  Also fixed 7 preexisting `test_basic.py` fixtures that used
+  `priority=4` thinking it meant P4 (Todoist's encoding is
+  inverted — `priority=4` is P1). 368 → 372 tests.
+  CodeRabbit: no actionable comments.
+- **`/today` smoke test passed** (session 21, on prod). Replan
+  flow works; no `~/.planning-agent/conversations/` entry
+  written on disconnect (extraction correctly skipped).
 - **PR #94 merged** (session 21, commit `2ad95bb`). M-R1
   through M-R4 + reminder-loss safeguards (#95, #96) on
   main. Branch deleted. #95 and #96 closed manually
@@ -150,21 +172,19 @@ Nothing.
 
 ## Next Up
 
-1. **Redeploy the Fly cron Machine (#57)** — operational
-   task. DEPLOY.md has the Fly-secret-based commands.
+1. **Sunday-night live test** — drive a real weekly review
+   on prod end-to-end. Watch for: P1 refusal works when the
+   agent tries to move one; tiered-horizon placement
+   produces sensible spreads; deferral counter increments.
+2. **Nightly job test** — once Sunday review looks good,
+   manually hit `POST /internal/nightly-replan` with
+   `dry_run=true` on prod. Inspect the dry-run output for
+   sensible placements before re-enabling the cron.
+3. **Redeploy the Fly cron Machine (#57)** — last open
+   task in M6. DEPLOY.md has the Fly-secret-based commands.
    Verify with `flyctl machine status -d` that no token
-   appears in the env block (per DECISIONS.md). This is
-   the last open task in M6.
-2. **Manual smoke test of `/today`** on a phone browser:
-   open `/`, tap "Replan today →", confirm the URL is
-   `/today` and the title reads "Replan Today"; drive a
-   short disruption ("kid got sick, push everything after
-   2pm to tomorrow") and confirm the agent proposes
-   `reschedule_tasks` calls. Disconnect and verify no new
-   conversation summary appears under
-   `~/.planning-agent/conversations/` (extraction does
-   not run on `/today`).
-3. **After #57 lands:** M6 is done. Pick M7 (scheduling
+   appears in the env block (per DECISIONS.md).
+4. **After #57 lands:** M6 is done. Pick M7 (scheduling
    pattern learning, #27–#34) or M8 (evaluation suite,
    #43–#45) as the next milestone.
 
