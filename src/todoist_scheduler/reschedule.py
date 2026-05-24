@@ -294,9 +294,11 @@ def reschedule_task(
             restore_reminders(
                 token, reminders, day_delta
             )
-        except Exception:
-            logging.warning(
-                "Failed to restore reminders for '%s'",
-                task.content,
-                exc_info=True,
-            )
+        except Exception as e:
+            raise ReminderRestoreError(
+                task_id=task.id,
+                task_content=task.content,
+                day=day,
+                reminders=reminders,
+                cause=e,
+            ) from e

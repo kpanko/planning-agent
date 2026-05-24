@@ -519,6 +519,40 @@ class TestRescheduleTask(unittest.TestCase):
             5,
         )
 
+    @patch(
+        "todoist_scheduler.reschedule.fetch_reminders"
+    )
+    @patch(
+        "todoist_scheduler.reschedule.delete_reminders"
+    )
+    @patch(
+        "todoist_scheduler.reschedule.restore_reminders"
+    )
+    def test_restore_reminders_failure_raises(
+        self,
+        mock_restore,
+        mock_delete,
+        mock_fetch,
+    ):
+        snapshot = [{"id": "r1", "item_id": "1"}]
+        mock_fetch.return_value = snapshot
+        cause = RuntimeError("sync API down")
+        mock_restore.side_effect = cause
+        task = create_task(
+            '1', 'Task', due_date_str='2024-01-10',
+        )
+        with self.assertRaises(ReminderRestoreError) as ctx:
+            reschedule_task(
+                self.api, task, date(2024, 1, 15),
+            )
+        self.api.update_task.assert_called_once()
+        mock_delete.assert_called_once()
+        err = ctx.exception
+        self.assertEqual(err.task_id, '1')
+        self.assertEqual(err.day, date(2024, 1, 15))
+        self.assertEqual(err.reminders, snapshot)
+        self.assertIs(err.__cause__, cause)
+
 
 class TestStripRecurrencePattern(unittest.TestCase):
 
