@@ -1,4 +1,4 @@
-"""Post-conversation memory extraction."""
+"""Post-conversation memory extraction (observations-based)."""
 
 from __future__ import annotations
 
@@ -9,50 +9,30 @@ from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 
 from planning_context.conversations import save_summary
-from planning_context.memories import (
-    MemoryCategory,
-    add_memory,
-    resolve_memory,
-)
-from planning_context.values import write_values
+from planning_context.observations import write_observations
+from planning_context.rules import write_rules
 
 from .config import EXTRACTION_MODEL
 
 logger = logging.getLogger("planning-agent")
 
 
-class Memory(BaseModel):
-    """A single memory to save."""
-
-    content: str
-    category: MemoryCategory = Field(
-        description=(
-            "One of: fact, observation,"
-            " open_thread, preference"
-        )
-    )
-    expiry_date: str | None = Field(
-        default=None,
-        description="Optional YYYY-MM-DD expiry date",
-    )
-
-
 class ExtractionResult(BaseModel):
-    """Structured output from extraction agent."""
+    """Structured output from the extraction agent."""
 
-    new_memories: list[Memory] = Field(  # pyright: ignore[reportUnknownVariableType]
-        default_factory=list,
-        description="New memories to save",
+    observations_doc: str = Field(
+        description=(
+            "Full replacement contents for observations.md."
+            " Markdown bullets, each with confidence and"
+            " evidence count. Empty string to clear."
+        ),
     )
-    resolved_memory_ids: list[str] = Field(
-        default_factory=list,
-        description="Memory IDs to mark resolved",
-    )
-    values_doc_update: str | None = Field(
+    rules_doc_update: str | None = Field(
         default=None,
         description=(
-            "New values doc content, or null for"
-            " no change"
+            "Full replacement contents for rules.md, OR null"
+            " for no change. Only set when the user has"
+            " explicitly stated or approved a new rule."
         ),
     )
     conversation_summary: str = Field(
@@ -61,34 +41,42 @@ class ExtractionResult(BaseModel):
 
 
 EXTRACTION_PROMPT = """\
-You are a memory extraction agent. Analyze the \
-conversation above between the user and their planning \
-agent. Extract:
+You are a memory extraction agent. Analyze the conversation
+above between the user and their planning agent. You see the
+*current* contents of observations.md and rules.md in the
+conversation context (the planning agent surfaces them). Your
+job is to produce three outputs.
 
-1. **new_memories**: Facts, preferences, observations, \
-or open threads worth remembering for future \
-conversations. Categories: fact, observation, \
-open_thread, preference. Set expiry_date (YYYY-MM-DD) \
-for time-sensitive items, null otherwise.
+1. **observations_doc**: a complete, updated body for
+   observations.md. Carry forward any existing observations
+   that remain valid. Add new soft inferences from the
+   conversation. Remove observations the user contradicted.
+   Each observation is a markdown bullet of the form:
 
-2. **resolved_memory_ids**: IDs of any memories that \
-were addressed or are no longer relevant (memory IDs \
-look like "m_001").
+       - <natural-language observation>
+         - confidence: low | medium | high
+         - evidence: <count> observation(s)
+         - first seen: YYYY-MM-DD
 
-3. **values_doc_update**: New content for the values \
-document ONLY if priorities clearly shifted during the \
-conversation. Set to null if no update needed (the \
-common case).
+   Be conservative. Only record patterns supported by the
+   conversation. Observations are SOFT — they will be hedged
+   when used. Wrong observations are worse than no
+   observations.
 
-4. **conversation_summary**: A 2-4 sentence summary of \
-what was discussed, what was decided, what tasks were \
-rescheduled, and the user's general mood/energy if \
-apparent.
+2. **rules_doc_update**: usually null. Only set this when the
+   user has explicitly stated a rule ("I never work past
+   9pm") or explicitly approved a graduation from a soft
+   observation to a hard rule. Returns the full new rules.md
+   body when set.
 
-Be selective with memories — only save things that will \
-be useful in future planning conversations. Don't save \
-things that are already in Todoist as tasks.\
+3. **conversation_summary**: 2-4 sentences. What was
+   discussed, what was decided, what tasks moved, the
+   user's mood/energy if apparent.
+
+Be selective. Do not record things already captured by
+Todoist tasks. Do not invent rules the user did not state.\
 """
+
 
 def _make_extraction_agent() -> Agent[None, ExtractionResult]:
     return Agent(
@@ -100,16 +88,13 @@ def _make_extraction_agent() -> Agent[None, ExtractionResult]:
 async def run_extraction(
     message_history: list[Any],
 ) -> ExtractionResult | None:
-    """Run extraction on a conversation and apply
-    results.
+    """Run extraction on a conversation and apply results.
 
-    Returns the ExtractionResult, or None if extraction
-    fails.
+    Returns the ExtractionResult, or None if extraction fails.
     """
     n_msgs = len(message_history)
     logger.info(
-        "Starting memory extraction (%d messages)",
-        n_msgs,
+        "Starting extraction (%d messages)", n_msgs
     )
     try:
         extraction_agent = _make_extraction_agent()
@@ -119,36 +104,25 @@ async def run_extraction(
         )
         _apply(result.output)
         logger.info(
-            "Extraction complete: %d new memories,"
-            " %d resolved, summary saved",
-            len(result.output.new_memories),
-            len(result.output.resolved_memory_ids),
+            "Extraction complete: observations %d chars,"
+            " rules_update=%s, summary saved",
+            len(result.output.observations_doc),
+            result.output.rules_doc_update is not None,
         )
         return result.output
     except Exception:
-        logger.warning(
-            "Extraction failed", exc_info=True
-        )
+        logger.warning("Extraction failed", exc_info=True)
         return None
 
 
 def _apply(result: ExtractionResult) -> None:
-    """Write extraction results to planning context."""
-    # Save conversation summary
+    """Write extraction results to the planning context.
+
+    Order matters: the conversation summary is persisted last,
+    so a failure in observations/rules writes does not leave a
+    summary referencing state that was never recorded.
+    """
+    write_observations(result.observations_doc)
+    if result.rules_doc_update is not None:
+        write_rules(result.rules_doc_update)
     save_summary(result.conversation_summary)
-
-    # Save new memories
-    for mem in result.new_memories:
-        add_memory(
-            mem.content,
-            mem.category,
-            mem.expiry_date,
-        )
-
-    # Resolve old memories
-    for mid in result.resolved_memory_ids:
-        resolve_memory(mid)
-
-    # Update values doc if needed
-    if result.values_doc_update is not None:
-        write_values(result.values_doc_update)

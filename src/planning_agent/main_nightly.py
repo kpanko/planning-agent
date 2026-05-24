@@ -5,21 +5,116 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import re
 import sys
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 from todoist_api_python.api import TodoistAPI
+from todoist_api_python.models import Task
 
 from planning_agent import config
-from todoist_scheduler.config import (
-    IGNORE_TASK_TAG,
-    TASKS_PER_DAY,
+from planning_context import deferrals, rules
+from todoist_scheduler.config import IGNORE_TASK_TAG
+from todoist_scheduler.overdue import fetch_overdue_tasks
+from todoist_scheduler.reschedule import reschedule_task
+
+from planning_agent.horizons import PlaceableTask, place_in_horizon
+
+
+# Matches "<num> hr[s]/week" or "<num> hour[s] per week".
+# Allows a leading "~" and decimals. Case-insensitive.
+_CAPACITY_RE = re.compile(
+    r"(\d+(?:\.\d+)?)\s*(?:hr|hour)s?\s*(?:/|per)\s*week\b",
+    re.IGNORECASE,
 )
-from todoist_scheduler.overdue import (
-    fetch_overdue_tasks,
-)
-from todoist_scheduler.scheduler import Scheduler
+
+
+def _parse_capacity_from_rules(
+    text: str,
+    fallback: float,
+) -> float:
+    """Extract a weekly capacity in hours from rules.md.
+
+    Returns the first ``N hrs/week`` (or ``N hours per week``)
+    number found, or *fallback* if none matches. The rule file
+    is authoritative — if the user lists multiple, the first
+    wins.
+    """
+    match = _CAPACITY_RE.search(text or "")
+    if not match:
+        return fallback
+    return float(match.group(1))
+
+
+# A Todoist "day" duration is treated as one working day's
+# worth of capacity, not 24 literal hours. Tunable if the
+# default proves wrong in practice.
+_HOURS_PER_TODOIST_DAY = 8.0
+
+
+def _task_to_placeable(
+    task: Task,
+    default_hours: float,
+) -> PlaceableTask:
+    """Convert a Todoist Task into a PlaceableTask.
+
+    - ``duration_hours``: Todoist's ``Duration`` (minute or
+      day) if set, else *default_hours*.
+    - ``deadline``: ``task.deadline.date`` parsed as a date,
+      else None. (``task.due`` is the soft schedule; only
+      ``task.deadline`` is the hard limit horizons must respect.)
+    """
+    if task.duration is None:
+        hours = default_hours
+    elif task.duration.unit == "minute":
+        hours = task.duration.amount / 60.0
+    elif task.duration.unit == "day":
+        hours = task.duration.amount * _HOURS_PER_TODOIST_DAY
+    else:  # Future-proof: fall back if a new DurationUnit is added upstream.
+        hours = default_hours
+
+    deadline: date | None = None
+    if task.deadline is not None:
+        raw = task.deadline.date  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
+        if isinstance(raw, datetime):  # pyright: ignore[reportUnnecessaryIsInstance]
+            deadline = raw.date()
+        elif isinstance(raw, date):  # pyright: ignore[reportUnnecessaryIsInstance]
+            deadline = raw  # pyright: ignore[reportUnknownVariableType]
+        else:
+            deadline = date.fromisoformat(str(raw))  # pyright: ignore[reportUnknownArgumentType]
+
+    return PlaceableTask(
+        id=task.id,
+        duration_hours=hours,
+        deadline=deadline,  # pyright: ignore[reportUnknownArgumentType]
+    )
+
+
+def plan_nightly(
+    overdue: list[Task],
+    today: date,
+    capacity_hours: float,
+    default_task_hours: float,
+) -> list[tuple[Task, date]]:
+    """Place each overdue task into the tiered horizon.
+
+    Returns ``(task, target_day)`` pairs in input order. The
+    horizon expands as needed — no task is dropped.
+    """
+    if not overdue:
+        return []
+
+    placeables = [
+        _task_to_placeable(t, default_hours=default_task_hours)
+        for t in overdue
+    ]
+    placements = place_in_horizon(
+        placeables,
+        capacity_hours_per_week=capacity_hours,
+        today=today,
+    )
+    return [(t, placements[t.id]) for t in overdue]
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -52,8 +147,8 @@ async def run_nightly(
 ) -> list[tuple[str, str, date]]:
     """Run the nightly replan.
 
-    Returns a list of (task_id, content, target_day)
-    for tasks that were (or would be) rescheduled.
+    Returns a list of (task_id, content, target_day) for tasks
+    that were (or would be) rescheduled.
     """
     if not config.TODOIST_API_KEY:
         logging.error("TODOIST_API_KEY is not set.")
@@ -65,8 +160,7 @@ async def run_nightly(
     ).date()
 
     logging.info(
-        "Nightly replan starting for %s "
-        "(dry_run=%s)",
+        "Nightly replan starting for %s (dry_run=%s)",
         today,
         dry_run,
     )
@@ -82,28 +176,60 @@ async def run_nightly(
         logging.info("Nothing to reschedule.")
         return []
 
-    scheduler = Scheduler(
-        api=api,
-        today=today,
-        tasks_per_day=TASKS_PER_DAY,
-        ignore_tag=IGNORE_TASK_TAG,
-        dry_run=dry_run,
-    )
-    scheduler.schedule_and_push_down(overdue)
+    # Record overdue appearances before doing any writes —
+    # even if the replan crashes mid-loop, the deferral
+    # signal for tonight is captured. Skip in dry-run so
+    # preview runs don't artificially age tasks.
+    if not dry_run:
+        deferrals.record_overdue_today(
+            {t.id for t in overdue}, today,
+        )
 
-    for _, content, day in scheduler.planned_moves:
+    capacity = _parse_capacity_from_rules(
+        rules.read_rules(),
+        fallback=config.NIGHTLY_DEFAULT_CAPACITY_HOURS,
+    )
+    logging.info(
+        "Planning against %.1f hr/week capacity.", capacity,
+    )
+
+    placements = plan_nightly(
+        overdue,
+        today=today,
+        capacity_hours=capacity,
+        default_task_hours=config.NIGHTLY_DEFAULT_TASK_HOURS,
+    )
+
+    planned_moves: list[tuple[str, str, date]] = []
+    for task, day in placements:
+        if dry_run:
+            planned_moves.append((task.id, task.content, day))
+            logging.info(
+                "[DRY RUN] Would reschedule '%s' -> %s",
+                task.content,
+                day,
+            )
+            continue
+        try:
+            reschedule_task(api, task, day)
+        except Exception:
+            # One bad task should not abort the whole night.
+            logging.exception(
+                "Failed to reschedule '%s' (%s)",
+                task.content,
+                task.id,
+            )
+            continue
+        planned_moves.append((task.id, task.content, day))
         logging.info(
-            "Rescheduled '%s' -> %s",
-            content,
-            day,
+            "Rescheduled '%s' -> %s", task.content, day,
         )
 
     logging.info(
-        "Nightly replan complete: "
-        "%d task(s) moved.",
-        len(scheduler.planned_moves),
+        "Nightly replan complete: %d task(s) moved.",
+        len(planned_moves),
     )
-    return scheduler.planned_moves
+    return planned_moves
 
 
 def main(

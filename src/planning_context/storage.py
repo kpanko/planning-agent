@@ -44,6 +44,14 @@ def _ensure_data_dir(data_dir: Path) -> None:
     if not fuzzy_path.exists():
         fuzzy_path.write_text("[]", encoding="utf-8")
 
+    rules_path = data_dir / "rules.md"
+    if not rules_path.exists():
+        rules_path.write_text("", encoding="utf-8")
+
+    observations_path = data_dir / "observations.md"
+    if not observations_path.exists():
+        observations_path.write_text("", encoding="utf-8")
+
     conversations_dir = data_dir / "conversations"
     conversations_dir.mkdir(exist_ok=True)
 

@@ -140,6 +140,33 @@ class DueDateMismatchError(Exception):
     """
 
 
+class ReminderRestoreError(Exception):
+    """Date update succeeded but reminders could not be restored.
+
+    The task's due date is now ``day``, but ``reminders`` (the
+    snapshot captured before the call) were lost. Callers should
+    surface this to the user so they can recreate them.
+    """
+
+    def __init__(
+        self,
+        task_id: str,
+        task_content: str,
+        day: date,
+        reminders: list[dict[str, Any]],
+        cause: BaseException,
+    ) -> None:
+        self.task_id = task_id
+        self.task_content = task_content
+        self.day = day
+        self.reminders = reminders
+        super().__init__(
+            f"Date moved to {day} for '{task_content}' "
+            f"({task_id}) but {len(reminders)} reminder(s) "
+            f"could not be restored: {cause}"
+        )
+
+
 def _verify_due_date_matches(
     api: TodoistAPI,
     task_id: str,
@@ -195,18 +222,11 @@ def reschedule_task(
         return
     validate_recurring_preserved(task, due_string)
 
-    # Save reminders before the update drops them
+    # Save reminders before the update drops them. Fail-fast — if we
+    # can't read them, we'd silently lose them on the date change.
     token: str = api._token  # pyright: ignore[reportPrivateUsage]
-    reminders: list[dict[str, Any]] = []
     old_date = _parse_task_date(task)
-    try:
-        reminders = fetch_reminders(token, task.id)
-    except Exception:
-        logging.warning(
-            "Failed to fetch reminders for '%s'",
-            task.content,
-            exc_info=True,
-        )
+    reminders = fetch_reminders(token, task.id)
 
     logging.info(
         f"Sending the task '{task.content}' to {day}"
@@ -271,12 +291,20 @@ def reschedule_task(
                 exc_info=True,
             )
         try:
-            restore_reminders(
+            restored = restore_reminders(
                 token, reminders, day_delta
             )
-        except Exception:
-            logging.warning(
-                "Failed to restore reminders for '%s'",
-                task.content,
-                exc_info=True,
-            )
+        except Exception as e:
+            raise ReminderRestoreError(
+                task_id=task.id,
+                task_content=task.content,
+                day=day,
+                reminders=reminders,
+                cause=e,
+            ) from e
+        logging.info(
+            "reminders task=%s content=%r fetched=%d "
+            "restored=%d",
+            task.id, task.content,
+            len(reminders), restored,
+        )

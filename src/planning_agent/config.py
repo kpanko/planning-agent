@@ -25,6 +25,16 @@ LOGFIRE_TOKEN = os.environ.get("LOGFIRE_TOKEN", "")
 NIGHTLY_REPLAN_TOKEN = os.environ.get(
     "NIGHTLY_REPLAN_TOKEN", ""
 )
+NIGHTLY_DEFAULT_CAPACITY_HOURS = float(
+    os.environ.get(
+        "NIGHTLY_DEFAULT_CAPACITY_HOURS", "50",
+    )
+)
+NIGHTLY_DEFAULT_TASK_HOURS = float(
+    os.environ.get(
+        "NIGHTLY_DEFAULT_TASK_HOURS", "1",
+    )
+)
 BASE_URL = os.environ.get(
     "BASE_URL", "http://localhost:8080"
 ).rstrip("/")

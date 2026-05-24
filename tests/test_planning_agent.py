@@ -22,13 +22,7 @@ from planning_agent.context import (
     _fmt_task,
     build_context,
 )
-from planning_agent.extraction import (
-    ExtractionResult,
-    Memory as ExtractionMemory,
-    _apply,
-)
 from planning_context.conversations import Conversation
-from planning_context.memories import Memory
 from tests.conftest import create_task
 
 
@@ -389,22 +383,19 @@ class TestBuildContext:
     )
     @patch("planning_agent.context.TODOIST_API_KEY", "")
     @patch("planning_agent.context.get_recent")
-    @patch("planning_agent.context.get_active")
     @patch("planning_agent.context.read_values")
     def test_builds_without_todoist(
-        self, mock_values, mock_active, mock_recent,
+        self, mock_values, mock_recent,
         mock_gcal_path,
     ):
         mock_gcal_path.exists.return_value = False
         mock_values.return_value = "my values"
-        mock_active.return_value = []
         mock_recent.return_value = []
 
         ctx = build_context()
 
         assert isinstance(ctx, PlanningContext)
         assert ctx.values_doc == "my values"
-        assert ctx.memories == []
         assert ctx.recent_conversations == []
         assert "(Todoist not connected)" in ctx.todoist_snapshot
         assert "(Todoist not connected)" in ctx.inbox_project
@@ -412,27 +403,6 @@ class TestBuildContext:
         assert ctx.day_type in (
             "remote", "office", "weekend",
         )
-
-    @patch("planning_agent.context.TODOIST_API_KEY", "")
-    @patch("planning_agent.context.get_recent")
-    @patch("planning_agent.context.get_active")
-    @patch("planning_agent.context.read_values")
-    def test_includes_memories(
-        self, mock_values, mock_active, mock_recent,
-    ):
-        mock_values.return_value = ""
-        mock_active.return_value = [
-            {
-                "id": "m_001",
-                "content": "Prefers morning errands",
-                "category": "preference",
-            },
-        ]
-        mock_recent.return_value = []
-
-        ctx = build_context()
-        assert len(ctx.memories) == 1
-        assert ctx.memories[0]["id"] == "m_001"
 
     @patch("planning_agent.context.fetch_calendar_snapshot")
     @patch("planning_agent.context._fetch_inbox_project")
@@ -446,16 +416,14 @@ class TestBuildContext:
         "fake-key",
     )
     @patch("planning_agent.context.get_recent")
-    @patch("planning_agent.context.get_active")
     @patch("planning_agent.context.read_values")
     def test_lazy_mode_skips_calendar_and_renders_placeholder(
         self,
-        mock_values, mock_active, mock_recent,
+        mock_values, mock_recent,
         _mock_api_cls,
         mock_todoist_snap, mock_inbox, mock_gcal,
     ):
         mock_values.return_value = "vals"
-        mock_active.return_value = [{"id": "m_001"}]
         mock_recent.return_value = [
             {"date": "2026-05-01"},
             {"date": "2026-04-30"},
@@ -473,7 +441,6 @@ class TestBuildContext:
         assert ctx.is_lazy is True
         assert ctx.n_overdue == 3
         assert ctx.n_upcoming == 7
-        assert ctx.n_memories == 1
         assert ctx.n_conversations == 2
         # Snapshot strings are placeholders, not full content
         assert ctx.todoist_snapshot == LAZY_TODOIST_PLACEHOLDER
@@ -486,10 +453,9 @@ class TestBuildContext:
     )
     @patch("planning_agent.context.TODOIST_API_KEY", "")
     @patch("planning_agent.context.get_recent")
-    @patch("planning_agent.context.get_active")
     @patch("planning_agent.context.read_values")
     def test_lazy_mode_without_todoist_key(
-        self, mock_values, mock_active, mock_recent,
+        self, mock_values, mock_recent,
         mock_gcal_path,
     ):
         # Lazy + no Todoist key: the "not connected" branch
@@ -497,7 +463,6 @@ class TestBuildContext:
         # placeholder, and counts stay zero.
         mock_gcal_path.exists.return_value = False
         mock_values.return_value = ""
-        mock_active.return_value = []
         mock_recent.return_value = []
 
         ctx = build_context(lazy=True)
@@ -505,7 +470,6 @@ class TestBuildContext:
         assert ctx.is_lazy is True
         assert ctx.n_overdue == 0
         assert ctx.n_upcoming == 0
-        assert ctx.n_memories == 0
         assert ctx.n_conversations == 0
         assert "(Todoist not connected)" in ctx.todoist_snapshot
         assert ctx.calendar_snapshot == LAZY_CALENDAR_PLACEHOLDER
@@ -534,105 +498,8 @@ class TestBuildContext:
 
 
 # -------------------------------------------------------------------
-# extraction models
+# extraction models — see tests/test_extraction.py
 # -------------------------------------------------------------------
-
-
-class TestExtractionResult:
-    def test_minimal_result(self):
-        result = ExtractionResult(
-            conversation_summary="Planned the week.",
-        )
-        assert result.new_memories == []
-        assert result.resolved_memory_ids == []
-        assert result.values_doc_update is None
-
-    def test_full_result(self):
-        result = ExtractionResult(
-            new_memories=[
-                ExtractionMemory(
-                    content="Prefers mornings",
-                    category="preference",
-                ),
-            ],
-            resolved_memory_ids=["m_001"],
-            values_doc_update="new values",
-            conversation_summary="Planned the week.",
-        )
-        assert len(result.new_memories) == 1
-        assert result.resolved_memory_ids == ["m_001"]
-
-
-class TestApplyExtraction:
-    @patch("planning_agent.extraction.write_values")
-    @patch("planning_agent.extraction.resolve_memory")
-    @patch("planning_agent.extraction.add_memory")
-    @patch("planning_agent.extraction.save_summary")
-    def test_applies_all_fields(
-        self,
-        mock_save,
-        mock_add,
-        mock_resolve,
-        mock_write,
-    ):
-        result = ExtractionResult(
-            new_memories=[
-                ExtractionMemory(
-                    content="Likes hiking",
-                    category="preference",
-                ),
-                ExtractionMemory(
-                    content="Dentist on March 20",
-                    category="fact",
-                    expiry_date="2026-03-20",
-                ),
-            ],
-            resolved_memory_ids=["m_002", "m_003"],
-            values_doc_update="updated values",
-            conversation_summary="Good session.",
-        )
-
-        _apply(result)
-
-        mock_save.assert_called_once_with(
-            "Good session."
-        )
-        assert mock_add.call_count == 2
-        mock_add.assert_any_call(
-            "Likes hiking", "preference", None,
-        )
-        mock_add.assert_any_call(
-            "Dentist on March 20",
-            "fact",
-            "2026-03-20",
-        )
-        mock_resolve.assert_any_call("m_002")
-        mock_resolve.assert_any_call("m_003")
-        mock_write.assert_called_once_with(
-            "updated values"
-        )
-
-    @patch("planning_agent.extraction.write_values")
-    @patch("planning_agent.extraction.resolve_memory")
-    @patch("planning_agent.extraction.add_memory")
-    @patch("planning_agent.extraction.save_summary")
-    def test_skips_values_when_none(
-        self,
-        mock_save,
-        mock_add,
-        mock_resolve,
-        mock_write,
-    ):
-        result = ExtractionResult(
-            conversation_summary="Quick chat.",
-        )
-
-        _apply(result)
-
-        mock_save.assert_called_once()
-        mock_add.assert_not_called()
-        mock_resolve.assert_not_called()
-        mock_write.assert_not_called()
 
 
 # -------------------------------------------------------------------
@@ -641,30 +508,6 @@ class TestApplyExtraction:
 
 
 class TestAgentSystemPrompt:
-    def test_format_memories_empty(self):
-        from planning_agent.agent import (
-            _format_memories,
-        )
-        assert "(no active memories)" in (
-            _format_memories([])
-        )
-
-    def test_format_memories_with_data(self):
-        from planning_agent.agent import (
-            _format_memories,
-        )
-        memories = [
-            {
-                "id": "m_001",
-                "content": "Prefers mornings",
-                "category": "preference",
-            },
-        ]
-        result = _format_memories(memories)
-        assert "m_001" in result
-        assert "Prefers mornings" in result
-        assert "preference" in result
-
     def test_format_conversations_empty(self):
         from planning_agent.agent import (
             _format_conversations,
@@ -695,18 +538,15 @@ def _make_ctx(
     *,
     todoist_snapshot: str = "FULL_TASKS_BODY",
     calendar_snapshot: str = "FULL_CAL_BODY",
-    memories: list[Memory] | None = None,
     conversations: list[Conversation] | None = None,
     n_overdue: int = 0,
     n_upcoming: int = 0,
-    n_memories: int = 0,
     n_conversations: int = 0,
     fuzzy_due_soon: str = "(none due in the next 14 days)",
 ) -> PlanningContext:
     return PlanningContext(
         is_lazy=is_lazy,
         values_doc="MY_VALUES_DOC",
-        memories=memories or [],
         recent_conversations=conversations or [],
         todoist_snapshot=todoist_snapshot,
         calendar_snapshot=calendar_snapshot,
@@ -715,143 +555,14 @@ def _make_ctx(
         inbox_project="Inbox project: Inbox (ID: 999)",
         n_overdue=n_overdue,
         n_upcoming=n_upcoming,
-        n_memories=n_memories,
         n_conversations=n_conversations,
         fuzzy_due_soon=fuzzy_due_soon,
     )
 
 
-class TestRenderSystemPrompt:
-    def test_full_mode_includes_snapshot_bodies(self):
-        from planning_agent.agent import (
-            STATIC_PROMPT,
-            _render_system_prompt,
-        )
-        ctx = _make_ctx(
-            is_lazy=False,
-            memories=[
-                {
-                    "id": "m_001",
-                    "content": "Likes mornings",
-                    "category": "preference",
-                },
-            ],
-            conversations=[
-                {
-                    "date": "2026-05-01",
-                    "entries": [
-                        {"summary": "Last session."},
-                    ],
-                },
-            ],
-        )
-        prompt = _render_system_prompt(ctx)
-
-        assert STATIC_PROMPT in prompt
-        assert "MY_VALUES_DOC" in prompt
-        assert "FULL_TASKS_BODY" in prompt
-        assert "FULL_CAL_BODY" in prompt
-        assert "Likes mornings" in prompt
-        assert "Last session." in prompt
-        assert "Tasks (overdue + next 14 days)" in prompt
-        assert "Calendar (next 14 days)" in prompt
-        # The lazy-block markdown header ("### Available context")
-        # only appears in lazy renders. The bare string "Available
-        # context (call tools to load)" is also referenced in the
-        # static prompt's Lazy Context Mode section, so we have to
-        # match the heading prefix specifically to distinguish.
-        assert "### Available context (call tools to load)" not in prompt
-
-    def test_lazy_mode_renders_shape_summary(self):
-        from planning_agent.agent import (
-            _render_system_prompt,
-        )
-        ctx = _make_ctx(
-            is_lazy=True,
-            n_overdue=27,
-            n_upcoming=18,
-            n_memories=6,
-            n_conversations=3,
-        )
-        prompt = _render_system_prompt(ctx)
-
-        assert "### Available context (call tools to load)" in prompt
-        assert "27 overdue, 18 in next 14 days" in prompt
-        assert "find_tasks / find_tasks_by_date" in prompt
-        assert "Calendar: not loaded — call get_calendar(days)" in prompt
-        assert "Memories: 6 active — call get_memories" in prompt
-        assert (
-            "Recent conversations: 3 available "
-            "— call get_recent_conversations"
-        ) in prompt
-
-    def test_lazy_mode_omits_full_snapshot_bodies(self):
-        from planning_agent.agent import (
-            _render_system_prompt,
-        )
-        ctx = _make_ctx(
-            is_lazy=True,
-            todoist_snapshot="SHOULD_NOT_APPEAR_TASKS",
-            calendar_snapshot="SHOULD_NOT_APPEAR_CAL",
-            memories=[
-                {
-                    "id": "m_999",
-                    "content": "SECRET_MEMORY_CONTENT",
-                    "category": "fact",
-                },
-            ],
-            conversations=[
-                {
-                    "date": "2026-05-01",
-                    "entries": [
-                        {"summary": "SECRET_CONV_SUMMARY"},
-                    ],
-                },
-            ],
-            n_memories=1,
-            n_conversations=1,
-        )
-        prompt = _render_system_prompt(ctx)
-
-        # Full bodies are not rendered — that's the whole point
-        # of lazy mode.
-        assert "SHOULD_NOT_APPEAR_TASKS" not in prompt
-        assert "SHOULD_NOT_APPEAR_CAL" not in prompt
-        assert "SECRET_MEMORY_CONTENT" not in prompt
-        assert "SECRET_CONV_SUMMARY" not in prompt
-        assert "Tasks (overdue + next 14 days)" not in prompt
-        assert "Calendar (next 14 days)" not in prompt
-        assert "Active memories" not in prompt
-
-    def test_always_shown_sections_present_in_both_modes(self):
-        from planning_agent.agent import (
-            _render_system_prompt,
-        )
-        for is_lazy in (False, True):
-            prompt = _render_system_prompt(_make_ctx(is_lazy))
-            # Values, inbox ID, current datetime, day type
-            # are cheap and live in the prompt regardless.
-            assert "MY_VALUES_DOC" in prompt, (
-                f"values missing in lazy={is_lazy}"
-            )
-            assert "Inbox project: Inbox (ID: 999)" in prompt, (
-                f"inbox missing in lazy={is_lazy}"
-            )
-            assert (
-                "Saturday, May 02, 2026 09:00 AM" in prompt
-            ), f"datetime missing in lazy={is_lazy}"
-            assert "weekend day" in prompt, (
-                f"day_type missing in lazy={is_lazy}"
-            )
-
-    def test_static_prompt_contains_lazy_context_section(self):
-        from planning_agent.agent import STATIC_PROMPT
-
-        assert "## Lazy Context Mode" in STATIC_PROMPT
-        # Names the fetch tools so the agent knows what to call.
-        assert "get_calendar(days)" in STATIC_PROMPT
-        assert "get_memories" in STATIC_PROMPT
-        assert "get_recent_conversations" in STATIC_PROMPT
+# TestRenderSystemPrompt deleted — _render_system_prompt and
+# STATIC_PROMPT removed in M-R2 hard cutover. The Sunday review
+# prompt has its own tests in tests/test_sunday_review.py.
 
 
 class TestLazyFetchTools:
@@ -859,20 +570,19 @@ class TestLazyFetchTools:
         "os.environ", {"ANTHROPIC_API_KEY": "fake-key"}
     )
     @patch("planning_agent.agent.TODOIST_API_KEY", "fake-key")
-    def test_lazy_fetch_tools_registered(self):
-        # The lazy prompt names these three tools (#74); without
-        # them registered the agent would hit a wall when lazy
-        # mode kicks in. Probes the pydantic-ai internal toolset
-        # rather than firing the LLM.
-        from planning_agent.agent import create_agent
+    def test_context_fetch_tools_registered(self):
+        # The Sunday agent exposes get_calendar and
+        # get_recent_conversations as on-demand context-refetch
+        # tools. Probes the pydantic-ai internal toolset rather
+        # than firing the LLM. (get_memories was removed in M-R2.)
+        from planning_agent.sunday_review import create_sunday_agent
 
-        agent = create_agent()
+        agent = create_sunday_agent()
         tool_names = {
             t.name
             for t in agent._function_toolset.tools.values()  # pyright: ignore[reportPrivateUsage]
         }
         assert "get_calendar" in tool_names
-        assert "get_memories" in tool_names
         assert "get_recent_conversations" in tool_names
 
     # ---------------------------------------------------------------
@@ -883,9 +593,9 @@ class TestLazyFetchTools:
 
     @staticmethod
     def _build_tool(name: str):
-        from planning_agent.agent import create_agent
+        from planning_agent.sunday_review import create_sunday_agent
 
-        agent = create_agent()
+        agent = create_sunday_agent()
         return agent._function_toolset.tools[name]  # pyright: ignore[reportPrivateUsage]
 
     @pytest.mark.anyio
@@ -920,32 +630,6 @@ class TestLazyFetchTools:
         await tool.function(MagicMock())
 
         mock_fetch.assert_called_once_with(14)
-
-    @pytest.mark.anyio
-    @patch.dict(
-        "os.environ", {"ANTHROPIC_API_KEY": "fake-key"}
-    )
-    @patch("planning_agent.agent.TODOIST_API_KEY", "fake-key")
-    @patch("planning_agent.agent._format_memories")
-    @patch("planning_agent.agent._get_active_memories")
-    async def test_get_memories_formats_active_list(
-        self,
-        mock_get_active: MagicMock,
-        mock_format: MagicMock,
-    ):
-        mock_get_active.return_value = [
-            {"id": "m_1", "content": "x", "category": "fact"},
-        ]
-        mock_format.return_value = "rendered memories"
-        tool = self._build_tool("get_memories")
-
-        result = await tool.function(MagicMock())
-
-        mock_get_active.assert_called_once_with()
-        mock_format.assert_called_once_with(
-            mock_get_active.return_value
-        )
-        assert result == "rendered memories"
 
     @pytest.mark.anyio
     @patch.dict(

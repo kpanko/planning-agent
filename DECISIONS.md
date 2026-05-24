@@ -86,6 +86,32 @@ quirks of the same shape and semantic conflicts (e.g. asking to move
 an `every Monday` task to a Tuesday — Todoist snaps back to Monday,
 and we'd otherwise report success on a wrong date).
 
+## Deferral counter never auto-clears (M-R3)
+
+**Decision:** `deferral_counts.json` entries are never auto-removed
+by the nightly job. Counts accumulate indefinitely, even if a task
+slides off the overdue list (because the user rescheduled it,
+because it was completed, or because it was deleted). The Sunday
+review's `tasks_with_count_at_least(threshold)` filter is what
+keeps the signal clean at read time.
+
+**Rationale:** The whole point of tracking deferrals is to detect
+tasks the user is treating as low-priority — repeatedly rescheduled
+without completion. Pruning on "left the overdue set today" would
+zero the count on every reschedule and defeat the signal. The other
+extreme — clearing only on observed completion — requires an
+out-of-band Todoist API check (no completion-event endpoint, would
+need a per-id `get_task` 404 sweep) that costs API calls without
+solving the reschedule case. The threshold filter at read time
+trades JSON-file growth (cheap) for signal preservation (load-
+bearing).
+
+**How to apply:** Do not add `deferrals.clear()` or
+`deferrals.prune_to()` calls to `run_nightly` or any other
+scheduled job. If `deferral_counts.json` ever becomes large enough
+to slow nightly reads, the right response is a manual cleanup
+script — not silent auto-pruning that loses history.
+
 ## Lazy preload optimizes prompt tokens, not API calls (#73)
 
 **Decision:** In lazy mode, `build_context()` still calls
@@ -109,3 +135,33 @@ unless (a) the upstream fetch is genuinely slow, or (b) the
 data source is rate-limited. Only skip the fetch outright when
 the cost of fetching outweighs the prompt-design value of having
 exact shape numbers.
+
+## XSS defense-in-depth in static chat UIs
+
+**Decision:** Both `static/index.html` and `static/today.html`
+sanitize all rendered Markdown through DOMPurify and never
+interpolate untrusted strings into innerHTML. Tool names,
+confirm details, and the calendar-reconnect URL go through
+`createElement` + `textContent` / a `safeUrl(...)` helper that
+only accepts http/https or same-origin paths.
+
+**Rationale:** The app is single-user and Google-OAuth-gated;
+no realistic attacker path exists today. CodeRabbit flagged
+`marked.parse(...)` without DOMPurify and innerHTML
+interpolation as critical XSS risks. We added the hardening
+anyway because (a) the content being rendered comes from an
+LLM whose outputs we don't fully control, (b) if a future
+change accidentally exposes a route to a second user or to
+unauthenticated traffic, the unsafe primitives become a real
+hole, and (c) the cost is small — one CDN script tag and a
+shared `renderMarkdown` / `safeUrl` helper.
+
+**How to apply:** Any new markdown-rendering site must go
+through `renderMarkdown(text)` (sanitizes via DOMPurify) — do
+not call `marked.parse(...)` directly. Any new dynamic
+`<a href>`, `<iframe src>`, etc. must run the URL through
+`safeUrl(...)` first. Do not use `innerHTML` to inject content
+that contains values from the WebSocket payload — use
+`createElement` + `textContent`. If a future requirement
+needs to render trusted HTML (e.g. a server-rendered help
+page), prefer a separate route that doesn't share this script.

@@ -7,10 +7,11 @@ import logging
 import traceback
 import uuid
 from pathlib import Path
-from collections.abc import AsyncIterable
+from collections.abc import AsyncIterable, Callable
 from typing import Any
 
 import logfire
+from pydantic_ai import Agent
 from pydantic_ai.messages import (
     PartDeltaEvent,
     PartStartEvent,
@@ -22,7 +23,7 @@ from pydantic_ai.messages import (
 from fastapi import Depends, FastAPI, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
-from .agent import ConfirmFn, DebugFn, create_agent
+from .agent import ConfirmFn, DebugFn
 from .config import DEBUG_MODE
 from . import config
 from .main_nightly import run_nightly
@@ -40,12 +41,16 @@ from .auth import (
     verify_state_cookie,
     get_verifier_cookie,
 )
-from .context import (
-    CALENDAR_NEEDS_RECONNECT,
-    build_context,
-)
+from .context import CALENDAR_NEEDS_RECONNECT, PlanningContext
 from .extraction import run_extraction
+from .replan_today import build_today_context, create_today_agent
+from .sunday_review import build_sunday_context, create_sunday_agent
 from .version import GIT_COMMIT
+
+_BuildCtxFn = Callable[[], PlanningContext]
+_CreateAgentFn = Callable[
+    [ConfirmFn, DebugFn], Agent[PlanningContext, str]
+]
 
 logger = logging.getLogger("planning-agent")
 
@@ -206,32 +211,48 @@ async def index(
     )
 
 
-@app.websocket("/ws")
-async def websocket_endpoint(ws: WebSocket) -> None:
-    """Handle a chat session over WebSocket.
+@app.get("/today", response_class=HTMLResponse)
+async def today_page(
+    _: str = Depends(require_session),
+) -> str:
+    """Serve the on-demand re-plan-today UI (requires login)."""
+    html = (_STATIC / "today.html").read_text(
+        encoding="utf-8"
+    )
+    return html.replace(
+        'id="version-label"',
+        f'id="version-label" data-v="{GIT_COMMIT}"',
+    )
 
-    Message protocol (JSON):
 
-    Client → Server:
-      {"type": "chat", "content": "..."}
-      {"type": "confirm_response",
-       "id": "...", "approved": true|false}
+async def _run_session(
+    ws: WebSocket,
+    build_ctx: _BuildCtxFn,
+    create_agent_fn: _CreateAgentFn,
+    run_extraction_on_close: bool,
+) -> None:
+    """Drive a planning-mode WebSocket chat session.
 
-    Server → Client:
-      {"type": "message", "content": "..."}
-      {"type": "confirm",
-       "id": "...", "tool": "...", "detail": "..."}
-      {"type": "error", "content": "..."}
+    Mode-agnostic: builds context via build_ctx, creates the
+    agent via create_agent_fn, runs the chat/confirm/debug
+    protocol, and (optionally) fires extraction on disconnect.
+    Auth and ``ws.accept()`` must be handled by the route
+    before calling this.
     """
-    # Auth check before accepting the WebSocket
-    email = get_session(ws)  # type: ignore[arg-type]
-    if not email:
-        await ws.close(code=4403)
+    try:
+        ctx = build_ctx()
+    except Exception as exc:
+        logger.exception(
+            "context build failed; closing socket"
+        )
+        try:
+            await ws.send_json({
+                "type": "error",
+                "content": f"Could not load context: {exc}",
+            })
+        finally:
+            await ws.close(code=1011)
         return
-
-    await ws.accept()
-
-    ctx = build_context(lazy=True)
     history: list[Any] = []
 
     if ctx.calendar_snapshot == CALENDAR_NEEDS_RECONNECT:
@@ -243,8 +264,6 @@ async def websocket_endpoint(ws: WebSocket) -> None:
     # Mutable so the receive loop can toggle it.
     debug_state: dict[str, bool] = {"enabled": DEBUG_MODE}
 
-    # Tell the client the initial debug state so
-    # the toggle reflects reality on connect.
     await ws.send_json({
         "type": "debug_state",
         "enabled": debug_state["enabled"],
@@ -253,15 +272,8 @@ async def websocket_endpoint(ws: WebSocket) -> None:
     if debug_state["enabled"]:
         logger.info("Debug mode enabled for session")
 
-    # Futures keyed by confirm-id, resolved when the
-    # client sends a confirm_response.
     pending_confirms: dict[str, asyncio.Future[bool]] = {}
-
-    # Chat messages from the client, buffered here so
-    # the receive loop and the agent run don't race.
-    chat_queue: asyncio.Queue[str | None] = (
-        asyncio.Queue()
-    )
+    chat_queue: asyncio.Queue[str | None] = asyncio.Queue()
 
     async def send_debug(
         event: str, data: dict[str, Any],
@@ -295,7 +307,7 @@ async def websocket_endpoint(ws: WebSocket) -> None:
 
     confirm: ConfirmFn = web_confirm
     debug: DebugFn = send_debug
-    agent = create_agent(confirm=confirm, debug_fn=debug)
+    agent = create_agent_fn(confirm, debug)
 
     async def receive_loop() -> None:
         """Route incoming WS messages to the right sink."""
@@ -319,6 +331,12 @@ async def websocket_endpoint(ws: WebSocket) -> None:
                         data.get("enabled")
                     )
         except WebSocketDisconnect:
+            # Resolve any awaiting confirms as denied so the
+            # agent.run loop doesn't hang on a dropped socket.
+            for fut in pending_confirms.values():
+                if not fut.done():
+                    fut.set_result(False)
+            pending_confirms.clear()
             await chat_queue.put(None)  # signal done
 
     recv_task = asyncio.create_task(receive_loop())
@@ -404,7 +422,60 @@ async def websocket_endpoint(ws: WebSocket) -> None:
                     break
     finally:
         recv_task.cancel()
-        await end_session(history)
+        if run_extraction_on_close:
+            await end_session(history)
+
+
+@app.websocket("/ws")
+async def websocket_endpoint(ws: WebSocket) -> None:
+    """Handle a Sunday review chat session over WebSocket.
+
+    Message protocol (JSON):
+
+    Client → Server:
+      {"type": "chat", "content": "..."}
+      {"type": "confirm_response",
+       "id": "...", "approved": true|false}
+
+    Server → Client:
+      {"type": "message", "content": "..."}
+      {"type": "confirm",
+       "id": "...", "tool": "...", "detail": "..."}
+      {"type": "error", "content": "..."}
+    """
+    email = get_session(ws)  # type: ignore[arg-type]
+    if not email:
+        await ws.close(code=4403)
+        return
+
+    await ws.accept()
+    await _run_session(
+        ws,
+        build_sunday_context,
+        create_sunday_agent,
+        run_extraction_on_close=True,
+    )
+
+
+@app.websocket("/ws/today")
+async def websocket_today_endpoint(ws: WebSocket) -> None:
+    """Handle an on-demand re-plan-today chat session.
+
+    Same protocol as /ws but with the narrow today context,
+    the today-mode agent, and no post-session extraction.
+    """
+    email = get_session(ws)  # type: ignore[arg-type]
+    if not email:
+        await ws.close(code=4403)
+        return
+
+    await ws.accept()
+    await _run_session(
+        ws,
+        build_today_context,
+        create_today_agent,
+        run_extraction_on_close=False,
+    )
 
 
 async def end_session(history: list[Any]) -> None:

@@ -18,9 +18,8 @@ from rich.console import Console
 from rich.live import Live
 from rich.markdown import Markdown
 
-from .agent import create_agent
-from .context import build_context
 from .extraction import run_extraction
+from .sunday_review import build_sunday_context, create_sunday_agent
 
 console = Console()
 _stderr = Console(stderr=True)
@@ -53,7 +52,7 @@ async def main() -> None:
     )
     logfire.instrument_pydantic_ai()
     console.print("Building context...")
-    ctx = build_context(lazy=True)
+    ctx = build_sunday_context()
 
     # Mutable holder so the confirm callback can
     # pause/resume the Live display during prompts.
@@ -85,7 +84,7 @@ async def main() -> None:
                 live.start()
         return answer in ("y", "yes")
 
-    agent = create_agent(confirm=cli_confirm)
+    agent = create_sunday_agent(confirm=cli_confirm)
     console.print(
         "Planning agent ready."
         " Type 'done' to exit.\n"
@@ -187,7 +186,7 @@ async def main() -> None:
             continue
 
     if history:
-        print("Extracting memories...")
+        print("Extracting observations and saving summary...")
         await run_extraction(history)
         print("Done.")
 

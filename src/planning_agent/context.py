@@ -8,7 +8,6 @@ from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 from planning_context.conversations import Conversation, get_recent
-from planning_context.memories import Memory, get_active
 from planning_context.values import read_values
 from todoist_api_python.api import TodoistAPI
 from todoist_api_python.models import Task
@@ -43,7 +42,6 @@ class PlanningContext:
 
     is_lazy: bool
     values_doc: str
-    memories: list[Memory]
     recent_conversations: list[Conversation]
     todoist_snapshot: str
     calendar_snapshot: str
@@ -52,9 +50,13 @@ class PlanningContext:
     inbox_project: str
     n_overdue: int
     n_upcoming: int
-    n_memories: int
     n_conversations: int
     fuzzy_due_soon: str
+    # Sunday-review extras: populated by build_sunday_context;
+    # default empty so non-Sunday callers keep working.
+    rules_doc: str = ""
+    observations_doc: str = ""
+    deferral_summary: str = ""
 
 
 def _compute_day_type() -> str:
@@ -94,11 +96,14 @@ def _fmt_task(task: Task) -> str:
 
 def _fetch_todoist_snapshot(
     api: TodoistAPI,
+    days_ahead: int = 14,
 ) -> tuple[str, int, int]:
-    """Fetch overdue + next 14 days of tasks.
+    """Fetch overdue + next ``days_ahead`` days of tasks.
 
     Returns ``(snapshot, n_overdue, n_upcoming)``. Lazy mode uses
     only the counts; full mode renders the snapshot string.
+    ``days_ahead=0`` returns overdue + today only, used by the
+    on-demand re-plan-today mode.
     """
     lines: list[str] = []
     n_overdue = 0
@@ -117,7 +122,7 @@ def _fetch_todoist_snapshot(
                 lines.append(f"  {_fmt_task(t)}")
 
         today = datetime.now(ZoneInfo(USER_TZ)).date()
-        end = today + timedelta(days=14)
+        end = today + timedelta(days=days_ahead)
         after = (
             (today - timedelta(days=1))
             .strftime("%Y-%m-%d")
@@ -136,9 +141,14 @@ def _fetch_todoist_snapshot(
         ]
         n_upcoming = len(upcoming)
         if upcoming:
-            lines.append(
-                f"\nNext 14 days ({len(upcoming)}):"
-            )
+            if days_ahead == 0:
+                header = f"\nToday ({len(upcoming)}):"
+            else:
+                header = (
+                    f"\nNext {days_ahead} days"
+                    f" ({len(upcoming)}):"
+                )
+            lines.append(header)
             for t in upcoming:
                 lines.append(f"  {_fmt_task(t)}")
 
@@ -280,12 +290,11 @@ def build_context(lazy: bool = False) -> PlanningContext:
 
     ``lazy=True`` skips the GCal fetch and the rendered task
     snapshot but still reads task counts from Todoist so the
-    shape summary in the prompt has numbers. Memories and
-    recent conversations are local file reads and are always
-    loaded; the prompt template decides whether to render them.
+    shape summary in the prompt has numbers. Recent
+    conversations are local file reads and are always loaded;
+    the prompt template decides whether to render them.
     """
     values_doc = read_values()
-    memories = get_active()
     conversations = get_recent(count=3)
 
     n_overdue = 0
@@ -322,7 +331,6 @@ def build_context(lazy: bool = False) -> PlanningContext:
     return PlanningContext(
         is_lazy=lazy,
         values_doc=values_doc,
-        memories=memories,
         recent_conversations=conversations,
         todoist_snapshot=todoist_snapshot,
         calendar_snapshot=calendar_snapshot,
@@ -331,7 +339,6 @@ def build_context(lazy: bool = False) -> PlanningContext:
         inbox_project=inbox_project,
         n_overdue=n_overdue,
         n_upcoming=n_upcoming,
-        n_memories=len(memories),
         n_conversations=len(conversations),
         fuzzy_due_soon=fuzzy_due_soon,
     )

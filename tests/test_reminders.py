@@ -130,7 +130,9 @@ class TestRestoreReminders(unittest.TestCase):
 
     @patch("todoist_scheduler.reminders.requests.post")
     def test_relative_reminder(self, mock_post):
-        mock_post.return_value = MagicMock()
+        mock_post.return_value = MagicMock(
+            json=lambda: {"sync_status": {}},
+        )
         reminders = [
             {
                 "id": "r1",
@@ -155,7 +157,9 @@ class TestRestoreReminders(unittest.TestCase):
 
     @patch("todoist_scheduler.reminders.requests.post")
     def test_absolute_reminder_shifts_date(self, mock_post):
-        mock_post.return_value = MagicMock()
+        mock_post.return_value = MagicMock(
+            json=lambda: {"sync_status": {}},
+        )
         reminders = [
             {
                 "id": "r1",
@@ -180,6 +184,90 @@ class TestRestoreReminders(unittest.TestCase):
         self.assertEqual(
             args["due"]["date"], "2024-01-13T09:00:00"
         )
+
+    @patch("todoist_scheduler.reminders.requests.post")
+    def test_returns_count_on_success(self, mock_post):
+        reminders = [
+            {
+                "id": "r1",
+                "item_id": "100",
+                "type": "relative",
+                "minute_offset": 30,
+            },
+            {
+                "id": "r2",
+                "item_id": "100",
+                "type": "relative",
+                "minute_offset": 60,
+            },
+        ]
+
+        def fake_post(*args, **kwargs):
+            import json as _json
+            commands = _json.loads(
+                kwargs["data"]["commands"]
+            )
+            return MagicMock(
+                json=lambda: {
+                    "sync_status": {
+                        c["uuid"]: "ok" for c in commands
+                    },
+                },
+            )
+
+        mock_post.side_effect = fake_post
+        result = restore_reminders("tok", reminders, 0)
+        self.assertEqual(result, 2)
+
+    @patch("todoist_scheduler.reminders.requests.post")
+    def test_raises_on_partial_failure(self, mock_post):
+        reminders = [
+            {
+                "id": "r1",
+                "item_id": "100",
+                "type": "relative",
+                "minute_offset": 30,
+            },
+            {
+                "id": "r2",
+                "item_id": "100",
+                "type": "relative",
+                "minute_offset": 60,
+            },
+        ]
+        captured: dict[str, list[dict[str, object]]] = {}
+
+        def fake_post(*args, **kwargs):
+            import json as _json
+            commands = _json.loads(
+                kwargs["data"]["commands"]
+            )
+            captured["commands"] = commands
+            return MagicMock(
+                json=lambda: {
+                    "sync_status": {
+                        commands[0]["uuid"]: "ok",
+                        commands[1]["uuid"]: {
+                            "error_code": 22,
+                            "error": "INVALID_ARGUMENT",
+                        },
+                    },
+                },
+            )
+
+        mock_post.side_effect = fake_post
+        with self.assertRaises(RuntimeError) as ctx:
+            restore_reminders("tok", reminders, 0)
+        msg = str(ctx.exception)
+        failed_uuid = captured["commands"][1]["uuid"]
+        self.assertIn(failed_uuid, msg)
+        self.assertIn("INVALID_ARGUMENT", msg)
+
+    @patch("todoist_scheduler.reminders.requests.post")
+    def test_empty_reminders_returns_zero(self, mock_post):
+        result = restore_reminders("tok", [], 0)
+        self.assertEqual(result, 0)
+        mock_post.assert_not_called()
 
 
 if __name__ == '__main__':

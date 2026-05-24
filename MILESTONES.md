@@ -128,7 +128,7 @@ from today and earlier, and spreads them forward using the existing
   (replaces local cron docs). (#54)
 
 
-## Milestone 5: Fuzzy Recurring Tasks — `in-progress`
+## Milestone 5: Fuzzy Recurring Tasks — `done`
 **Goal:** Add the fuzzy-recurring-task subsystem: a `fuzzy_recurring.json`
 store, MCP tools to manage it, and agent integration so maintenance tasks
 (e.g. "check spare tire ~every 6 months") surface during weekly planning.

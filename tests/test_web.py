@@ -212,6 +212,102 @@ class TestIndexRoute:
             response = client.get("/")
         assert "WebSocket" in response.text
 
+    def test_index_page_labels_sunday_review(self):
+        with patch(
+            "planning_agent.auth.WEB_SECRET", _TEST_SECRET
+        ):
+            client = TestClient(app)
+            client.cookies.update(_session_cookies())
+            response = client.get("/")
+        body = response.text.lower()
+        assert "sunday" in body and "review" in body
+
+    def test_index_links_to_today(self):
+        with patch(
+            "planning_agent.auth.WEB_SECRET", _TEST_SECRET
+        ):
+            client = TestClient(app)
+            client.cookies.update(_session_cookies())
+            response = client.get("/")
+        assert response.status_code == 200
+        assert 'href="/today"' in response.text
+
+
+class TestTodayRoute:
+    def test_today_page_requires_auth(self):
+        with TestClient(app, follow_redirects=False) as c:
+            resp = c.get("/today")
+        assert resp.status_code in (303, 401)
+
+    def test_today_page_with_auth_renders(self):
+        with patch(
+            "planning_agent.auth.WEB_SECRET", _TEST_SECRET
+        ):
+            client = TestClient(app)
+            client.cookies.update(_session_cookies())
+            resp = client.get("/today")
+        assert resp.status_code == 200
+        body = resp.text.lower()
+        assert "replan today" in body
+
+
+class TestWebSocketToday:
+    def test_ws_today_uses_today_context_and_agent(self):
+        import inspect
+
+        import planning_agent.main_web as web
+
+        src = inspect.getsource(web.websocket_today_endpoint)
+        assert "build_today_context" in src
+        assert "create_today_agent" in src
+        assert "run_extraction_on_close=False" in src
+
+    def test_ws_today_does_not_fire_extraction(self):
+        """A /ws/today session must NOT call run_extraction."""
+        mock_agent = _make_mock_agent("ok")
+        extraction_calls: list[Any] = []
+
+        async def _fake_extraction(history: Any) -> None:
+            extraction_calls.append(history)
+
+        with (
+            patch(
+                "planning_agent.auth.WEB_SECRET",
+                _TEST_SECRET,
+            ),
+            patch("planning_agent.main_web.DEBUG_MODE", False),
+            patch(
+                "planning_agent.main_web.create_today_agent",
+                return_value=mock_agent,
+            ),
+            patch(
+                "planning_agent.main_web.build_today_context",
+                return_value=_make_mock_context(),
+            ),
+            patch(
+                "planning_agent.main_web.run_extraction",
+                side_effect=_fake_extraction,
+            ),
+        ):
+            with TestClient(app) as client:
+                client.cookies.update(_session_cookies())
+                with client.websocket_connect(
+                    "/ws/today"
+                ) as ws:
+                    ws.receive_json()  # debug_state
+                    ws.send_json(
+                        {"type": "chat", "content": "go"}
+                    )
+                    while ws.receive_json().get(
+                        "type"
+                    ) != "message_done":
+                        pass
+                # Disconnect by leaving the context manager.
+
+        assert not extraction_calls, (
+            "extraction must not fire on /ws/today"
+        )
+
 
 # ── WebSocket: basic chat ─────────────────────────────────
 
@@ -227,11 +323,11 @@ class TestWebSocketChat:
             ),
             patch("planning_agent.main_web.DEBUG_MODE", False),
             patch(
-                "planning_agent.main_web.create_agent",
+                "planning_agent.main_web.create_sunday_agent",
                 return_value=mock_agent,
             ),
             patch(
-                "planning_agent.main_web.build_context",
+                "planning_agent.main_web.build_sunday_context",
                 return_value=_make_mock_context(),
             ),
             patch(
@@ -268,11 +364,11 @@ class TestWebSocketChat:
                 _TEST_SECRET,
             ),
             patch(
-                "planning_agent.main_web.create_agent",
+                "planning_agent.main_web.create_sunday_agent",
                 return_value=mock_agent,
             ),
             patch(
-                "planning_agent.main_web.build_context",
+                "planning_agent.main_web.build_sunday_context",
                 return_value=_make_mock_context(),
             ),
             patch(
@@ -311,11 +407,11 @@ class TestWebSocketChat:
             ),
             patch("planning_agent.main_web.DEBUG_MODE", False),
             patch(
-                "planning_agent.main_web.create_agent",
+                "planning_agent.main_web.create_sunday_agent",
                 return_value=mock_agent,
             ),
             patch(
-                "planning_agent.main_web.build_context",
+                "planning_agent.main_web.build_sunday_context",
                 return_value=_make_mock_context(),
             ),
             patch(
@@ -351,11 +447,11 @@ class TestWebSocketChat:
                 False,
             ),
             patch(
-                "planning_agent.main_web.create_agent",
+                "planning_agent.main_web.create_sunday_agent",
                 return_value=mock_agent,
             ),
             patch(
-                "planning_agent.main_web.build_context",
+                "planning_agent.main_web.build_sunday_context",
                 return_value=_make_mock_context(),
             ),
             patch(
@@ -471,11 +567,11 @@ class TestWebSocketConfirm:
             ),
             patch("planning_agent.main_web.DEBUG_MODE", False),
             patch(
-                "planning_agent.main_web.create_agent",
+                "planning_agent.main_web.create_sunday_agent",
                 side_effect=capture_create_agent,
             ),
             patch(
-                "planning_agent.main_web.build_context",
+                "planning_agent.main_web.build_sunday_context",
                 return_value=_make_mock_context(),
             ),
             patch(
@@ -562,11 +658,11 @@ class TestWebSocketConfirm:
             ),
             patch("planning_agent.main_web.DEBUG_MODE", False),
             patch(
-                "planning_agent.main_web.create_agent",
+                "planning_agent.main_web.create_sunday_agent",
                 side_effect=capture_create_agent,
             ),
             patch(
-                "planning_agent.main_web.build_context",
+                "planning_agent.main_web.build_sunday_context",
                 return_value=_make_mock_context(),
             ),
             patch(
