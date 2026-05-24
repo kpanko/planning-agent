@@ -584,6 +584,43 @@ class TestRescheduleTask(unittest.TestCase):
         # Restore still ran after the delete failure.
         mock_restore.assert_called_once()
 
+    @patch(
+        "todoist_scheduler.reschedule.fetch_reminders"
+    )
+    @patch(
+        "todoist_scheduler.reschedule.delete_reminders"
+    )
+    @patch(
+        "todoist_scheduler.reschedule.restore_reminders"
+    )
+    def test_logs_reminder_counts_on_success(
+        self,
+        mock_restore,
+        mock_delete,
+        mock_fetch,
+    ):
+        mock_fetch.return_value = [
+            {"id": "r1", "item_id": "1"},
+        ]
+        mock_restore.return_value = 1
+        task = create_task(
+            '1', 'Task', due_date_str='2024-01-10',
+        )
+        with self.assertLogs(level="INFO") as captured:
+            reschedule_task(
+                self.api, task, date(2024, 1, 15),
+            )
+        log_lines = [
+            r.getMessage() for r in captured.records
+        ]
+        matching = [
+            line for line in log_lines
+            if "fetched=1" in line and "restored=1" in line
+        ]
+        self.assertEqual(len(matching), 1, log_lines)
+        self.assertIn("task=1", matching[0])
+        self.assertIn("Task", matching[0])
+
 
 class TestStripRecurrencePattern(unittest.TestCase):
 

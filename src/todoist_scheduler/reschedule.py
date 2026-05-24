@@ -291,7 +291,7 @@ def reschedule_task(
                 exc_info=True,
             )
         try:
-            restore_reminders(
+            restored = restore_reminders(
                 token, reminders, day_delta
             )
         except Exception as e:
@@ -302,3 +302,9 @@ def reschedule_task(
                 reminders=reminders,
                 cause=e,
             ) from e
+        logging.info(
+            "reminders task=%s content=%r fetched=%d "
+            "restored=%d",
+            task.id, task.content,
+            len(reminders), restored,
+        )
