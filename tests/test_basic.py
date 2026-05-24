@@ -94,7 +94,7 @@ class TestScheduling(unittest.TestCase):
 
     def test_schedule_fit_in_one_day(self):
         tasks_to_add = [
-            create_task('1', 'Task 1', priority=4, due_date_str='2023-12-31'),
+            create_task('1', 'Task 1', priority=3, due_date_str='2023-12-31'),
             create_task('2', 'Task 2', priority=1, due_date_str='2023-12-30')
         ]
         self.api.filter_tasks.return_value = iter([])
@@ -112,8 +112,8 @@ class TestScheduling(unittest.TestCase):
 
     def test_push_to_next_day(self):
         tasks_to_add = [
-            create_task('1', 'Task 1 P4', priority=4, due_date_str='2023-12-31'),
-            create_task('2', 'Task 2 P4', priority=4, due_date_str='2023-12-30'),
+            create_task('1', 'Task 1 P4', priority=3, due_date_str='2023-12-31'),
+            create_task('2', 'Task 2 P4', priority=3, due_date_str='2023-12-30'),
             create_task('3', 'Task 3 P1', priority=1, due_date_str='2023-12-29')
         ]
         self.api.filter_tasks.side_effect = [
@@ -133,8 +133,8 @@ class TestScheduling(unittest.TestCase):
         # by a higher-priority task.
         existing_task = create_task('existing', 'Existing Task', priority=1, due_date_str=self.today.strftime('%Y-%m-%d'))
         tasks_to_add = [
-            create_task('1', 'New Task 1 P4', priority=4, due_date_str='2023-12-31'),
-            create_task('2', 'New Task 2 P4', priority=4, due_date_str='2023-12-30')
+            create_task('1', 'New Task 1 P4', priority=3, due_date_str='2023-12-31'),
+            create_task('2', 'New Task 2 P4', priority=3, due_date_str='2023-12-30')
         ]
         self.api.filter_tasks.side_effect = [
             iter([[existing_task]]), iter([]),
@@ -157,7 +157,7 @@ class TestScheduling(unittest.TestCase):
             create_task(
                 '1',
                 'Task with time',
-                priority=4,
+                priority=3,
                 due_date_str='2023-12-31',
                 is_recurring=True,
                 due_string='every week at 5pm',
@@ -182,7 +182,7 @@ class TestScheduling(unittest.TestCase):
             create_task(
                 '1',
                 'Task with time',
-                priority=4,
+                priority=3,
                 due_date_str='2023-12-31',
                 is_recurring=False,
                 due_datetime_str=due_datetime_str

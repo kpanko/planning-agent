@@ -136,6 +136,33 @@ data source is rate-limited. Only skip the fetch outright when
 the cost of fetching outweighs the prompt-design value of having
 exact shape numbers.
 
+## P1 tasks are never auto-rescheduled (#97)
+
+**Decision:** `reschedule_task` raises `PriorityProtectedError`
+when called on a Todoist priority-4 (P1) task, before any API
+mutation. The Todoist MCP `reschedule_tasks` tool surfaces the
+refusal to the agent in its per-task results line.
+
+**Rationale:** Discovered 2026-05-24. A P1 weekly-recurring task
+was overdue from the previous Friday. The user asked the Sunday
+agent to move it to today. Todoist silently snapped the recurrence
+forward to next Friday (the pattern anchor), at which point the
+read-after-write defense (#62) correctly raised
+`DueDateMismatchError` — but the call should not have been
+attempted at all. Original `todoist_scheduler` already had the
+"never touch P1" rule at the fetch-filter layer
+(`overdue & ! p1` in `overdue.py`); the redesign's Sunday/Today
+agents bypass that filter by reading the snapshot directly and
+calling `reschedule_task` themselves. Putting the guard in the
+tool layer means policy survives any future change to context
+assembly or prompts.
+
+**How to apply:** To move a P1 task, the user downgrades the
+priority first or does it manually. The agent should explain
+this to the user when the refusal comes back. Do not add an
+override flag — leaving a P1 overdue is the user's signal to do
+it now (Todoist sorts overdue items to the top of the Today view).
+
 ## XSS defense-in-depth in static chat UIs
 
 **Decision:** Both `static/index.html` and `static/today.html`

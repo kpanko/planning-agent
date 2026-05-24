@@ -7,6 +7,7 @@ from todoist_api_python.models import Duration
 
 from todoist_scheduler.reschedule import (
     DueDateMismatchError,
+    PriorityProtectedError,
     ReminderRestoreError,
     _strip_recurrence_pattern,
     _verify_due_date_matches,
@@ -851,6 +852,60 @@ class TestReminderRestoreError(unittest.TestCase):
         self.assertIn("2024-01-15", msg)
         self.assertIn("2", msg)
         self.assertIn("sync API down", msg)
+
+
+class TestPriorityProtected(unittest.TestCase):
+    """P1 (priority == 4) tasks must never be auto-rescheduled."""
+
+    def setUp(self):
+        self.api = MagicMock()
+        self.api._token = "tok"
+        self.api.update_task.return_value = True
+
+    @patch("todoist_scheduler.reschedule.fetch_reminders")
+    def test_p1_task_raises(self, mock_fetch):
+        task = create_task(
+            '1', 'Important', priority=4,
+            due_date_str='2024-01-10',
+        )
+        with self.assertRaises(PriorityProtectedError):
+            reschedule_task(self.api, task, date(2024, 1, 15))
+        self.api.update_task.assert_not_called()
+        mock_fetch.assert_not_called()
+
+    @patch("todoist_scheduler.reschedule.fetch_reminders")
+    def test_p1_raises_even_when_already_on_day(self, mock_fetch):
+        # Guard fires before the no-op check — policy is "don't
+        # touch", not "don't change date".
+        task = create_task(
+            '1', 'Important', priority=4,
+            due_date_str='2024-01-15',
+        )
+        with self.assertRaises(PriorityProtectedError):
+            reschedule_task(self.api, task, date(2024, 1, 15))
+        self.api.update_task.assert_not_called()
+        mock_fetch.assert_not_called()
+
+    @patch("todoist_scheduler.reschedule.fetch_reminders")
+    def test_p2_task_proceeds(self, mock_fetch):
+        mock_fetch.return_value = []
+        self.api.get_task.return_value = create_task(
+            '1', 'Task', priority=3,
+            due_date_str='2024-01-15',
+        )
+        task = create_task(
+            '1', 'Task', priority=3,
+            due_date_str='2024-01-10',
+        )
+        reschedule_task(self.api, task, date(2024, 1, 15))
+        self.api.update_task.assert_called_once()
+
+    def test_error_message_names_task(self):
+        err = PriorityProtectedError('abc', 'Check finances')
+        msg = str(err)
+        self.assertIn('Check finances', msg)
+        self.assertIn('abc', msg)
+        self.assertIn('P1', msg)
 
 
 if __name__ == '__main__':
