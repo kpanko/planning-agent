@@ -1,12 +1,23 @@
 # Status
 
-**Last updated:** 2026-05-18 (session 20)
-**Active work:** Redesign feature-complete on
-`redesign-2026-05`. PR #94 carries M-R1 + M-R2 + M-R3 + M-R4
-plus a follow-up CodeRabbit pass. Awaiting review and merge.
+**Last updated:** 2026-05-24 (session 21)
+**Active work:** None. PR #94 merged (commit `2ad95bb`).
+Redesign (M-R1 + M-R2 + M-R3 + M-R4) shipped to `main`;
+branch `redesign-2026-05` deleted. Next is the Fly cron
+redeploy (#57) and the manual `/today` smoke test.
 
 ## Recently Completed
 
+- **PR #94 merged** (session 21, commit `2ad95bb`). M-R1
+  through M-R4 + reminder-loss safeguards (#95, #96) on
+  main. Branch deleted. #95 and #96 closed manually
+  (PR body didn't link them via "closes #"). Known
+  follow-ups deferred to issues only if/when they bite:
+  (1) `place_in_horizon` as a Sunday tool if the
+  prompt-only approach proves unreliable, (2) Saturday
+  weekend-bunching in `place_in_horizon`, (3) CLI-only
+  quirks from the M-R2 cutover, (4) `run_nightly`
+  non-dry-run integration coverage.
 - **CodeRabbit pass on PR #94** (session 20, commits
   `00fcb9c` and `cde2a2a`). Fixed 6 real findings: (1)
   nightly `dry_run=True` was writing `deferral_counts.json`
@@ -135,47 +146,16 @@ plus a follow-up CodeRabbit pass. Awaiting review and merge.
 
 ## In Progress
 
-Nothing actively in progress. PR #94 is open with M-R1 +
-M-R2 + M-R3 + M-R4. The redesign is feature-complete on the
-branch.
-
-## Redesign Branch State
-
-- Branch: `redesign-2026-05`, pushed.
-- PR: [#94](https://github.com/kpanko/planning-agent/pull/94)
-- Ahead of main: ~42 commits. CodeRabbit fixes added (most-recent first):
-  - `cde2a2a` — `fix: address remaining CodeRabbit findings (strip, sort, confirm-on-disconnect, XSS hardening)`
-  - `00fcb9c` — `fix(nightly): dry-run side-effect-free; only count successful reschedules`
-  - `dd237ad` — `test(prompt-coverage): cover TODAY_PROMPT against create_today_agent`
-  - `76d8750` — `feat(web): /ws/today hosts on-demand re-plan session`
-  - `3c4abbd` — `feat(web): add GET /today page and index link`
-  - `ba4d27f` — `refactor(web): extract _run_session helper from websocket_endpoint`
-  - `6d2af96` — `feat(replan_today): create_today_agent factory`
-  - `f244910` — `feat(replan_today): build_today_context + render`
-  - `71444d1` — `feat(replan_today): add TODAY_PROMPT`
-  - `a21a1dc` — `feat(context): add days_ahead param to _fetch_todoist_snapshot`
-  - `1820ea7` — `feat(agent): add read_only flag to rules/observation register helpers`
-  - (older: M-R1, M-R2, M-R3 + plans + review-fix commits)
-- Plans: `project-plans/redesign-2026-05.md` (spec),
-  `project-plans/redesign-m-r1.md`,
-  `project-plans/redesign-m-r2.md`,
-  `project-plans/redesign-m-r3.md`,
-  `project-plans/redesign-m-r4.md` (committed as `921620d`).
+Nothing.
 
 ## Next Up
 
-1. **Review and merge PR #94.** The branch must NOT be
-   deleted on merge per the M-R1 plan — keep it alive for
-   any redesign-adjacent follow-ups (e.g.
-   `place_in_horizon`-as-a-Sunday-tool experiment from
-   M-R3's notes). Merge with `gh pr merge 94 --merge`
-   (drop `--delete-branch`).
-2. **Redeploy the Fly cron Machine (#57)** — operational
-   task, independent of the redesign. DEPLOY.md has the
-   Fly-secret-based commands. Verify with
-   `flyctl machine status -d` that no token appears in the
-   env block (per DECISIONS.md).
-3. **Manual smoke test of `/today`** on a phone browser:
+1. **Redeploy the Fly cron Machine (#57)** — operational
+   task. DEPLOY.md has the Fly-secret-based commands.
+   Verify with `flyctl machine status -d` that no token
+   appears in the env block (per DECISIONS.md). This is
+   the last open task in M6.
+2. **Manual smoke test of `/today`** on a phone browser:
    open `/`, tap "Replan today →", confirm the URL is
    `/today` and the title reads "Replan Today"; drive a
    short disruption ("kid got sick, push everything after
@@ -184,14 +164,16 @@ branch.
    conversation summary appears under
    `~/.planning-agent/conversations/` (extraction does
    not run on `/today`).
+3. **After #57 lands:** M6 is done. Pick M7 (scheduling
+   pattern learning, #27–#34) or M8 (evaluation suite,
+   #43–#45) as the next milestone.
 
 ## Blockers / Open Questions
 
 - **Nightly job still disabled in prod.** Cron Machine destroyed;
   token rotated but Machine not yet redeployed. M-R3 rebuilt the
-  code, but the redeploy is a separate operational task (#57)
-  the user runs at their convenience. DEPLOY.md has the
-  Fly-secret-based commands.
+  code (now on main), but the redeploy is a separate operational
+  task (#57). DEPLOY.md has the Fly-secret-based commands.
 - **Todoist API is a persistent source of bugs.** Recurrence
   handling and date interpretation have caused multiple incidents
   (#55, #62). Defensive read-after-write is in place for date
@@ -221,9 +203,8 @@ branch.
 ## Key Context
 
 - Deployed on fly.io: `planning-agent` app, `ord` region, 512mb
-  shared-cpu-1x, 1GB volume at `/data`. Current image: `acba053`.
-  Production is still M5/M6 code from `main`; the redesign hasn't
-  shipped yet.
+  shared-cpu-1x, 1GB volume at `/data`. The redesign is now on
+  main; next merge → CI → flyctl deploy will ship it to prod.
 - Deploy is automated: merge to main → CI passes → manual approval
   in GitHub Actions → flyctl deploys. `FLY_API_TOKEN` lives in the
   `production` environment secret. The `environment: production`
@@ -233,11 +214,9 @@ branch.
   logfire-us.pydantic.dev/pankok/planning-agent.
 - Branching strategy: per-issue branches for substantive work;
   direct main pushes for small hotfixes. PRs use
-  `--merge --delete-branch` for normal issues, **but PR #94
-  keeps its branch alive** through M-R4.
+  `--merge --delete-branch`.
 - Anthropic prompt caching is on for the Sunday agent
   (`sunday_review.py`, `anthropic_cache_instructions=True`,
   `anthropic_cache_messages=True`). The old `agent.py` lazy mode is
   gone — full context is the only mode now in the Sunday session.
-- M5 is done. M6 remains `in-progress` until #57 lands as part of
-  M-R3.
+- M5 is done. M6 remains `in-progress` until #57 lands.
