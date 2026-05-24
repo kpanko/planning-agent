@@ -117,10 +117,16 @@ def restore_reminders(
     token: str,
     reminders: list[dict[str, Any]],
     day_delta: int,
-) -> None:
-    """Recreate reminders via Sync API commands."""
+) -> int:
+    """Recreate reminders via Sync API commands.
+
+    Returns the count of successfully restored reminders. Raises
+    ``RuntimeError`` if the Sync API returns a partial-batch failure
+    (HTTP 200 but with one or more commands in ``sync_status``
+    reporting an error).
+    """
     if not reminders:
-        return
+        return 0
 
     commands: list[dict[str, Any]] = []
     for r in reminders:
@@ -160,7 +166,20 @@ def restore_reminders(
         },
     )
     resp.raise_for_status()
+    body = resp.json()
     logging.debug(
-        "Sync API restore response: %s",
-        resp.json(),
+        "Sync API restore response: %s", body,
     )
+    sync_status = body.get("sync_status", {})
+    failures = {
+        uuid_: status
+        for uuid_, status in sync_status.items()
+        if status != "ok"
+    }
+    if failures:
+        raise RuntimeError(
+            f"Sync API rejected {len(failures)} of "
+            f"{len(commands)} reminder_add commands: "
+            f"{failures}"
+        )
+    return len(commands)
