@@ -140,6 +140,33 @@ class DueDateMismatchError(Exception):
     """
 
 
+class ReminderRestoreError(Exception):
+    """Date update succeeded but reminders could not be restored.
+
+    The task's due date is now ``day``, but ``reminders`` (the
+    snapshot captured before the call) were lost. Callers should
+    surface this to the user so they can recreate them.
+    """
+
+    def __init__(
+        self,
+        task_id: str,
+        task_content: str,
+        day: date,
+        reminders: list[dict[str, Any]],
+        cause: BaseException,
+    ) -> None:
+        self.task_id = task_id
+        self.task_content = task_content
+        self.day = day
+        self.reminders = reminders
+        super().__init__(
+            f"Date moved to {day} for '{task_content}' "
+            f"({task_id}) but {len(reminders)} reminder(s) "
+            f"could not be restored: {cause}"
+        )
+
+
 def _verify_due_date_matches(
     api: TodoistAPI,
     task_id: str,

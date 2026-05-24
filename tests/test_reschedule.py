@@ -7,6 +7,7 @@ from todoist_api_python.models import Duration
 
 from todoist_scheduler.reschedule import (
     DueDateMismatchError,
+    ReminderRestoreError,
     _strip_recurrence_pattern,
     _verify_due_date_matches,
     compute_due_string,
@@ -680,6 +681,40 @@ class TestVerifyDueDateMatches(unittest.TestCase):
                 api, '1', date(2024, 1, 15), 'sent',
                 expected_time='17:00',
             )
+
+
+class TestReminderRestoreError(unittest.TestCase):
+
+    def test_carries_diagnostic_fields(self):
+        reminders = [{"id": "r1", "item_id": "1"}]
+        cause = RuntimeError("sync API down")
+        err = ReminderRestoreError(
+            task_id="1",
+            task_content="Task",
+            day=date(2024, 1, 15),
+            reminders=reminders,
+            cause=cause,
+        )
+        self.assertEqual(err.task_id, "1")
+        self.assertEqual(err.task_content, "Task")
+        self.assertEqual(err.day, date(2024, 1, 15))
+        self.assertEqual(err.reminders, reminders)
+
+    def test_message_includes_task_and_count(self):
+        cause = RuntimeError("sync API down")
+        err = ReminderRestoreError(
+            task_id="1",
+            task_content="Task",
+            day=date(2024, 1, 15),
+            reminders=[{"id": "r1"}, {"id": "r2"}],
+            cause=cause,
+        )
+        msg = str(err)
+        self.assertIn("Task", msg)
+        self.assertIn("1", msg)
+        self.assertIn("2024-01-15", msg)
+        self.assertIn("2", msg)
+        self.assertIn("sync API down", msg)
 
 
 if __name__ == '__main__':
