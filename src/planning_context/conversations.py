@@ -94,18 +94,17 @@ def _is_valid_conversation(data: object) -> bool:
     return True
 
 
-def get_recent(count: int = 3) -> list[Conversation]:
-    """Return the most recent `count` conversation files, newest first.
+def list_summaries() -> list[Conversation]:
+    """Return all conversation files, newest first.
 
     Files that fail shape validation are skipped and logged.
     """
     conv_dir = _conversations_dir()
     if not conv_dir.exists():
         return []
-
     files = sorted(conv_dir.glob("*.json"), reverse=True)
     results: list[Conversation] = []
-    for f in files[:count]:
+    for f in files:
         data = read_json(f)
         if _is_valid_conversation(data):
             results.append(cast(Conversation, data))
@@ -114,3 +113,26 @@ def get_recent(count: int = 3) -> list[Conversation]:
                 "Skipping malformed conversation file %s", f.name
             )
     return results
+
+
+def delete_summary(date_str: str) -> bool:
+    """Delete the conversation file for date_str
+    (YYYY-MM-DD). Returns True if deleted, False if absent."""
+    path = _conversations_dir() / f"{date_str}.json"
+    if not path.exists():
+        return False
+    path.unlink()
+    commit_data(
+        path.parent.parent,
+        f"conversation: delete summary for {date_str}",
+    )
+    logger.info(
+        "Conversation summary deleted for %s", date_str
+    )
+    return True
+
+
+def get_recent(count: int = 3) -> list[Conversation]:
+    """Return the most recent `count` conversation files,
+    newest first."""
+    return list_summaries()[:count]

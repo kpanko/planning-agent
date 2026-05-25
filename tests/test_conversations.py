@@ -107,3 +107,25 @@ def test_get_recent_skips_malformed_files(data_dir, caplog):
     assert recent[0]["date"] == "2026-02-20"
     assert "2026-02-21.json" in caplog.text
     assert "2026-02-22.json" in caplog.text
+
+
+def test_list_summaries_returns_all_newest_first(data_dir):
+    from planning_context import conversations
+
+    conversations.save_summary("day one")
+    assert len(conversations.list_summaries()) == 1
+
+
+def test_delete_summary_removes_file(data_dir):
+    from planning_context import conversations
+
+    conversations.save_summary("did stuff")
+    day = conversations.list_summaries()[0]["date"]
+    assert conversations.delete_summary(day) is True
+    assert conversations.list_summaries() == []
+
+
+def test_delete_missing_returns_false(data_dir):
+    from planning_context import conversations
+
+    assert conversations.delete_summary("2020-01-01") is False
