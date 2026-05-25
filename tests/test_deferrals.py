@@ -73,3 +73,13 @@ def test_tasks_older_than_threshold():
     stale = deferrals.tasks_with_count_at_least(180)
     assert "task_old" in stale
     assert "task_new" not in stale
+
+
+def test_all_counts_returns_count_per_task():
+    deferrals.record_overdue_today({"a", "b"}, date(2026, 5, 1))
+    deferrals.record_overdue_today({"a"}, date(2026, 5, 2))
+    assert deferrals.all_counts() == {"a": 2, "b": 1}
+
+
+def test_all_counts_empty_when_no_state():
+    assert deferrals.all_counts() == {}

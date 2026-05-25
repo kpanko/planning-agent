@@ -69,6 +69,14 @@ def get_count(task_id: str) -> int:
     return len(_load().get(task_id, []))
 
 
+def all_counts() -> dict[str, int]:
+    """Return {task_id: distinct overdue-day count} for all
+    tracked tasks."""
+    return {
+        tid: len(days) for tid, days in _load().items()
+    }
+
+
 def clear(task_id: str) -> None:
     """Forget all deferral history for a task.
 
