@@ -1,6 +1,7 @@
 """Tests for values data layer."""
 
 import os
+import subprocess
 
 import pytest
 
@@ -63,3 +64,25 @@ def test_write_failure_returns_error_string(data_dir, monkeypatch):
     result = values.write_values("some content")
     assert result.startswith("Error:")
     assert "Permission denied" in result
+
+
+def _last_subject(data_dir):
+    out = subprocess.run(
+        ["git", "log", "-1", "--format=%s"],
+        cwd=data_dir,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return out.stdout.strip()
+
+
+def test_write_uses_custom_commit_message(data_dir):
+    from planning_context.values import write_values
+
+    write_values(
+        "x\n", commit_message="values: manual edit via settings"
+    )
+    assert _last_subject(data_dir) == (
+        "values: manual edit via settings"
+    )

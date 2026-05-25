@@ -21,15 +21,22 @@ def read_values() -> str:
         raise
 
 
-def write_values(content: str) -> str:
+def write_values(
+    content: str, commit_message: str | None = None
+) -> str:
     """Overwrite values.md with new content. Returns confirmation."""
     path = get_data_dir() / "values.md"
     try:
         path.write_text(content, encoding="utf-8")
     except OSError as exc:
-        logger.error("Failed to write values.md: %s", exc, exc_info=True)
+        logger.error(
+            "Failed to write values.md: %s", exc, exc_info=True
+        )
         return f"Error: could not save values document — {exc}"
-    commit_data(path.parent, "values: update values document")
+    commit_data(
+        path.parent,
+        commit_message or "values: update values document",
+    )
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     logger.info("Values doc updated at %s (%d chars)", ts, len(content))
     return f"Values doc updated at {ts} ({len(content)} chars)"

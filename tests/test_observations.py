@@ -1,5 +1,7 @@
 """Tests for planning_context.observations."""
 
+import subprocess
+
 import pytest
 
 from planning_context import observations
@@ -30,3 +32,24 @@ def test_write_and_read_roundtrip():
 def test_write_returns_confirmation_string():
     result = observations.write_observations("- one\n")
     assert "updated" in result.lower()
+
+
+def _last_subject(data_dir):
+    out = subprocess.run(
+        ["git", "log", "-1", "--format=%s"],
+        cwd=data_dir,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return out.stdout.strip()
+
+
+def test_write_uses_custom_commit_message(isolated_data_dir):
+    observations.write_observations(
+        "x\n",
+        commit_message="observations: manual edit via settings",
+    )
+    assert _last_subject(isolated_data_dir) == (
+        "observations: manual edit via settings"
+    )

@@ -28,7 +28,9 @@ def read_observations() -> str:
         raise
 
 
-def write_observations(content: str) -> str:
+def write_observations(
+    content: str, commit_message: str | None = None
+) -> str:
     """Overwrite observations.md. Returns a confirmation."""
     path = get_data_dir() / "observations.md"
     try:
@@ -41,7 +43,9 @@ def write_observations(content: str) -> str:
         )
         return f"Error: could not save observations — {exc}"
     commit_data(
-        path.parent, "observations: update observations document"
+        path.parent,
+        commit_message
+        or "observations: update observations document",
     )
     ts = datetime.now(timezone.utc).strftime(
         "%Y-%m-%dT%H:%M:%SZ"
