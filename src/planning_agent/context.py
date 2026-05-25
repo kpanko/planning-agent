@@ -15,6 +15,7 @@ from todoist_api_python.models import Task
 from .auth import save_credentials as _save_credentials
 from .config import (
     GOOGLE_CALENDAR_CREDENTIALS,
+    GOOGLE_CALENDAR_ID,
     TODOIST_API_KEY,
     USER_TZ,
 )
@@ -172,6 +173,9 @@ def fetch_calendar_snapshot(days: int = 14) -> str:
     if not GOOGLE_CALENDAR_CREDENTIALS.exists():
         return "(Google Calendar not connected)"
 
+    if not GOOGLE_CALENDAR_ID:
+        return "(GOOGLE_CALENDAR_ID not set)"
+
     from google.auth.exceptions import RefreshError  # pyright: ignore[reportUnknownVariableType]
 
     try:
@@ -204,7 +208,7 @@ def fetch_calendar_snapshot(days: int = 14) -> str:
             dict[str, Any],
             service.events()  # pyright: ignore[reportUnknownMemberType]
             .list(
-                calendarId="primary",
+                calendarId=GOOGLE_CALENDAR_ID,
                 timeMin=time_min,
                 timeMax=time_max,
                 singleEvents=True,

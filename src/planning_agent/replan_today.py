@@ -80,6 +80,16 @@ doubt.
   rules. Only call tools when the user's message implies
   you need more.
 
+## P1 tasks are protected
+
+The `reschedule_tasks` tool refuses to move any task at Todoist
+priority P1 — the refusal comes back as
+`✗ <id>: PriorityProtectedError` in the per-task results. Don't
+propose rescheduling a P1. If a P1 is overdue and you think it
+should move, ask the user to either downgrade the priority first
+or do the move manually. Leaving a P1 overdue is a deliberate
+signal — Todoist sorts overdue P1s to the top of Today.
+
 ## Rules and observations
 
 You have read-only access to two stores of user context:

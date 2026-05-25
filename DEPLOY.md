@@ -33,7 +33,8 @@ flyctl secrets set \
   WEB_SECRET="$(openssl rand -hex 32)" \
   BASE_URL="https://your-app.fly.dev" \
   TODOIST_API_KEY="your-todoist-key" \
-  ANTHROPIC_API_KEY="your-anthropic-key"
+  ANTHROPIC_API_KEY="your-anthropic-key" \
+  GOOGLE_CALENDAR_ID="your-calendar-id@group.calendar.google.com"
 ```
 
 ## Deploy

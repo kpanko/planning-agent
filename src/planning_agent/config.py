@@ -25,6 +25,9 @@ LOGFIRE_TOKEN = os.environ.get("LOGFIRE_TOKEN", "")
 NIGHTLY_REPLAN_TOKEN = os.environ.get(
     "NIGHTLY_REPLAN_TOKEN", ""
 )
+GOOGLE_CALENDAR_ID = os.environ.get(
+    "GOOGLE_CALENDAR_ID", ""
+)
 NIGHTLY_DEFAULT_CAPACITY_HOURS = float(
     os.environ.get(
         "NIGHTLY_DEFAULT_CAPACITY_HOURS", "50",
