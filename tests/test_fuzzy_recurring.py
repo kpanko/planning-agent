@@ -181,7 +181,7 @@ def test_unknown_seasonal_constraint_suppresses(data_dir):
     assert get_due_soon(14, reference_date=ref) == []
 
 
-def test_list_returns_all_tasks():
+def test_list_returns_all_tasks(data_dir):
     from planning_context import fuzzy_recurring
 
     fuzzy_recurring.add_fuzzy_recurring("Gutters", 180)
@@ -191,13 +191,13 @@ def test_list_returns_all_tasks():
     assert names == {"Gutters", "Filter"}
 
 
-def test_list_empty_by_default():
+def test_list_empty_by_default(data_dir):
     from planning_context import fuzzy_recurring
 
     assert fuzzy_recurring.list_fuzzy_recurring() == []
 
 
-def test_update_changes_fields():
+def test_update_changes_fields(data_dir):
     from planning_context import fuzzy_recurring
 
     t = fuzzy_recurring.add_fuzzy_recurring("Gutters", 180)
@@ -211,7 +211,7 @@ def test_update_changes_fields():
     assert updated["name"] == "Gutters"
 
 
-def test_update_missing_returns_none():
+def test_update_missing_returns_none(data_dir):
     from planning_context import fuzzy_recurring
 
     assert (
