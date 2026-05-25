@@ -219,6 +219,26 @@ class TestFetchCalendarSnapshot:
         "google.oauth2.credentials.Credentials"
         ".from_authorized_user_file"
     )
+    @patch("planning_agent.context.GOOGLE_CALENDAR_ID", "")
+    @patch("planning_agent.context.GOOGLE_CALENDAR_CREDENTIALS")
+    def test_no_calendar_id_returns_fail_loud(
+        self, mock_path, _mock_creds, mock_build,
+        _mock_save,
+    ):
+        mock_path.exists.return_value = True
+
+        result = fetch_calendar_snapshot()
+
+        assert result == "(GOOGLE_CALENDAR_ID not set)"
+        mock_build.assert_not_called()
+
+    @patch("planning_agent.context._save_credentials")
+    @patch("googleapiclient.discovery.build")
+    @patch(
+        "google.oauth2.credentials.Credentials"
+        ".from_authorized_user_file"
+    )
+    @patch("planning_agent.context.GOOGLE_CALENDAR_ID", "primary")
     @patch("planning_agent.context.GOOGLE_CALENDAR_CREDENTIALS")
     def test_returns_formatted_events(
         self, mock_path, _mock_creds, mock_build,
@@ -258,6 +278,7 @@ class TestFetchCalendarSnapshot:
         "google.oauth2.credentials.Credentials"
         ".from_authorized_user_file"
     )
+    @patch("planning_agent.context.GOOGLE_CALENDAR_ID", "primary")
     @patch("planning_agent.context.GOOGLE_CALENDAR_CREDENTIALS")
     def test_empty_calendar(
         self, mock_path, _mock_creds, mock_build,
@@ -281,6 +302,7 @@ class TestFetchCalendarSnapshot:
         ".from_authorized_user_file",
         side_effect=Exception("auth error"),
     )
+    @patch("planning_agent.context.GOOGLE_CALENDAR_ID", "primary")
     @patch("planning_agent.context.GOOGLE_CALENDAR_CREDENTIALS")
     def test_api_error_returns_error_message(
         self, mock_path, _mock_creds
@@ -295,6 +317,7 @@ class TestFetchCalendarSnapshot:
         "google.oauth2.credentials.Credentials"
         ".from_authorized_user_file"
     )
+    @patch("planning_agent.context.GOOGLE_CALENDAR_ID", "primary")
     @patch("planning_agent.context.GOOGLE_CALENDAR_CREDENTIALS")
     def test_refresh_error_returns_reconnect(
         self, mock_path, _mock_creds, mock_build
@@ -319,6 +342,7 @@ class TestFetchCalendarSnapshot:
         "google.oauth2.credentials.Credentials"
         ".from_authorized_user_file"
     )
+    @patch("planning_agent.context.GOOGLE_CALENDAR_ID", "primary")
     @patch("planning_agent.context.GOOGLE_CALENDAR_CREDENTIALS")
     def test_saves_credentials_after_success(
         self, mock_path, mock_creds_cls,
@@ -480,6 +504,7 @@ class TestBuildContext:
         "google.oauth2.credentials.Credentials"
         ".from_authorized_user_file"
     )
+    @patch("planning_agent.context.GOOGLE_CALENDAR_ID", "primary")
     @patch("planning_agent.context.GOOGLE_CALENDAR_CREDENTIALS")
     def test_calendar_snapshot_honors_days_arg(
         self, mock_path, _mock_creds, mock_build, _mock_save,
