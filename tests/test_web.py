@@ -694,3 +694,17 @@ class TestWebSocketConfirm:
                         pass
 
         assert confirm_result == [False]
+
+
+class TestRequireSessionApi:
+    def test_raises_401_without_cookie(self):
+        from fastapi import HTTPException
+
+        from planning_agent.auth import require_session_api
+
+        class _Req:
+            cookies: dict[str, str] = {}
+
+        with pytest.raises(HTTPException) as ei:
+            require_session_api(_Req())  # type: ignore[arg-type]
+        assert ei.value.status_code == 401
