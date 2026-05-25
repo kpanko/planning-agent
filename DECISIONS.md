@@ -192,3 +192,43 @@ that contains values from the WebSocket payload — use
 `createElement` + `textContent`. If a future requirement
 needs to render trusted HTML (e.g. a server-rendered help
 page), prefer a separate route that doesn't share this script.
+
+## Calendar source is a curated calendar, not `primary`
+
+**Decision:** `fetch_calendar_snapshot()` reads from the Google
+Calendar identified by the `GOOGLE_CALENDAR_ID` env var (a Fly
+secret in prod, `.env` value locally), not from `primary`. When
+the env var is unset or empty, the function short-circuits to
+`"(GOOGLE_CALENDAR_ID not set)"` without calling the API — fail
+loud, no silent fallback to `primary`.
+
+**Rationale:** Discovered 2026-05-24 during the first real Sunday
+review on prod. The user's `primary` calendar carries enough
+non-commitment events (high-frequency recurring "wake up" entries,
+auto-imported contact birthdays from people the user doesn't know
+well, placeholder events with low intent) that the agent's
+calendar context block became noise. The user follows GTD-style
+"only put things on the calendar that have to happen at a
+specific time", but `primary` is not the same set as "real
+commitments". Curating a separate Google Calendar with only the
+"do not schedule on top of these" events solves the noise problem
+in user-space without code-level filtering rules (title regex,
+all-day suppression, color rules, etc.) that would need ongoing
+maintenance.
+
+Fail-loud over silent-fallback because the whole point of the
+redesign is that `primary` is too noisy. A silent fallback would
+defeat it and would also mask deploy-time config drift (e.g. a
+Fly deploy that loses the secret).
+
+**How to apply:** Set `GOOGLE_CALENDAR_ID` to the calendar's ID
+(found in Google Calendar Settings → "Integrate calendar" →
+Calendar ID) before deploying. On Fly:
+`flyctl secrets set GOOGLE_CALENDAR_ID=<id>`. If the agent's
+calendar context block ever starts saying
+`"(GOOGLE_CALENDAR_ID not set)"`, the secret was lost or the
+local `.env` is missing the value. Do not add a code-level
+fallback to `primary`. If the curated calendar approach proves
+insufficient (e.g. user can never finish the cleanup), add a
+title-pattern skip list as a second layer in a follow-up — do
+not silently re-introduce the primary calendar.
