@@ -102,6 +102,7 @@ def list_summaries() -> list[Conversation]:
     conv_dir = _conversations_dir()
     if not conv_dir.exists():
         return []
+
     files = sorted(conv_dir.glob("*.json"), reverse=True)
     results: list[Conversation] = []
     for f in files:

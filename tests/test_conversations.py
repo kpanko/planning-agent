@@ -109,7 +109,7 @@ def test_get_recent_skips_malformed_files(data_dir, caplog):
     assert "2026-02-22.json" in caplog.text
 
 
-def test_list_summaries_returns_all_newest_first(data_dir):
+def test_list_summaries_returns_saved(data_dir):
     from planning_context import conversations
 
     conversations.save_summary("day one")
