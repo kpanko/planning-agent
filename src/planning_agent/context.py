@@ -208,7 +208,7 @@ def fetch_calendar_snapshot(days: int = 14) -> str:
             dict[str, Any],
             service.events()  # pyright: ignore[reportUnknownMemberType]
             .list(
-                calendarId="primary",
+                calendarId=GOOGLE_CALENDAR_ID,
                 timeMin=time_min,
                 timeMax=time_max,
                 singleEvents=True,
