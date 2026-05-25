@@ -708,3 +708,4 @@ class TestRequireSessionApi:
         with pytest.raises(HTTPException) as ei:
             require_session_api(_Req())  # type: ignore[arg-type]
         assert ei.value.status_code == 401
+        assert ei.value.detail == "unauthorized"

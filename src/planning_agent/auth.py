@@ -192,8 +192,7 @@ def require_session(request: Request) -> str:
 
 
 def require_session_api(request: Request) -> str:
-    """FastAPI Depends for JSON APIs — 401 instead of a
-    redirect."""
+    """FastAPI Depends for JSON APIs — 401 instead of redirect."""
     email = get_session(request)
     if not email:
         raise HTTPException(
