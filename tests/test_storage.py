@@ -5,6 +5,8 @@ import os
 
 import pytest
 
+from planning_context import storage
+
 os.environ["PLANNING_AGENT_DATA_DIR"] = ""
 
 
@@ -82,3 +84,47 @@ def test_env_var_overrides_default(tmp_path, monkeypatch):
     d = get_data_dir()
     assert d == custom_dir
     assert d.exists()
+
+
+@pytest.fixture
+def repo(tmp_path, monkeypatch):
+    """A data dir with git initialised and one extra commit."""
+    monkeypatch.setenv(
+        "PLANNING_AGENT_DATA_DIR", str(tmp_path)
+    )
+    storage.get_data_dir()  # init repo + first commit
+    (tmp_path / "rules.md").write_text(
+        "hello\n", encoding="utf-8"
+    )
+    storage.commit_data(
+        tmp_path, "rules: manual edit via settings"
+    )
+    yield tmp_path
+
+
+def test_git_log_returns_commits_newest_first(repo):
+    commits = storage.git_log(repo, limit=10)
+    assert len(commits) >= 2
+    assert commits[0]["subject"] == (
+        "rules: manual edit via settings"
+    )
+    assert "commit" in commits[0] and "date" in commits[0]
+
+
+def test_git_log_filtered_by_path(repo):
+    commits = storage.git_log(repo, path="rules.md")
+    assert all("commit" in c for c in commits)
+    assert any(
+        c["subject"] == "rules: manual edit via settings"
+        for c in commits
+    )
+
+
+def test_git_show_returns_diff(repo):
+    head = storage.git_log(repo, limit=1)[0]["commit"]
+    diff = storage.git_show(repo, head)
+    assert "hello" in diff
+
+
+def test_git_show_rejects_non_hex_ref(repo):
+    assert storage.git_show(repo, "HEAD; rm -rf /") == ""
