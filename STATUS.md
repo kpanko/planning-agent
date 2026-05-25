@@ -1,14 +1,53 @@
 # Status
 
-**Last updated:** 2026-05-24 (session 21)
-**Active work:** None. PR #94 merged (`2ad95bb`) — redesign on
-main. `/today` smoke test confirmed (replan flow works, no
-extraction on disconnect). PR #98 merged (`45fe37a`) — P1
-reschedule guard. Next is the Fly cron redeploy (#57), held
-until after Sunday-night + nightly-job testing.
+**Last updated:** 2026-05-25 (session 22)
+**Active work:** None. PR #102 merged (`5fa10d2`) — Sunday
+review polish (curated calendar source + P1 prompt). Fly secret
+`GOOGLE_CALENDAR_ID` set; `.env` updated. CI is `waiting` on
+prod deploy approval. Next is the Sunday-night live test on
+the curated calendar, then the Fly cron redeploy (#57).
 
 ## Recently Completed
 
+- **PR #102 merged — Sunday review polish (#101)** (session 22,
+  commit `5fa10d2`). Two bundled changes from the 2026-05-24
+  Sunday-review live test, executed via subagent-driven plan
+  (`docs/superpowers/specs/2026-05-24-sunday-review-polish-design.md`
+  + `docs/superpowers/plans/2026-05-24-sunday-review-polish.md`):
+  **(A) Curated calendar via `GOOGLE_CALENDAR_ID`.**
+  `fetch_calendar_snapshot()` now reads from a Google Calendar
+  configured by env var instead of the hardcoded `primary`.
+  Fail loud (returns `(GOOGLE_CALENDAR_ID not set)` with no
+  API call) when unset — no fallback. User curates the
+  calendar in Google's UI; code does no filtering. New
+  `GOOGLE_CALENDAR_ID = os.environ.get("GOOGLE_CALENDAR_ID",
+  "")` in `config.py`; short-circuit in
+  `fetch_calendar_snapshot` between the existing creds-missing
+  check and the API call; the legacy positive-path tests
+  (6 of them across `TestFetchCalendarSnapshot` and
+  `TestBuildContext`) now patch the new symbol to a `"primary"`
+  sentinel so their semantics are unchanged. **(B) P1
+  protection in both prompts.** New "## P1 tasks are
+  protected" section in `SUNDAY_PROMPT` (between "## Your job"
+  and "## Rules and observations") and the structurally
+  analogous spot in `TODAY_PROMPT` (between "## What you do
+  NOT do here" and "## Rules and observations"). Wording lifted
+  from #97's DECISIONS.md entry so the agent stops proposing
+  reschedules the tool layer will refuse. New `DECISIONS.md`
+  entry on the calendar-source choice + fail-loud rationale.
+  README and DEPLOY.md updated with setup steps. 372 → 374
+  tests; pyright clean; CodeRabbit pass. Rollout step done at
+  merge time: curated calendar created in Google, ID set via
+  `flyctl secrets set GOOGLE_CALENDAR_ID=<id>` and in local
+  `.env`. Subagent-driven flow caught two issues at the final
+  whole-branch review that per-task review missed: Task 5's
+  `DECISIONS.md` commit had landed on local `main` instead of
+  the feature branch (fixed by rebasing the branch onto local
+  main before push); README's `GOOGLE_CALENDAR_ID` example
+  listed "your email address for your primary calendar" as a
+  valid value, which undermined the curated-calendar design
+  intent (replaced with a single opaque-group-ID example +
+  "Use a dedicated calendar… not your primary calendar").
 - **PR #98 merged — P1 reschedule guard (#97)** (session 21,
   commit `45fe37a`). `reschedule_task` raises
   `PriorityProtectedError` on `task.priority == 4` before any
@@ -172,19 +211,28 @@ Nothing.
 
 ## Next Up
 
-1. **Sunday-night live test** — drive a real weekly review
-   on prod end-to-end. Watch for: P1 refusal works when the
-   agent tries to move one; tiered-horizon placement
-   produces sensible spreads; deferral counter increments.
-2. **Nightly job test** — once Sunday review looks good,
+1. **Approve the queued deploy.** Post-merge CI on `main` is
+   `waiting` for the production-environment manual approval
+   (the usual gate). Once approved, deploy ships the curated-
+   calendar reads and the P1 prompt updates to prod.
+2. **Sunday-night live test on the curated calendar.** Drive
+   a real weekly review on prod end-to-end after the deploy.
+   Watch for: the calendar block contains only events from the
+   curated calendar (no "wake up", no random birthdays); the
+   agent does NOT propose to reschedule any P1 task; tiered-
+   horizon placement produces sensible spreads; deferral
+   counter increments. Curating events into the dedicated
+   `GOOGLE_CALENDAR_ID` calendar is now part of the ongoing
+   workflow.
+3. **Nightly job test** — once Sunday review looks good,
    manually hit `POST /internal/nightly-replan` with
    `dry_run=true` on prod. Inspect the dry-run output for
    sensible placements before re-enabling the cron.
-3. **Redeploy the Fly cron Machine (#57)** — last open
+4. **Redeploy the Fly cron Machine (#57)** — last open
    task in M6. DEPLOY.md has the Fly-secret-based commands.
    Verify with `flyctl machine status -d` that no token
    appears in the env block (per DECISIONS.md).
-4. **After #57 lands:** M6 is done. Pick M7 (scheduling
+5. **After #57 lands:** M6 is done. Pick M7 (scheduling
    pattern learning, #27–#34) or M8 (evaluation suite,
    #43–#45) as the next milestone.
 
