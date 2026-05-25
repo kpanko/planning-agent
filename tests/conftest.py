@@ -1,4 +1,18 @@
+import os
+import subprocess
+
 from todoist_api_python.models import Duration, Task, Due
+
+
+def _last_subject(data_dir: "str | os.PathLike[str]") -> str:
+    out = subprocess.run(
+        ["git", "log", "-1", "--format=%s"],
+        cwd=data_dir,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return out.stdout.strip()
 
 
 def create_task(

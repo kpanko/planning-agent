@@ -1,10 +1,9 @@
 """Tests for planning_context.observations."""
 
-import subprocess
-
 import pytest
 
 from planning_context import observations
+from tests.conftest import _last_subject
 
 
 @pytest.fixture(autouse=True)
@@ -34,17 +33,6 @@ def test_write_returns_confirmation_string():
     assert "updated" in result.lower()
 
 
-def _last_subject(data_dir):
-    out = subprocess.run(
-        ["git", "log", "-1", "--format=%s"],
-        cwd=data_dir,
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return out.stdout.strip()
-
-
 def test_write_uses_custom_commit_message(isolated_data_dir):
     observations.write_observations(
         "x\n",
@@ -52,4 +40,11 @@ def test_write_uses_custom_commit_message(isolated_data_dir):
     )
     assert _last_subject(isolated_data_dir) == (
         "observations: manual edit via settings"
+    )
+
+
+def test_write_defaults_commit_message(isolated_data_dir):
+    observations.write_observations("x\n")
+    assert _last_subject(isolated_data_dir) == (
+        "observations: update observations document"
     )

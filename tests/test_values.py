@@ -1,9 +1,10 @@
 """Tests for values data layer."""
 
 import os
-import subprocess
 
 import pytest
+
+from tests.conftest import _last_subject
 
 # Point data dir to a temp directory before importing modules
 os.environ["PLANNING_AGENT_DATA_DIR"] = ""  # will be set per-test
@@ -66,17 +67,6 @@ def test_write_failure_returns_error_string(data_dir, monkeypatch):
     assert "Permission denied" in result
 
 
-def _last_subject(data_dir):
-    out = subprocess.run(
-        ["git", "log", "-1", "--format=%s"],
-        cwd=data_dir,
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return out.stdout.strip()
-
-
 def test_write_uses_custom_commit_message(data_dir):
     from planning_context.values import write_values
 
@@ -85,4 +75,13 @@ def test_write_uses_custom_commit_message(data_dir):
     )
     assert _last_subject(data_dir) == (
         "values: manual edit via settings"
+    )
+
+
+def test_write_defaults_commit_message(data_dir):
+    from planning_context.values import write_values
+
+    write_values("x\n")
+    assert _last_subject(data_dir) == (
+        "values: update values document"
     )

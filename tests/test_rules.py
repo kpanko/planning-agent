@@ -1,10 +1,9 @@
 """Tests for planning_context.rules."""
 
-import subprocess
-
 import pytest
 
 from planning_context import rules
+from tests.conftest import _last_subject
 
 
 @pytest.fixture(autouse=True)
@@ -35,17 +34,6 @@ def test_write_returns_confirmation_string():
     result = rules.write_rules("- rule one\n")
     assert "updated" in result.lower()
     assert "11" in result  # byte/char count
-
-
-def _last_subject(data_dir):
-    out = subprocess.run(
-        ["git", "log", "-1", "--format=%s"],
-        cwd=data_dir,
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return out.stdout.strip()
 
 
 def test_write_uses_custom_commit_message(isolated_data_dir):
