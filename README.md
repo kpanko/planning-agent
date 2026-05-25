@@ -52,6 +52,16 @@ Environment variables:
   configurable; one of these is required
 - `GOOGLE_CALENDAR_CREDENTIALS` — path to OAuth client JSON;
   optional, the agent falls back gracefully without calendar data
+- `GOOGLE_CALENDAR_ID` — Calendar ID of the calendar the agent
+  reads for context (e.g.
+  `abc123@group.calendar.google.com`, or your email address for
+  your primary calendar). Find it in Google Calendar → Settings
+  for that calendar → "Integrate calendar". If unset, the agent's
+  calendar context block shows `(GOOGLE_CALENDAR_ID not set)` and
+  no calendar data reaches the agent — there is no silent fallback
+  to the primary calendar. Use a calendar that holds only events
+  you consider hard blocks (appointments, things you don't want
+  scheduled over).
 - `WEB_SECRET`, `LOGFIRE_TOKEN`, and the Google OAuth pair are
   required in production but not for local dev or tests
 
