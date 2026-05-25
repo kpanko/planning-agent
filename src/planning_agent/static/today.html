@@ -254,6 +254,18 @@
       border-left-color: #dc2626;
       color: #f87171;
     }
+    .mode-link {
+      padding: 0.25rem 0.6rem;
+      color: #93c5fd;
+      font-size: 0.8rem;
+      text-decoration: none;
+      border: 1px solid #1e3a8a;
+      border-radius: 5px;
+    }
+    .mode-link:hover {
+      color: #dbeafe;
+      border-color: #2563eb;
+    }
   </style>
 </head>
 <body>
@@ -262,6 +274,7 @@
   <span id="page-title">Replan Today</span>
   <div id="status-dot" class="connecting"></div>
   <span id="status-label">Connecting…</span>
+  <a href="/settings" class="mode-link">⚙ Settings</a>
   <button id="debug-toggle">Debug</button>
   <button id="disconnect-btn">Disconnect</button>
   <span id="version-label"></span>

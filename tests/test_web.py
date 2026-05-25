@@ -709,3 +709,42 @@ class TestRequireSessionApi:
             require_session_api(_Req())  # type: ignore[arg-type]
         assert ei.value.status_code == 401
         assert ei.value.detail == "unauthorized"
+
+
+class TestSettingsRoute:
+    def test_settings_page_requires_auth(self):
+        with TestClient(
+            app, follow_redirects=False
+        ) as c:
+            resp = c.get("/settings")
+        assert resp.status_code in (303, 401)
+
+    def test_settings_page_renders_with_auth(self):
+        with patch(
+            "planning_agent.auth.WEB_SECRET", _TEST_SECRET
+        ):
+            client = TestClient(app)
+            client.cookies.update(_session_cookies())
+            resp = client.get("/settings")
+        assert resp.status_code == 200
+        body = resp.text.lower()
+        assert "settings" in body
+        assert "/api/settings/state" in resp.text
+
+    def test_index_links_to_settings(self):
+        with patch(
+            "planning_agent.auth.WEB_SECRET", _TEST_SECRET
+        ):
+            client = TestClient(app)
+            client.cookies.update(_session_cookies())
+            resp = client.get("/")
+        assert 'href="/settings"' in resp.text
+
+    def test_today_links_to_settings(self):
+        with patch(
+            "planning_agent.auth.WEB_SECRET", _TEST_SECRET
+        ):
+            client = TestClient(app)
+            client.cookies.update(_session_cookies())
+            resp = client.get("/today")
+        assert 'href="/settings"' in resp.text
