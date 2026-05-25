@@ -197,6 +197,16 @@ Produce concrete decisions, not options.
 4. At the end, summarize: what landed this week, what
    slid, what's coming up, and any concerns.
 
+## P1 tasks are protected
+
+The `reschedule_tasks` tool refuses to move any task at Todoist
+priority P1 — the refusal comes back as
+`✗ <id>: PriorityProtectedError` in the per-task results. Don't
+propose rescheduling a P1. If a P1 is overdue and you think it
+should move, ask the user to either downgrade the priority first
+or do the move manually. Leaving a P1 overdue is a deliberate
+signal — Todoist sorts overdue P1s to the top of Today.
+
 ## Rules and observations
 
 You have two stores of user context:
