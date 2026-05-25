@@ -23,12 +23,17 @@ def _parse_task_date(task: Task) -> date | None:
     return date.fromisoformat(date_str)
 
 
-# Strips a trailing `at <time>` clause from a Todoist recurrence
-# pattern. Matches "at 5pm", "at 5:30pm", "at 17:00", "at 9am",
-# case-insensitive. See #62 — we re-attach time before
-# `starting on` so Todoist honors the new weekday.
-_AT_TIME_RE = re.compile(
-    r"\s+at\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?\b",
+# Strips a time-of-day clause from a Todoist recurrence pattern,
+# with or without a leading "at". Matches "at 5pm", "at 5:30pm",
+# "at 17:00", "at 9am", and the bare forms "4 pm", "4pm", "16:00",
+# "12:30pm" — case-insensitive. The token must carry a colon or an
+# am/pm marker, so a bare cadence integer (the "3" in "every 3
+# days") is never mistaken for a time. See #62 (we re-attach time
+# before `starting on` so Todoist honors the new weekday) and the
+# bare-time double-time 400 this also guards against.
+_TIME_RE = re.compile(
+    r"\s+(?:at\s+)?"
+    r"(?:\d{1,2}:\d{2}(?:\s*(?:am|pm))?|\d{1,2}\s*(?:am|pm))\b",
     re.IGNORECASE,
 )
 
@@ -36,11 +41,12 @@ _AT_TIME_RE = re.compile(
 def _strip_recurrence_pattern(due_string: str) -> str:
     """Reduce a recurring due_string to just the cadence pattern.
 
-    Removes any trailing `starting on ...` clause and any `at <time>`
-    clause so we can re-emit the pattern with our own time placement.
+    Removes any trailing `starting on ...` clause and any time-of-day
+    clause (an explicit `at <time>` or a bare `4 pm` / `16:00`) so we
+    can re-emit the pattern with our own time placement.
     """
     pattern = re.sub(r'\s*starting on.*', '', due_string)
-    pattern = _AT_TIME_RE.sub('', pattern)
+    pattern = _TIME_RE.sub('', pattern)
     return pattern.strip()
 
 

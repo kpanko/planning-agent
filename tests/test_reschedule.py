@@ -183,6 +183,43 @@ class TestComputeDueString(unittest.TestCase):
         )
         self.assertEqual(result, '2024-01-15 09:30')
 
+    def test_time_override_recurring_bare_time_pattern(self):
+        # A recurrence whose pattern embeds a bare time ("every
+        # day 4 pm", no "at") must not produce a double-time
+        # due_string like "every day 4 pm at 09:30 ...", which
+        # Todoist rejects with a 400.
+        task = create_task(
+            '1', 'Task',
+            due_date_str='2024-01-10',
+            is_recurring=True,
+            due_string='every day 4 pm',
+            due_datetime_str='2024-01-10T16:00:00Z',
+        )
+        result = compute_due_string(
+            task, date(2024, 1, 15), time='09:30',
+        )
+        self.assertEqual(
+            result,
+            'every day at 09:30 starting on 2024-01-15',
+        )
+
+    def test_recurring_bare_time_pattern_inherited_time(self):
+        # Plain date move (no override) reuses the existing time
+        # but must still strip the bare time in the pattern, or we
+        # emit "every day 4 pm at 16:00 ..." and Todoist 400s.
+        task = create_task(
+            '1', 'Task',
+            due_date_str='2024-01-10',
+            is_recurring=True,
+            due_string='every day 4 pm',
+            due_datetime_str='2024-01-10T16:00:00Z',
+        )
+        result = compute_due_string(task, date(2024, 1, 15))
+        self.assertEqual(
+            result,
+            'every day at 16:00 starting on 2024-01-15',
+        )
+
 
 class TestValidateRecurringPreserved(unittest.TestCase):
 
@@ -669,6 +706,38 @@ class TestStripRecurrencePattern(unittest.TestCase):
         self.assertEqual(
             _strip_recurrence_pattern('every Monday'),
             'every Monday',
+        )
+
+    def test_strips_bare_pm_time(self):
+        self.assertEqual(
+            _strip_recurrence_pattern('every day 4 pm'),
+            'every day',
+        )
+
+    def test_strips_bare_pm_no_space(self):
+        self.assertEqual(
+            _strip_recurrence_pattern('every day 4pm'),
+            'every day',
+        )
+
+    def test_strips_bare_24h_time(self):
+        self.assertEqual(
+            _strip_recurrence_pattern('every day 16:00'),
+            'every day',
+        )
+
+    def test_strips_bare_colon_ampm_time(self):
+        self.assertEqual(
+            _strip_recurrence_pattern('every day 12:30pm'),
+            'every day',
+        )
+
+    def test_keeps_interval_integer(self):
+        # The "3" is the cadence interval, not a time-of-day, so
+        # it must survive. Only colon/am-pm tokens are times.
+        self.assertEqual(
+            _strip_recurrence_pattern('every 3 days'),
+            'every 3 days',
         )
 
 
