@@ -44,6 +44,7 @@ from .auth import (
 from .context import CALENDAR_NEEDS_RECONNECT, PlanningContext
 from .extraction import run_extraction
 from .replan_today import build_today_context, create_today_agent
+from .settings_api import router as settings_router
 from .sunday_review import build_sunday_context, create_sunday_agent
 from .version import GIT_COMMIT
 
@@ -64,6 +65,7 @@ logfire.instrument_pydantic_ai()
 
 app = FastAPI(title="Planning Agent")
 logfire.instrument_fastapi(app)
+app.include_router(settings_router)
 
 
 # ---------------------------------------------------------------------------
