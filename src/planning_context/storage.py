@@ -149,11 +149,12 @@ def git_log(
     path: str | None = None,
     limit: int = 50,
 ) -> list[dict[str, str]]:
-    """Return recent commits as
-    [{"commit", "date", "subject"}], newest first.
+    """Return recent commits, newest first.
 
-    Returns [] if git is unavailable.
+    Each item is {"commit", "date", "subject"}. Returns []
+    if git is unavailable.
     """
+    limit = max(1, limit)
     args = ["log", f"-{limit}", "--format=%H%x1f%cI%x1f%s"]
     if path:
         args += ["--", path]
@@ -183,9 +184,11 @@ def git_show(
     commit: str,
     path: str | None = None,
 ) -> str:
-    """Return the unified diff for a commit, optionally
-    restricted to one path. Empty string if git is
-    unavailable or the ref is invalid."""
+    """Return the unified diff for a commit as a string.
+
+    Optionally restricted to one path. Returns "" if git is
+    unavailable or the ref is not a valid hex hash.
+    """
     if not commit or not all(
         c in "0123456789abcdefABCDEF" for c in commit
     ):
