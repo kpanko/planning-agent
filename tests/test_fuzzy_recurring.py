@@ -179,3 +179,42 @@ def test_unknown_seasonal_constraint_suppresses(data_dir):
     )
     ref = date(2026, 5, 1)
     assert get_due_soon(14, reference_date=ref) == []
+
+
+def test_list_returns_all_tasks():
+    from planning_context import fuzzy_recurring
+
+    fuzzy_recurring.add_fuzzy_recurring("Gutters", 180)
+    fuzzy_recurring.add_fuzzy_recurring("Filter", 90)
+    names = {t["name"] for t in
+             fuzzy_recurring.list_fuzzy_recurring()}
+    assert names == {"Gutters", "Filter"}
+
+
+def test_list_empty_by_default():
+    from planning_context import fuzzy_recurring
+
+    assert fuzzy_recurring.list_fuzzy_recurring() == []
+
+
+def test_update_changes_fields():
+    from planning_context import fuzzy_recurring
+
+    t = fuzzy_recurring.add_fuzzy_recurring("Gutters", 180)
+    updated = fuzzy_recurring.update_fuzzy_recurring(
+        t["id"], interval_days=200, notes="autumn"
+    )
+    assert updated is not None
+    assert updated["interval_days"] == 200
+    assert updated["notes"] == "autumn"
+    # name left untouched
+    assert updated["name"] == "Gutters"
+
+
+def test_update_missing_returns_none():
+    from planning_context import fuzzy_recurring
+
+    assert (
+        fuzzy_recurring.update_fuzzy_recurring("fr_999", name="x")
+        is None
+    )
