@@ -4,6 +4,8 @@ state stored in the planning-agent data directory."""
 from __future__ import annotations
 
 import hashlib
+import json
+import re
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -34,6 +36,8 @@ router = APIRouter(
 )
 
 _DOC_NAMES = ("rules", "values", "observations")
+
+_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 def _hash(content: str) -> str:
@@ -70,7 +74,10 @@ def _last_modified(filename: str) -> str | None:
 
 def _doc_state(name: str) -> dict[str, Any]:
     spec = _doc_spec(name)
-    assert spec is not None
+    if spec is None:
+        raise ValueError(
+            f"_doc_state: unknown doc {name!r}"
+        )
     filename, read_fn, _ = spec
     content = read_fn()
     return {
@@ -101,13 +108,11 @@ class FuzzyUpdate(BaseModel):
 
 def _has_legacy_memories(data_dir: Path) -> bool:
     """True if memories.json exists and contains entries."""
-    import json as _json
-
     path = data_dir / "memories.json"
     if not path.exists():
         return False
     try:
-        data = _json.loads(
+        data = json.loads(
             path.read_text(encoding="utf-8")
         )
         return bool(data)
@@ -211,6 +216,10 @@ async def delete_fuzzy(task_id: str) -> JSONResponse:
 
 @router.delete("/conversation/{date}")
 async def delete_conversation(date: str) -> JSONResponse:
+    if not _DATE_RE.fullmatch(date):
+        raise HTTPException(
+            status_code=422, detail="invalid date format"
+        )
     if not conversations.delete_summary(date):
         raise HTTPException(
             status_code=404, detail="not found"
@@ -222,6 +231,7 @@ async def delete_conversation(date: str) -> JSONResponse:
 async def history(
     file: str | None = None, limit: int = 50
 ) -> JSONResponse:
+    limit = min(limit, 500)
     return JSONResponse(
         {"commits": git_log(get_data_dir(), file, limit)}
     )

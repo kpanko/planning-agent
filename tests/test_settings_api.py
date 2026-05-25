@@ -170,6 +170,12 @@ def test_conversation_delete_missing_404(client):
     ).status_code == 404
 
 
+def test_conversation_delete_invalid_date_422(client):
+    assert client.delete(
+        "/api/settings/conversation/not-a-date"
+    ).status_code == 422
+
+
 def test_history_lists_and_diffs(client):
     base = client.get(
         "/api/settings/state"
