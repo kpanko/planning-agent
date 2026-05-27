@@ -90,6 +90,45 @@ def get_fuzzy_recurring(task_id: str) -> FuzzyRecurring | None:
     return None
 
 
+def list_fuzzy_recurring() -> list[FuzzyRecurring]:
+    """Return all fuzzy recurring tasks."""
+    return _load()
+
+
+def update_fuzzy_recurring(
+    task_id: str,
+    name: str | None = None,
+    interval_days: int | None = None,
+    seasonal_constraints: list[str] | None = None,
+    notes: str | None = None,
+) -> FuzzyRecurring | None:
+    """Update fields on a task. Only non-None args are
+    applied. Returns the updated task, or None if not found."""
+    tasks = _load()
+    for t in tasks:
+        if t["id"] == task_id:
+            if name is not None:
+                t["name"] = name
+            if interval_days is not None:
+                t["interval_days"] = interval_days
+            if seasonal_constraints is not None:
+                t["seasonal_constraints"] = seasonal_constraints
+            if notes is not None:
+                t["notes"] = notes
+            _save(tasks)
+            commit_data(
+                _path().parent, f"fuzzy: update {task_id}"
+            )
+            logger.info(
+                "Fuzzy recurring updated: %s", task_id
+            )
+            return t
+    logger.warning(
+        "update_fuzzy_recurring: id %s not found", task_id
+    )
+    return None
+
+
 def update_last_done(
     task_id: str,
     date_str: str,

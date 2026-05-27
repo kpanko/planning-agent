@@ -3,6 +3,7 @@
 import pytest
 
 from planning_context import rules
+from tests.conftest import _last_subject
 
 
 @pytest.fixture(autouse=True)
@@ -33,3 +34,19 @@ def test_write_returns_confirmation_string():
     result = rules.write_rules("- rule one\n")
     assert "updated" in result.lower()
     assert "11" in result  # byte/char count
+
+
+def test_write_uses_custom_commit_message(isolated_data_dir):
+    rules.write_rules(
+        "- a\n", commit_message="rules: manual edit via settings"
+    )
+    assert _last_subject(isolated_data_dir) == (
+        "rules: manual edit via settings"
+    )
+
+
+def test_write_defaults_commit_message(isolated_data_dir):
+    rules.write_rules("- a\n")
+    assert _last_subject(isolated_data_dir) == (
+        "rules: update rules document"
+    )

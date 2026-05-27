@@ -4,6 +4,8 @@ import os
 
 import pytest
 
+from tests.conftest import _last_subject
+
 # Point data dir to a temp directory before importing modules
 os.environ["PLANNING_AGENT_DATA_DIR"] = ""  # will be set per-test
 
@@ -63,3 +65,23 @@ def test_write_failure_returns_error_string(data_dir, monkeypatch):
     result = values.write_values("some content")
     assert result.startswith("Error:")
     assert "Permission denied" in result
+
+
+def test_write_uses_custom_commit_message(data_dir):
+    from planning_context.values import write_values
+
+    write_values(
+        "x\n", commit_message="values: manual edit via settings"
+    )
+    assert _last_subject(data_dir) == (
+        "values: manual edit via settings"
+    )
+
+
+def test_write_defaults_commit_message(data_dir):
+    from planning_context.values import write_values
+
+    write_values("x\n")
+    assert _last_subject(data_dir) == (
+        "values: update values document"
+    )

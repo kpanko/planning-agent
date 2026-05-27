@@ -191,6 +191,16 @@ def require_session(request: Request) -> str:
     return email
 
 
+def require_session_api(request: Request) -> str:
+    """FastAPI Depends for JSON APIs — 401 instead of redirect."""
+    email = get_session(request)
+    if not email:
+        raise HTTPException(
+            status_code=401, detail="unauthorized"
+        )
+    return email
+
+
 # ---------------------------------------------------------------------------
 # OAuth state cookie (short-lived CSRF protection)
 # ---------------------------------------------------------------------------

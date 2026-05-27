@@ -25,7 +25,9 @@ def read_rules() -> str:
         raise
 
 
-def write_rules(content: str) -> str:
+def write_rules(
+    content: str, commit_message: str | None = None
+) -> str:
     """Overwrite rules.md. Returns a confirmation string."""
     path = get_data_dir() / "rules.md"
     try:
@@ -35,7 +37,10 @@ def write_rules(content: str) -> str:
             "Failed to write rules.md: %s", exc, exc_info=True
         )
         return f"Error: could not save rules — {exc}"
-    commit_data(path.parent, "rules: update rules document")
+    commit_data(
+        path.parent,
+        commit_message or "rules: update rules document",
+    )
     ts = datetime.now(timezone.utc).strftime(
         "%Y-%m-%dT%H:%M:%SZ"
     )

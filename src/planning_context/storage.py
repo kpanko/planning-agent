@@ -142,3 +142,62 @@ def write_json(
     except OSError:
         logger.error("Failed to write %s", path, exc_info=True)
         raise
+
+
+def git_log(
+    data_dir: Path,
+    path: str | None = None,
+    limit: int = 50,
+) -> list[dict[str, str]]:
+    """Return recent commits, newest first.
+
+    Each item is {"commit", "date", "subject"}. Returns []
+    if git is unavailable.
+    """
+    limit = max(1, limit)
+    args = ["log", f"-{limit}", "--format=%H%x1f%cI%x1f%s"]
+    if path:
+        args += ["--", path]
+    try:
+        result = _git(data_dir, *args)
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return []
+    commits: list[dict[str, str]] = []
+    for line in result.stdout.splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("\x1f")
+        if len(parts) != 3:
+            continue
+        commits.append(
+            {
+                "commit": parts[0],
+                "date": parts[1],
+                "subject": parts[2],
+            }
+        )
+    return commits
+
+
+def git_show(
+    data_dir: Path,
+    commit: str,
+    path: str | None = None,
+) -> str:
+    """Return the unified diff for a commit as a string.
+
+    Optionally restricted to one path. Returns "" if git is
+    unavailable or the ref is not a valid hex hash.
+    """
+    if not commit or not all(
+        c in "0123456789abcdefABCDEF" for c in commit
+    ):
+        return ""
+    args = ["show", commit]
+    if path:
+        args += ["--", path]
+    try:
+        result = _git(data_dir, *args)
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return ""
+    return result.stdout

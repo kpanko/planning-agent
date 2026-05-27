@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1">
+  <title>Planning Agent · Settings</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: system-ui, sans-serif;
+      background: #1a1a1a; color: #e0e0e0;
+    }
+    header {
+      padding: 0.6rem 1rem; background: #111;
+      border-bottom: 1px solid #333; display: flex;
+      align-items: center; gap: 0.5rem; font-size: 0.9rem;
+      font-weight: 600; position: sticky; top: 0;
+    }
+    .mode-link {
+      padding: 0.25rem 0.6rem; color: #93c5fd;
+      font-size: 0.8rem; text-decoration: none;
+      border: 1px solid #1e3a8a; border-radius: 5px;
+    }
+    #logout-link {
+      margin-left: auto; padding: 0.25rem 0.6rem;
+      color: #888; font-size: 0.75rem; text-decoration: none;
+    }
+    #version-label {
+      font-size: 0.65rem; color: #555; font-weight: 400;
+      font-family: monospace;
+    }
+    main { padding: 1rem; max-width: 760px; margin: 0 auto; }
+    details.section {
+      border: 1px solid #333; border-radius: 8px;
+      margin-bottom: 0.75rem; background: #222;
+    }
+    details.section > summary {
+      cursor: pointer; padding: 0.7rem 0.9rem;
+      font-weight: 600; display: flex; gap: 0.5rem;
+      align-items: baseline;
+    }
+    .hint {
+      margin-left: auto; font-size: 0.7rem; color: #888;
+      font-weight: 400;
+    }
+    .section-body { padding: 0 0.9rem 0.9rem; }
+    textarea {
+      width: 100%; min-height: 180px; background: #111;
+      color: #e0e0e0; border: 1px solid #444;
+      border-radius: 6px; padding: 0.6rem; font-size: 0.9rem;
+      font-family: ui-monospace, monospace; resize: vertical;
+    }
+    button.act {
+      padding: 0.4rem 0.9rem; border: none; border-radius: 6px;
+      background: #2563eb; color: #fff; font-weight: 600;
+      cursor: pointer; margin-top: 0.5rem;
+    }
+    button.danger { background: #b91c1c; }
+    button.ghost {
+      background: transparent; border: 1px solid #444;
+      color: #aaa;
+    }
+    .row {
+      display: flex; gap: 0.5rem; align-items: center;
+      padding: 0.4rem 0; border-bottom: 1px solid #2a2a2a;
+      flex-wrap: wrap;
+    }
+    .row input[type=text], .row input[type=number] {
+      background: #111; color: #e0e0e0; border: 1px solid #444;
+      border-radius: 5px; padding: 0.35rem; font-size: 0.85rem;
+    }
+    .grow { flex: 1; }
+    .conflict {
+      border: 1px solid #b45309; background: #2a1d09;
+      border-radius: 6px; padding: 0.6rem; margin-top: 0.5rem;
+    }
+    .conflict pre {
+      background: #111; padding: 0.5rem; border-radius: 4px;
+      max-height: 220px; overflow: auto; white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .legacy { color: #f59e0b; font-size: 0.85rem; }
+    table { width: 100%; border-collapse: collapse;
+      font-size: 0.85rem; }
+    td, th { text-align: left; padding: 0.3rem 0.4rem;
+      border-bottom: 1px solid #2a2a2a; }
+    .commit { cursor: pointer; }
+    .commit:hover { color: #93c5fd; }
+    pre.diff {
+      background: #111; padding: 0.5rem; border-radius: 4px;
+      overflow: auto; font-size: 0.78rem; white-space: pre;
+    }
+    .summary-text p { margin: 0.2em 0; }
+    #toast {
+      position: fixed; bottom: 1rem; left: 50%;
+      transform: translateX(-50%); background: #16a34a;
+      color: #fff; padding: 0.5rem 1rem; border-radius: 6px;
+      font-size: 0.85rem; display: none;
+    }
+    #toast.err { background: #b91c1c; }
+  </style>
+</head>
+<body>
+
+<header>
+  <span>Planning Agent · Settings</span>
+  <a href="/" class="mode-link">← Sunday review</a>
+  <span id="version-label"></span>
+  <a href="/logout" id="logout-link">Log out</a>
+</header>
+
+<main id="root">Loading…</main>
+<div id="toast"></div>
+
+<script>
+  "use strict";
+
+  const root = document.getElementById("root");
+  const toastEl = document.getElementById("toast");
+  const docHashes = {};
+
+  function toast(msg, isErr) {
+    toastEl.textContent = msg;
+    toastEl.className = isErr ? "err" : "";
+    toastEl.style.display = "block";
+    setTimeout(() => { toastEl.style.display = "none"; }, 2500);
+  }
+
+  function renderMarkdown(text) {
+    return DOMPurify.sanitize(marked.parse(text || ""));
+  }
+
+  async function api(method, path, body) {
+    const opts = { method, headers: {} };
+    if (body !== undefined) {
+      opts.headers["Content-Type"] = "application/json";
+      opts.body = JSON.stringify(body);
+    }
+    const r = await fetch(path, opts);
+    let data = null;
+    try { data = await r.json(); } catch (_) {}
+    return { status: r.status, data };
+  }
+
+  function el(tag, props, children) {
+    const e = document.createElement(tag);
+    Object.assign(e, props || {});
+    (children || []).forEach((c) => {
+      e.appendChild(
+        typeof c === "string"
+          ? document.createTextNode(c)
+          : c
+      );
+    });
+    return e;
+  }
+
+  // doc sections
+  function docSection(name, doc) {
+    docHashes[name] = doc.hash;
+    const ta = el("textarea", { value: doc.content });
+    const saveBtn = el(
+      "button", { className: "act", textContent: "Save" }
+    );
+    const conflictBox = el("div", {});
+
+    saveBtn.addEventListener("click", async () => {
+      const res = await api("PUT", `/api/settings/doc/${name}`, {
+        content: ta.value,
+        base_hash: docHashes[name],
+      });
+      if (res.status === 200) {
+        docHashes[name] = res.data.hash;
+        conflictBox.innerHTML = "";
+        toast(`${name} saved`);
+      } else if (res.status === 409) {
+        showConflict(
+          name, ta, conflictBox, res.data.current_content,
+          res.data.current_hash
+        );
+      } else {
+        toast(
+          (res.data && res.data.error) || "Save failed", true
+        );
+      }
+    });
+
+    const hint = el("span", {
+      className: "hint",
+      textContent: doc.last_modified
+        ? "edited " + doc.last_modified.slice(0, 10)
+        : "",
+    });
+    const body = el("div", { className: "section-body" }, [
+      ta, saveBtn, conflictBox,
+    ]);
+    const summary = el("summary", {}, [
+      capital(name), hint,
+    ]);
+    return el(
+      "details", { className: "section" }, [summary, body]
+    );
+  }
+
+  function showConflict(name, ta, box, theirs, theirHash) {
+    box.innerHTML = "";
+    const pre = el("pre", { textContent: theirs });
+    const keepMine = el("button", {
+      className: "act", textContent: "Keep mine (overwrite)",
+    });
+    keepMine.addEventListener("click", async () => {
+      const res = await api(
+        "PUT", `/api/settings/doc/${name}`,
+        { content: ta.value, base_hash: theirHash }
+      );
+      if (res.status === 200) {
+        docHashes[name] = res.data.hash;
+        box.innerHTML = "";
+        toast(`${name} saved`);
+      } else {
+        toast("Still conflicting — reload", true);
+      }
+    });
+    const takeTheirs = el("button", {
+      className: "act ghost", textContent: "Load theirs",
+    });
+    takeTheirs.addEventListener("click", () => {
+      ta.value = theirs;
+      docHashes[name] = theirHash;
+      box.innerHTML = "";
+    });
+    box.appendChild(el("div", { className: "conflict" }, [
+      el("div", {
+        textContent:
+          "The agent changed this since you loaded it:",
+      }),
+      pre, keepMine, document.createTextNode(" "), takeTheirs,
+    ]));
+  }
+
+  // fuzzy section
+  function fuzzySection(tasks) {
+    const body = el("div", { className: "section-body" });
+    tasks.forEach((t) => body.appendChild(fuzzyRow(t)));
+    body.appendChild(fuzzyAddRow());
+    const summary = el("summary", {}, [
+      "Fuzzy recurring",
+      el("span", {
+        className: "hint", textContent: `(${tasks.length})`,
+      }),
+    ]);
+    return el(
+      "details", { className: "section" }, [summary, body]
+    );
+  }
+
+  function fuzzyRow(t) {
+    const nameI = el("input", {
+      type: "text", value: t.name, className: "grow",
+    });
+    const intI = el("input", {
+      type: "number", value: t.interval_days,
+      style: "width:5rem",
+    });
+    const save = el("button", {
+      className: "act", textContent: "Save",
+    });
+    save.addEventListener("click", async () => {
+      const res = await api(
+        "PUT", `/api/settings/fuzzy/${t.id}`,
+        { name: nameI.value,
+          interval_days: Number(intI.value) }
+      );
+      toast(res.status === 200 ? "Saved" : "Failed",
+            res.status !== 200);
+    });
+    const del = el("button", {
+      className: "act danger", textContent: "Delete",
+    });
+    del.addEventListener("click", async () => {
+      if (!confirm(`Delete fuzzy task "${t.name}"?`)) return;
+      const res = await api(
+        "DELETE", `/api/settings/fuzzy/${t.id}`
+      );
+      if (res.status === 200) { load(); }
+      else { toast("Delete failed", true); }
+    });
+    return el("div", { className: "row" }, [
+      nameI, intI, el("span", { textContent: "days" }),
+      save, del,
+    ]);
+  }
+
+  function fuzzyAddRow() {
+    const nameI = el("input", {
+      type: "text", placeholder: "New task name",
+      className: "grow",
+    });
+    const intI = el("input", {
+      type: "number", placeholder: "days", style: "width:5rem",
+    });
+    const add = el("button", {
+      className: "act", textContent: "Add",
+    });
+    add.addEventListener("click", async () => {
+      if (!nameI.value.trim() || !intI.value) return;
+      const res = await api("POST", "/api/settings/fuzzy", {
+        name: nameI.value.trim(),
+        interval_days: Number(intI.value),
+      });
+      if (res.status === 200) { load(); }
+      else { toast("Add failed", true); }
+    });
+    return el("div", { className: "row" }, [
+      nameI, intI, el("span", { textContent: "days" }), add,
+    ]);
+  }
+
+  // conversations section
+  function conversationsSection(convs) {
+    const body = el("div", { className: "section-body" });
+    convs.forEach((c) => {
+      const summaries = (c.entries || [])
+        .map((e) => e.summary).join("\n\n");
+      const text = el("div", { className: "summary-text" });
+      text.innerHTML = renderMarkdown(summaries);
+      const del = el("button", {
+        className: "act danger", textContent: "Delete",
+      });
+      del.addEventListener("click", async () => {
+        if (!confirm(`Delete conversation for ${c.date}?`))
+          return;
+        const res = await api(
+          "DELETE", `/api/settings/conversation/${c.date}`
+        );
+        if (res.status === 200) { load(); }
+        else { toast("Delete failed", true); }
+      });
+      body.appendChild(el("div", { className: "row" }, [
+        el("strong", { textContent: c.date }), del,
+      ]));
+      body.appendChild(el("div", {
+        className: "section-body",
+      }, [text]));
+    });
+    const summary = el("summary", {}, [
+      "Conversations",
+      el("span", {
+        className: "hint", textContent: `(${convs.length})`,
+      }),
+    ]);
+    return el(
+      "details", { className: "section" }, [summary, body]
+    );
+  }
+
+  // deferral counts (read-only)
+  function deferralSection(counts) {
+    const keys = Object.keys(counts);
+    const table = el("table", {});
+    table.appendChild(el("tr", {}, [
+      el("th", { textContent: "Task ID" }),
+      el("th", { textContent: "Days deferred" }),
+    ]));
+    keys.forEach((k) => {
+      table.appendChild(el("tr", {}, [
+        el("td", { textContent: k }),
+        el("td", { textContent: String(counts[k]) }),
+      ]));
+    });
+    const body = el("div", { className: "section-body" }, [
+      keys.length ? table
+        : el("div", { textContent: "(none)" }),
+    ]);
+    const summary = el("summary", {}, [
+      "Deferral counts",
+      el("span", {
+        className: "hint", textContent: "read-only",
+      }),
+    ]);
+    return el(
+      "details", { className: "section" }, [summary, body]
+    );
+  }
+
+  // legacy memories
+  function legacySection() {
+    const body = el("div", { className: "section-body" }, [
+      el("div", {
+        className: "legacy",
+        textContent:
+          "memories.json is present but legacy — no longer "
+          + "used by the agent. Shown for transparency only.",
+      }),
+    ]);
+    const summary = el("summary", {}, [
+      "Legacy: memories.json",
+    ]);
+    return el(
+      "details", { className: "section" }, [summary, body]
+    );
+  }
+
+  // change history
+  function historySection() {
+    const body = el("div", { className: "section-body" }, [
+      el("div", { textContent: "Expand to load…" }),
+    ]);
+    const det = el(
+      "details", { className: "section" },
+      [el("summary", {}, ["Change history"]), body]
+    );
+    det.addEventListener("toggle", async () => {
+      if (!det.open || det.dataset.loaded) return;
+      det.dataset.loaded = "1";
+      const res = await api("GET", "/api/settings/history");
+      body.innerHTML = "";
+      (res.data.commits || []).forEach((c) => {
+        const diffPre = el("pre", { className: "diff" });
+        diffPre.style.display = "none";
+        const line = el("div", {
+          className: "commit",
+          textContent:
+            c.date.slice(0, 10) + "  " + c.subject,
+        });
+        line.addEventListener("click", async () => {
+          if (diffPre.style.display === "none") {
+            if (!diffPre.dataset.loaded) {
+              const d = await api(
+                "GET", `/api/settings/history/${c.commit}`
+              );
+              diffPre.textContent = d.data.diff || "(empty)";
+              diffPre.dataset.loaded = "1";
+            }
+            diffPre.style.display = "block";
+          } else {
+            diffPre.style.display = "none";
+          }
+        });
+        body.appendChild(line);
+        body.appendChild(diffPre);
+      });
+    });
+    return det;
+  }
+
+  function capital(s) {
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+
+  async function load() {
+    const res = await api("GET", "/api/settings/state");
+    if (res.status !== 200) {
+      root.textContent = "Failed to load settings.";
+      return;
+    }
+    const s = res.data;
+    root.innerHTML = "";
+    ["rules", "values", "observations"].forEach((n) => {
+      root.appendChild(docSection(n, s.docs[n]));
+    });
+    root.appendChild(fuzzySection(s.fuzzy));
+    root.appendChild(conversationsSection(s.conversations));
+    root.appendChild(deferralSection(s.deferral_counts));
+    if (s.legacy_memories_present) {
+      root.appendChild(legacySection());
+    }
+    root.appendChild(historySection());
+  }
+
+  const vLabel = document.getElementById("version-label");
+  if (vLabel && vLabel.dataset.v) {
+    vLabel.textContent = vLabel.dataset.v;
+  }
+
+  load();
+</script>
+</body>
+</html>
