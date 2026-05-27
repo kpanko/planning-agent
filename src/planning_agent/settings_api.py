@@ -107,7 +107,13 @@ class FuzzyUpdate(BaseModel):
 
 
 def _has_legacy_memories(data_dir: Path) -> bool:
-    """True if memories.json exists and contains entries."""
+    """True if memories.json exists and contains entries.
+
+    storage._ensure_data_dir always seeds an empty
+    memories.json ("[]"), so a plain .exists() check would
+    always be True. We flag the legacy file only when it
+    actually holds entries.
+    """
     path = data_dir / "memories.json"
     if not path.exists():
         return False
