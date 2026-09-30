@@ -73,16 +73,16 @@ def _default_models() -> tuple[str, str]:
     )
 
     if has_anthropic:
-        main = "anthropic:claude-opus-4-6"
-        extraction = "anthropic:claude-opus-4-6"
+        main = "anthropic:claude-opus-5-5"
+        extraction = "anthropic:claude-opus-5-5"
     elif has_openai:
         main = "openai:gpt-5.4"
         extraction = "openai:gpt-5.4"
     else:
         # Fall back to Anthropic; will error at
         # runtime if no key is provided.
-        main = "anthropic:claude-opus-4-6"
-        extraction = "anthropic:claude-opus-4-6"
+        main = "anthropic:claude-opus-5-5"
+        extraction = "anthropic:claude-opus-5-5"
 
     return main, extraction
 
