@@ -234,6 +234,9 @@ def create_today_agent(
         model_settings=AnthropicModelSettings(
             anthropic_cache_instructions=True,
             anthropic_cache_messages=True,
+            # Opus 5.5 defaults to medium; keep the depth we had
+            # on Opus 4.6, whose default was high.
+            anthropic_effort="high",
         ),
     )
 

@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from typing import Any
 
 from pydantic import BaseModel, Field
-from pydantic_ai import Agent
+from pydantic_ai import Agent, NativeOutput
+from pydantic_ai.messages import ModelResponse, ThinkingPart
+from pydantic_ai.models.anthropic import AnthropicModelSettings
 
 from planning_context.conversations import save_summary
 from planning_context.observations import write_observations
@@ -79,10 +82,37 @@ Todoist tasks. Do not invent rules the user did not state.\
 
 
 def _make_extraction_agent() -> Agent[None, ExtractionResult]:
+    # NativeOutput uses the API's JSON-schema output. The default
+    # tool output forces `tool_choice: any`, which Opus 5.5 rejects.
     return Agent(
         EXTRACTION_MODEL,
-        output_type=ExtractionResult,
+        output_type=NativeOutput(ExtractionResult),
+        model_settings=AnthropicModelSettings(
+            anthropic_effort="high",
+        ),
     )
+
+
+def _strip_thinking(message_history: list[Any]) -> list[Any]:
+    """Drop thinking parts from the chat history.
+
+    Thinking blocks are bound to the request that produced them
+    (same system prompt and tools). Extraction replays the chat
+    with a different tool set, so Opus 5.5 would reject them.
+    Extraction only needs the visible conversation.
+    """
+    stripped: list[Any] = []
+    for msg in message_history:
+        if isinstance(msg, ModelResponse):
+            parts = [
+                p for p in msg.parts
+                if not isinstance(p, ThinkingPart)
+            ]
+            if not parts:
+                continue
+            msg = replace(msg, parts=parts)
+        stripped.append(msg)
+    return stripped
 
 
 async def run_extraction(
@@ -100,7 +130,7 @@ async def run_extraction(
         extraction_agent = _make_extraction_agent()
         result = await extraction_agent.run(
             EXTRACTION_PROMPT,
-            message_history=message_history,
+            message_history=_strip_thinking(message_history),
         )
         _apply(result.output)
         logger.info(

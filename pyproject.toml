@@ -55,3 +55,12 @@ dev = [
     "pyright>=1.1",
     "freezegun>=1.5",
 ]
+
+[tool.uv]
+# pydantic-ai passes `httpx` clients to the provider SDKs, but anthropic
+# 1.x and openai 3.x switched to `httpx2` and reject them. pydantic-ai
+# doesn't cap these itself, so cap them here until it catches up.
+constraint-dependencies = [
+    "anthropic<1",
+    "openai<3",
+]
