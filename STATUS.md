@@ -1,14 +1,41 @@
 # Status
 
-**Last updated:** 2026-05-25 (session 22)
-**Active work:** None. PR #102 merged (`5fa10d2`) — Sunday
-review polish (curated calendar source + P1 prompt). Fly secret
-`GOOGLE_CALENDAR_ID` set; `.env` updated. CI is `waiting` on
-prod deploy approval. Next is the Sunday-night live test on
-the curated calendar, then the Fly cron redeploy (#57).
+**Last updated:** 2026-09-30 (session 23)
+**Active work:** PR #104 (open), which upgrades the model to Claude
+Opus 5.5. First session after a ~4-month break. Prod was
+unusable for part of that time because the Anthropic API key ran
+out of credits. Credits were topped up this session and `/today`
+works again (still on Opus 4.6 until #104 deploys).
 
 ## Recently Completed
 
+- **PR #104 opened — upgrade to Claude Opus 5.5** (session 23).
+  Default `LLM_MODEL` / `EXTRACTION_MODEL` →
+  `anthropic:claude-opus-5-5`. pydantic-ai 1.68 → 2.31.1
+  (anthropic SDK 0.84 → 0.125). `[tool.uv]
+  constraint-dependencies` caps `anthropic<1` and `openai<3`:
+  those majors moved to `httpx2` and reject the `httpx` clients
+  pydantic-ai passes them. Lift the caps once pydantic-ai
+  supports them. **Extraction bug the upgrade would have
+  caused:** `output_type=ExtractionResult` makes pydantic-ai
+  force `tool_choice: any`, which Opus 5.5 rejects with a 400.
+  `run_extraction` swallows exceptions, so memories would have
+  stopped saving without any visible error. Fixed with
+  `NativeOutput(ExtractionResult)` (JSON-schema output, no
+  tools). pydantic-ai 2.31 still thinks `claude-opus-5*` supports
+  forced tool choice, so don't go back to tool output. Extraction
+  also strips `ThinkingPart`s from the replayed chat: Opus 5.5
+  binds thinking blocks to the producing request's system prompt
+  and tools. `anthropic_effort="high"` on all three agents
+  (5.5 defaults to `medium`). 419 → 421 tests; pyright clean.
+  Not yet verified against the live API.
+- **PR #103 merged — settings screen** (session 22, merge
+  `93e4cbc`). Settings page + nav links; settings JSON API
+  router behind a `require_session_api` dependency; fuzzy
+  list/update, conversation list/delete, `deferrals.all_counts()`;
+  `git_log` / `git_show` history helpers over the data dir;
+  optional commit messages on doc writers. Spec and plan under
+  `docs/superpowers/`.
 - **PR #102 merged — Sunday review polish (#101)** (session 22,
   commit `5fa10d2`). Two bundled changes from the 2026-05-24
   Sunday-review live test, executed via subagent-driven plan
@@ -207,41 +234,35 @@ the curated calendar, then the Fly cron redeploy (#57).
 
 ## In Progress
 
-Nothing.
+- **PR #104 (Opus 5.5 upgrade)** — awaiting review/merge.
 
 ## Next Up
 
-1. **Approve the queued deploy.** Post-merge CI on `main` is
-   `waiting` for the production-environment manual approval
-   (the usual gate). Once approved, deploy ships the curated-
-   calendar reads and the P1 prompt updates to prod.
-2. **Sunday-night live test on the curated calendar.** Drive
-   a real weekly review on prod end-to-end after the deploy.
-   Watch for: the calendar block contains only events from the
-   curated calendar (no "wake up", no random birthdays); the
-   agent does NOT propose to reschedule any P1 task; tiered-
-   horizon placement produces sensible spreads; deferral
-   counter increments. Curating events into the dedicated
-   `GOOGLE_CALENDAR_ID` calendar is now part of the ongoing
-   workflow.
-3. **Nightly job test** — once Sunday review looks good,
-   manually hit `POST /internal/nightly-replan` with
-   `dry_run=true` on prod. Inspect the dry-run output for
-   sensible placements before re-enabling the cron.
-4. **Redeploy the Fly cron Machine (#57)** — last open
-   task in M6. DEPLOY.md has the Fly-secret-based commands.
-   Verify with `flyctl machine status -d` that no token
-   appears in the env block (per DECISIONS.md).
-5. **After #57 lands:** M6 is done. Pick M7 (scheduling
-   pattern learning, #27–#34) or M8 (evaluation suite,
-   #43–#45) as the next milestone.
+1. **Deploy #104 and verify.** First check
+   `flyctl secrets list -a planning-agent` for `LLM_MODEL` /
+   `EXTRACTION_MODEL`: if either is set, it overrides the new
+   default. After deploy, run a short Sunday session, disconnect,
+   and confirm a new conversation summary is written. That shows
+   extraction works on 5.5.
+2. **Sunday-night live test on the curated calendar.** Carried
+   over from session 22; unclear whether it ever ran. Watch for
+   curated-calendar-only events, no P1 reschedule proposals,
+   sensible horizon spreads, deferral counter increments.
+3. **Nightly job: build trust before re-enabling.** The cron is
+   deliberately off because the user doesn't trust the nightly
+   code. Path: run `POST /internal/nightly-replan?dry_run=true`
+   by hand a few times and read the proposed moves; consider
+   #45 (deterministic validity checks on reschedules) as the
+   safety net. Only after that, redeploy the cron (#57).
+4. **Then:** pick M7 (scheduling pattern learning, #27–#34) or
+   M8 (evaluation suite, #43–#45).
 
 ## Blockers / Open Questions
 
-- **Nightly job still disabled in prod.** Cron Machine destroyed;
-  token rotated but Machine not yet redeployed. M-R3 rebuilt the
-  code (now on main), but the redeploy is a separate operational
-  task (#57). DEPLOY.md has the Fly-secret-based commands.
+- **Nightly job disabled in prod, on purpose.** The user
+  doesn't trust the nightly code yet (see Next Up #3). The cron
+  Machine is destroyed and the token rotated; #57 only matters
+  once it's re-enabled.
 - **Todoist API is a persistent source of bugs.** Recurrence
   handling and date interpretation have caused multiple incidents
   (#55, #62). Defensive read-after-write is in place for date
