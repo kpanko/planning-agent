@@ -1,15 +1,19 @@
 # Status
 
 **Last updated:** 2026-09-30 (session 23)
-**Active work:** PR #104 (open), which upgrades the model to Claude
-Opus 5.5. First session after a ~4-month break. Prod was
-unusable for part of that time because the Anthropic API key ran
-out of credits. Credits were topped up this session and `/today`
-works again (still on Opus 4.6 until #104 deploys).
+**Active work:** None. PR #104 (Opus 5.5 upgrade) merged
+(`565c77b`) and deployed; prod `/health` reports `565c77b`.
+No `LLM_MODEL` / `EXTRACTION_MODEL` Fly secrets are set, so prod
+runs on the new `claude-opus-5-5` default. Still to do: a live
+Sunday session to confirm extraction works on 5.5. First
+session after a ~4-month break. Prod was unusable for part of
+that time because the Anthropic API key ran out of credits;
+credits were topped up this session.
 
 ## Recently Completed
 
-- **PR #104 opened — upgrade to Claude Opus 5.5** (session 23).
+- **PR #104 merged + deployed — upgrade to Claude Opus 5.5**
+  (session 23, merge `565c77b`).
   Default `LLM_MODEL` / `EXTRACTION_MODEL` →
   `anthropic:claude-opus-5-5`. pydantic-ai 1.68 → 2.31.1
   (anthropic SDK 0.84 → 0.125). `[tool.uv]
@@ -28,7 +32,8 @@ works again (still on Opus 4.6 until #104 deploys).
   binds thinking blocks to the producing request's system prompt
   and tools. `anthropic_effort="high"` on all three agents
   (5.5 defaults to `medium`). 419 → 421 tests; pyright clean.
-  Not yet verified against the live API.
+  Deploy approved and green. Not yet verified against the
+  live API (see Next Up #1).
 - **PR #103 merged — settings screen** (session 22, merge
   `93e4cbc`). Settings page + nav links; settings JSON API
   router behind a `require_session_api` dependency; fuzzy
@@ -234,16 +239,15 @@ works again (still on Opus 4.6 until #104 deploys).
 
 ## In Progress
 
-- **PR #104 (Opus 5.5 upgrade)** — awaiting review/merge.
+Nothing.
 
 ## Next Up
 
-1. **Deploy #104 and verify.** First check
-   `flyctl secrets list -a planning-agent` for `LLM_MODEL` /
-   `EXTRACTION_MODEL`: if either is set, it overrides the new
-   default. After deploy, run a short Sunday session, disconnect,
-   and confirm a new conversation summary is written. That shows
-   extraction works on 5.5.
+1. **Verify #104 on prod.** Deployed; secrets checked (no model
+   override). Run a short Sunday session, disconnect, and confirm
+   a new conversation summary is written. That shows extraction
+   works on 5.5. Also smoke `/settings` (#103's manual test plan
+   was never ticked off).
 2. **Sunday-night live test on the curated calendar.** Carried
    over from session 22; unclear whether it ever ran. Watch for
    curated-calendar-only events, no P1 reschedule proposals,
